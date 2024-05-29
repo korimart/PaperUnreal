@@ -5,8 +5,65 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Components/DynamicMeshComponent.h"
-#include "GeometryScript/MeshPrimitiveFunctions.h"
 #include "TracingMeshComponent.generated.h"
+
+
+class FTracingMeshEditor
+{
+public:
+	void SetTargetMeshComponent(UDynamicMeshComponent* InTarget)
+	{
+		TargetComponent = InTarget;
+		RebuildMesh();
+	}
+
+	void AddTracingPoint(const AActor* ActorToTrace)
+	{
+		TracePoints.Emplace(ActorToTrace->GetActorLocation(), ActorToTrace->GetActorRightVector());
+		RebuildMesh();
+	}
+
+private:
+	TWeakObjectPtr<UDynamicMeshComponent> TargetComponent;
+
+	struct FTracePoint
+	{
+		FVector Location;
+		FVector RightVector;
+	};
+
+	TArray<FTracePoint> TracePoints;
+
+	void RebuildMesh()
+	{
+		if (!TargetComponent.IsValid())
+		{
+			return;
+		}
+
+		TargetComponent->GetDynamicMesh()->Reset();
+
+		TArray<int> VertexIds;
+		for (const auto& [EachLocation, EachRightVector] : TracePoints)
+		{
+			VertexIds.Add(TargetComponent->GetMesh()->AppendVertex(EachLocation - 50.f * EachRightVector));
+			VertexIds.Add(TargetComponent->GetMesh()->AppendVertex(EachLocation + 50.f * EachRightVector));
+		}
+		
+		for (int32 i = 3; i < VertexIds.Num(); i = i + 2)
+		{
+			const int V0 = VertexIds[i - 3];
+			const int V1 = VertexIds[i - 2];
+			const int V2 = VertexIds[i - 1];
+			const int V3 = VertexIds[i];
+
+			TargetComponent->GetMesh()->AppendTriangle(V0, V1, V2);
+			TargetComponent->GetMesh()->AppendTriangle(V1, V3, V2);
+		}
+
+		TargetComponent->NotifyMeshModified();
+	}
+};
 
 
 UCLASS(meta=(BlueprintSpawnableComponent))
@@ -18,7 +75,7 @@ private:
 	UPROPERTY()
 	UDynamicMeshComponent* DynamicMeshComponent;
 
-	TArray<FTransform> Path;
+	FTracingMeshEditor TracingMeshEditor;
 
 	UTracingMeshComponent()
 	{
@@ -30,46 +87,25 @@ private:
 	{
 		Super::BeginPlay();
 
-		if (GetNetMode() != NM_DedicatedServer)
-		{
-			DynamicMeshComponent = NewObject<UDynamicMeshComponent>(GetOwner(), TEXT("DynamicMeshComponent"));
-			DynamicMeshComponent->SetIsReplicated(false);
-			DynamicMeshComponent->RegisterComponent();
-		}
+		DynamicMeshComponent = NewObject<UDynamicMeshComponent>(GetOwner(), TEXT("DynamicMeshComponent"));
+		DynamicMeshComponent->SetIsReplicated(false);
+		DynamicMeshComponent->RegisterComponent();
+
+		TracingMeshEditor.SetTargetMeshComponent(DynamicMeshComponent);
 	}
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override
 	{
 		Super::EndPlay(EndPlayReason);
 
-		if (IsValid(DynamicMeshComponent))
-		{
-			DynamicMeshComponent->DestroyComponent();
-			DynamicMeshComponent = nullptr;
-		}
+		DynamicMeshComponent->DestroyComponent();
+		DynamicMeshComponent = nullptr;
 	}
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override
 	{
 		Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-		Path.Add(GetOwner()->GetActorTransform());
-
-		const FGeometryScriptPrimitiveOptions PrimitiveOptions
-		{
-			.PolygroupMode = EGeometryScriptPrimitivePolygroupMode::SingleGroup,
-		};
-
-		const TArray<FVector2D> PolygonVertices
-		{
-			{-100.f, 100.f,},
-			{-100.f, -100.f,},
-			{100.f, -100.f,},
-			{100.f, 100.f,},
-		};
-
-		DynamicMeshComponent->GetDynamicMesh()->Reset();
-		UGeometryScriptLibrary_MeshPrimitiveFunctions::AppendSweepPolygon(
-			DynamicMeshComponent->GetDynamicMesh(), PrimitiveOptions, {}, PolygonVertices, Path, false, true);
+		TracingMeshEditor.AddTracingPoint(GetOwner());
 	}
 };
