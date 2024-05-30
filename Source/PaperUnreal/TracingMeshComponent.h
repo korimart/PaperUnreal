@@ -15,8 +15,21 @@ public:
 	{
 		TargetComponent = InTarget;
 		TargetComponent->GetDynamicMesh()->Reset();
-		LastVertexId0 = {};
-		LastVertexId1 = {};
+		TargetComponent->GetMesh()->EnableAttributes();
+		
+		UE::Geometry::FDynamicMeshNormalOverlay* NormalOverlay = TargetComponent->GetMesh()->Attributes()->PrimaryNormals();
+		NormalOverlay->AppendElement(FVector3f::UnitZ());
+		NormalOverlay->AppendElement(FVector3f::UnitZ());
+		NormalOverlay->AppendElement(FVector3f::UnitZ());
+		
+		UE::Geometry::FDynamicMeshUVOverlay* UVOverlay = TargetComponent->GetMesh()->Attributes()->PrimaryUV();
+		UVOverlay->AppendElement({0.f, 0.f});
+		UVOverlay->AppendElement({1.f, 0.f});
+		UVOverlay->AppendElement({0.f, 1.f});
+		UVOverlay->AppendElement({1.f, 1.f});
+		
+		LastVertexId0.Reset();
+		LastVertexId1.Reset();
 	}
 
 	void Trace(const AActor* ActorToTrace)
@@ -59,12 +72,14 @@ private:
 	{
 		if (TargetComponent.IsValid())
 		{
+			FDynamicMesh3* Mesh = TargetComponent->GetMesh();
+
 			const TOptional<int> LastLastVertexId0 = LastVertexId0;
 			const TOptional<int> LastLastVertexId1 = LastVertexId1;
 
 			const auto& [LeftVertexPosition, RightVertexPosition] = TracePoint.MakeVertexPositions();
-			LastVertexId0 = TargetComponent->GetMesh()->AppendVertex(LeftVertexPosition);
-			LastVertexId1 = TargetComponent->GetMesh()->AppendVertex(RightVertexPosition);
+			LastVertexId0 = Mesh->AppendVertex(LeftVertexPosition);
+			LastVertexId1 = Mesh->AppendVertex(RightVertexPosition);
 
 			if (LastLastVertexId0 && LastLastVertexId1)
 			{
@@ -73,8 +88,13 @@ private:
 				const int V2 = *LastVertexId0;
 				const int V3 = *LastVertexId1;
 
-				TargetComponent->GetMesh()->AppendTriangle(V0, V1, V2);
-				TargetComponent->GetMesh()->AppendTriangle(V1, V3, V2);
+				const int Tri0 = Mesh->AppendTriangle(V0, V1, V2);
+				const int Tri1 = Mesh->AppendTriangle(V1, V3, V2);
+
+				Mesh->Attributes()->PrimaryNormals()->SetTriangle(Tri0, {0, 1, 2});
+				Mesh->Attributes()->PrimaryNormals()->SetTriangle(Tri1, {0, 1, 2});
+				Mesh->Attributes()->PrimaryUV()->SetTriangle(Tri0, {0, 1, 2});
+				Mesh->Attributes()->PrimaryUV()->SetTriangle(Tri1, {1, 3, 2});
 			}
 
 			TargetComponent->NotifyMeshModified();
