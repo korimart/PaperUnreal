@@ -14,13 +14,23 @@ public:
 	void SetTargetMeshComponent(UDynamicMeshComponent* InTarget)
 	{
 		TargetComponent = InTarget;
-		RebuildMesh();
+		TargetComponent->GetDynamicMesh()->Reset();
+		LastVertexId0 = {};
+		LastVertexId1 = {};
 	}
 
-	void AddTracingPoint(const AActor* ActorToTrace)
+	void Trace(const AActor* ActorToTrace)
 	{
-		TracePoints.Emplace(ActorToTrace->GetActorLocation(), ActorToTrace->GetActorRightVector());
-		RebuildMesh();
+		static int32 Counter = 0;
+		Counter++;
+		if (Counter % 120 == 0)
+		{
+			ExtrudeMesh({ActorToTrace});
+		}
+		else
+		{
+			ElongateMesh({ActorToTrace});
+		}
 	}
 
 private:
@@ -30,38 +40,56 @@ private:
 	{
 		FVector Location;
 		FVector RightVector;
+
+		FTracePoint(const AActor* Actor)
+			: Location(Actor->GetActorLocation()), RightVector(Actor->GetActorRightVector())
+		{
+		}
+
+		TTuple<FVector, FVector> MakeVertexPositions() const
+		{
+			return MakeTuple(Location - 50.f * RightVector, Location + 50.f * RightVector);
+		}
 	};
 
-	TArray<FTracePoint> TracePoints;
+	TOptional<int> LastVertexId0;
+	TOptional<int> LastVertexId1;
 
-	void RebuildMesh()
+	void ExtrudeMesh(const FTracePoint& TracePoint)
 	{
-		if (!TargetComponent.IsValid())
+		if (TargetComponent.IsValid())
 		{
-			return;
+			const TOptional<int> LastLastVertexId0 = LastVertexId0;
+			const TOptional<int> LastLastVertexId1 = LastVertexId1;
+
+			const auto& [LeftVertexPosition, RightVertexPosition] = TracePoint.MakeVertexPositions();
+			LastVertexId0 = TargetComponent->GetMesh()->AppendVertex(LeftVertexPosition);
+			LastVertexId1 = TargetComponent->GetMesh()->AppendVertex(RightVertexPosition);
+
+			if (LastLastVertexId0 && LastLastVertexId1)
+			{
+				const int V0 = *LastLastVertexId0;
+				const int V1 = *LastLastVertexId1;
+				const int V2 = *LastVertexId0;
+				const int V3 = *LastVertexId1;
+
+				TargetComponent->GetMesh()->AppendTriangle(V0, V1, V2);
+				TargetComponent->GetMesh()->AppendTriangle(V1, V3, V2);
+			}
+
+			TargetComponent->NotifyMeshModified();
 		}
+	}
 
-		TargetComponent->GetDynamicMesh()->Reset();
-
-		TArray<int> VertexIds;
-		for (const auto& [EachLocation, EachRightVector] : TracePoints)
+	void ElongateMesh(const FTracePoint& TracePoint)
+	{
+		if (TargetComponent.IsValid() && LastVertexId0 && LastVertexId1)
 		{
-			VertexIds.Add(TargetComponent->GetMesh()->AppendVertex(EachLocation - 50.f * EachRightVector));
-			VertexIds.Add(TargetComponent->GetMesh()->AppendVertex(EachLocation + 50.f * EachRightVector));
+			const auto& [LeftVertexPosition, RightVertexPosition] = TracePoint.MakeVertexPositions();
+			TargetComponent->GetMesh()->SetVertex(*LastVertexId0, LeftVertexPosition);
+			TargetComponent->GetMesh()->SetVertex(*LastVertexId1, RightVertexPosition);
+			TargetComponent->FastNotifyPositionsUpdated();
 		}
-		
-		for (int32 i = 3; i < VertexIds.Num(); i = i + 2)
-		{
-			const int V0 = VertexIds[i - 3];
-			const int V1 = VertexIds[i - 2];
-			const int V2 = VertexIds[i - 1];
-			const int V3 = VertexIds[i];
-
-			TargetComponent->GetMesh()->AppendTriangle(V0, V1, V2);
-			TargetComponent->GetMesh()->AppendTriangle(V1, V3, V2);
-		}
-
-		TargetComponent->NotifyMeshModified();
 	}
 };
 
@@ -80,7 +108,6 @@ private:
 	UTracingMeshComponent()
 	{
 		PrimaryComponentTick.bCanEverTick = true;
-		PrimaryComponentTick.TickInterval = 1.f / 30.f;
 	}
 
 	virtual void BeginPlay() override
@@ -106,6 +133,6 @@ private:
 	{
 		Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-		TracingMeshEditor.AddTracingPoint(GetOwner());
+		TracingMeshEditor.Trace(GetOwner());
 	}
 };
