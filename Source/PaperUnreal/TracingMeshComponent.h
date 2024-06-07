@@ -35,15 +35,32 @@ public:
 
 	void Trace(const AActor* ActorToTrace)
 	{
-		static int32 Counter = 0;
-		Counter++;
-		if (Counter % 120 == 0)
+		const FTracePoint TracePoint{ActorToTrace};
+
+		if (!LastTracePoint && !LastLastTracePoint)
 		{
-			ExtrudeMesh({ActorToTrace});
+			ExtrudeMesh(TracePoint);
+			return;
+		}
+
+		if (LastTracePoint && *LastTracePoint == TracePoint)
+		{
+			return;
+		}
+
+		const FVector Direction0 = LastLastTracePoint
+			? LastTracePoint->Location - LastLastTracePoint->Location : LastTracePoint->ForwardVector;
+		const FVector Direction1 = TracePoint.Location - LastTracePoint->Location;
+		const float Angle = FMath::RadiansToDegrees(FMath::Acos(Direction0.CosineAngle2D(Direction1)));
+		UE_LOG(LogTemp, Warning, TEXT("%f"), Angle);
+
+		if (Angle < 10.f)
+		{
+			ElongateMesh(TracePoint);
 		}
 		else
 		{
-			ElongateMesh({ActorToTrace});
+			ExtrudeMesh(TracePoint);
 		}
 	}
 
@@ -53,21 +70,35 @@ private:
 	struct FTracePoint
 	{
 		FVector Location;
+		FVector ForwardVector;
 		FVector RightVector;
 
 		FTracePoint(const AActor* Actor)
-			: Location(Actor->GetActorLocation()), RightVector(Actor->GetActorRightVector())
+			: Location(Actor->GetActorLocation())
 		{
+			ForwardVector = Actor->GetActorForwardVector();
+			ForwardVector.Z = 0.f;
+			ForwardVector.Normalize();
+			
+			RightVector = FVector::UnitZ().Cross(ForwardVector);
 		}
 
 		TTuple<FVector, FVector> MakeVertexPositions() const
 		{
 			return MakeTuple(Location - 50.f * RightVector, Location + 50.f * RightVector);
 		}
+
+		friend bool operator==(const FTracePoint& Left, const FTracePoint& Right)
+		{
+			return Left.Location == Right.Location;
+		}
 	};
 
 	TOptional<int> LastVertexId0;
 	TOptional<int> LastVertexId1;
+
+	TOptional<FTracePoint> LastLastTracePoint;
+	TOptional<FTracePoint> LastTracePoint;
 
 	void ExtrudeMesh(const FTracePoint& TracePoint)
 	{
@@ -99,6 +130,9 @@ private:
 			}
 
 			TargetComponent->NotifyMeshModified();
+			
+			LastLastTracePoint = LastTracePoint;
+			LastTracePoint = TracePoint;
 		}
 	}
 
