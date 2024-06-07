@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Components/DynamicMeshComponent.h"
+#include "Engine/AssetManager.h"
 #include "TracingMeshComponent.generated.h"
 
 
@@ -120,6 +121,9 @@ class UTracingMeshComponent : public UActorComponent
 	GENERATED_BODY()
 
 private:
+	UPROPERTY(EditAnywhere)
+	TSoftObjectPtr<UMaterialInstance> TraceMaterial;
+	
 	UPROPERTY()
 	UDynamicMeshComponent* DynamicMeshComponent;
 
@@ -137,8 +141,14 @@ private:
 		DynamicMeshComponent = NewObject<UDynamicMeshComponent>(GetOwner(), TEXT("DynamicMeshComponent"));
 		DynamicMeshComponent->SetIsReplicated(false);
 		DynamicMeshComponent->RegisterComponent();
-
+		
 		TracingMeshEditor.SetTargetMeshComponent(DynamicMeshComponent);
+
+		UAssetManager::GetStreamableManager().RequestAsyncLoad(TraceMaterial.ToSoftObjectPath(),
+			FStreamableDelegate::CreateWeakLambda(this, [this]()
+		{
+			DynamicMeshComponent->ConfigureMaterialSet({ TraceMaterial.Get() });
+		}));
 	}
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override
