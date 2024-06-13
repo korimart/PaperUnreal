@@ -202,11 +202,12 @@ private:
 
 		TracingMeshEditor.SetTargetMeshComponent(DynamicMeshComponent);
 
-		UAssetManager::GetStreamableManager().RequestAsyncLoad(TraceMaterial.ToSoftObjectPath(),
-		                                                       FStreamableDelegate::CreateWeakLambda(this, [this]()
-		                                                       {
-			                                                       DynamicMeshComponent->ConfigureMaterialSet({TraceMaterial.Get()});
-		                                                       }));
+		UAssetManager::GetStreamableManager().RequestAsyncLoad(
+			TraceMaterial.ToSoftObjectPath(),
+			FStreamableDelegate::CreateWeakLambda(this, [this]()
+			{
+				DynamicMeshComponent->ConfigureMaterialSet({TraceMaterial.Get()});
+			}));
 	}
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override
