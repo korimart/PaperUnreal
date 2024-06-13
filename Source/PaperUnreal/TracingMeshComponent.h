@@ -17,18 +17,18 @@ public:
 		TargetComponent = InTarget;
 		TargetComponent->GetDynamicMesh()->Reset();
 		TargetComponent->GetMesh()->EnableAttributes();
-		
+
 		UE::Geometry::FDynamicMeshNormalOverlay* NormalOverlay = TargetComponent->GetMesh()->Attributes()->PrimaryNormals();
 		NormalOverlay->AppendElement(FVector3f::UnitZ());
 		NormalOverlay->AppendElement(FVector3f::UnitZ());
 		NormalOverlay->AppendElement(FVector3f::UnitZ());
-		
+
 		UE::Geometry::FDynamicMeshUVOverlay* UVOverlay = TargetComponent->GetMesh()->Attributes()->PrimaryUV();
 		UVOverlay->AppendElement({0.f, 0.f});
 		UVOverlay->AppendElement({1.f, 0.f});
 		UVOverlay->AppendElement({0.f, 1.f});
 		UVOverlay->AppendElement({1.f, 1.f});
-		
+
 		LastVertexId0.Reset();
 		LastVertexId1.Reset();
 	}
@@ -37,30 +37,55 @@ public:
 	{
 		const FTracePoint TracePoint{ActorToTrace};
 
-		if (!LastTracePoint && !LastLastTracePoint)
+		if (!LastTracePoint)
 		{
 			ExtrudeMesh(TracePoint);
 			return;
 		}
 
-		if (LastTracePoint && *LastTracePoint == TracePoint)
+		if (*LastTracePoint == TracePoint)
 		{
 			return;
 		}
 
-		const FVector Direction0 = LastLastTracePoint
-			? LastTracePoint->Location - LastLastTracePoint->Location : LastTracePoint->ForwardVector;
-		const FVector Direction1 = TracePoint.Location - LastTracePoint->Location;
-		const float Angle = FMath::RadiansToDegrees(FMath::Acos(Direction0.CosineAngle2D(Direction1)));
-		UE_LOG(LogTemp, Warning, TEXT("%f"), Angle);
-
-		if (Angle < 10.f)
+		if (!LastLastTracePoint)
 		{
-			ElongateMesh(TracePoint);
+			ExtrudeMesh(TracePoint);
+			return;
+		}
+
+		const float Curvature = [&]()
+		{
+			const FVector& Position0 = LastLastTracePoint->Location;
+			const FVector& Position1 = LastTracePoint->Location;
+			const FVector& Position2 = TracePoint.Location;
+
+			const float ASideLength = (Position1 - Position2).Length();
+			const float BSideLength = (Position0 - Position2).Length();
+			const float CSideLength = (Position0 - Position1).Length();
+
+			const float TriangleArea = 0.5f * FMath::Abs(
+				Position0.X * (Position1.Y - Position2.Y)
+				+ Position1.X * (Position2.Y - Position0.Y)
+				+ Position2.X * (Position0.Y - Position1.Y));
+
+			return 4.f * TriangleArea / ASideLength / BSideLength / CSideLength;
+		}();
+
+		const float CurrentDeviation = [&]()
+		{
+			const FVector D = TracePoint.Location - LastTracePoint->Location;
+			const FVector Proj = D.ProjectOnToNormal(LastTracePoint->ForwardVector);
+			return (D - Proj).Length();
+		}();
+
+		if (Curvature > 0.005f || CurrentDeviation > 10.f)
+		{
+			ExtrudeMesh(TracePoint);
 		}
 		else
 		{
-			ExtrudeMesh(TracePoint);
+			ElongateMesh(TracePoint);
 		}
 	}
 
@@ -79,7 +104,7 @@ private:
 			ForwardVector = Actor->GetActorForwardVector();
 			ForwardVector.Z = 0.f;
 			ForwardVector.Normalize();
-			
+
 			RightVector = FVector::UnitZ().Cross(ForwardVector);
 		}
 
@@ -130,7 +155,7 @@ private:
 			}
 
 			TargetComponent->NotifyMeshModified();
-			
+
 			LastLastTracePoint = LastTracePoint;
 			LastTracePoint = TracePoint;
 		}
@@ -157,7 +182,7 @@ class UTracingMeshComponent : public UActorComponent
 private:
 	UPROPERTY(EditAnywhere)
 	TSoftObjectPtr<UMaterialInstance> TraceMaterial;
-	
+
 	UPROPERTY()
 	UDynamicMeshComponent* DynamicMeshComponent;
 
@@ -175,14 +200,14 @@ private:
 		DynamicMeshComponent = NewObject<UDynamicMeshComponent>(GetOwner(), TEXT("DynamicMeshComponent"));
 		DynamicMeshComponent->SetIsReplicated(false);
 		DynamicMeshComponent->RegisterComponent();
-		
+
 		TracingMeshEditor.SetTargetMeshComponent(DynamicMeshComponent);
 
 		UAssetManager::GetStreamableManager().RequestAsyncLoad(TraceMaterial.ToSoftObjectPath(),
-			FStreamableDelegate::CreateWeakLambda(this, [this]()
-		{
-			DynamicMeshComponent->ConfigureMaterialSet({ TraceMaterial.Get() });
-		}));
+		                                                       FStreamableDelegate::CreateWeakLambda(this, [this]()
+		                                                       {
+			                                                       DynamicMeshComponent->ConfigureMaterialSet({TraceMaterial.Get()});
+		                                                       }));
 	}
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override
