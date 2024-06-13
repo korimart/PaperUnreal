@@ -174,7 +174,7 @@ private:
 };
 
 
-UCLASS(meta=(BlueprintSpawnableComponent))
+UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class UTracingMeshComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -198,7 +198,6 @@ private:
 		Super::BeginPlay();
 
 		DynamicMeshComponent = NewObject<UDynamicMeshComponent>(GetOwner(), TEXT("DynamicMeshComponent"));
-		DynamicMeshComponent->SetIsReplicated(false);
 		DynamicMeshComponent->RegisterComponent();
 
 		TracingMeshEditor.SetTargetMeshComponent(DynamicMeshComponent);
