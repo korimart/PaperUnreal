@@ -3,6 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "SegmentArray.h"
+#include "Algo/AllOf.h"
 #include "Components/ActorComponent.h"
 #include "Components/DynamicMeshComponent.h"
 #include "GeometryScript/MeshPrimitiveFunctions.h"
@@ -15,66 +17,61 @@
 class FPolygonBoundary2D
 {
 public:
+	struct FSegment
+	{
+		int32 StartPointIndex;
+		int32 EndPointIndex;
+	};
+	
 	struct FIntersection
 	{
-		int32 SegmentStartIndex;
-		FVector2D ExactPosition;
+		FSegment HitSegment;
+		FVector2D PointOfIntersection;
 	};
-
-	bool IsValid() const
-	{
-		return Points.Num() >= 3;
-	}
 
 	bool IsInside(const FVector2D& Point) const
 	{
-		if (!IsValid())
+		if (!Segments.IsValid())
 		{
 			return false;
 		}
 
-		const auto IsPointToTheLeftOfLine = [](
-			const FVector2D& PointOnLine0,
-			const FVector2D& PointOnLine1,
-			const FVector2D& Point)
+		const auto IsSegmentToTheRightOfPoint = [&](const std::tuple<FVector2D, FVector2D>& SegmentEnds)
 		{
-			const FVector2D Line = PointOnLine1 - PointOnLine0;
-			const FVector2D ToPoint = Point - PointOnLine0;
-			const float CrossProduct = FVector2D::CrossProduct(Line, ToPoint);
-			return CrossProduct < 0.f;
+			const FVector2D Line = std::get<1>(SegmentEnds) - std::get<0>(SegmentEnds);
+			const FVector2D ToPoint = Point - std::get<0>(SegmentEnds);
+			const double CrossProduct = FVector2D::CrossProduct(Line, ToPoint);
+			return CrossProduct < 0.;
 		};
 
-		return AreAllOfSegments([&](const FVector2D& Start, const FVector2D& End)
-		{
-			return IsPointToTheLeftOfLine(Start, End, Point);
-		});
+		return Algo::AllOf(Segments, IsSegmentToTheRightOfPoint);
 	}
 
-	TOptional<FIntersection> DoesSegmentIntersect(const FVector2D& TargetSegmentStart, const FVector2D& TargetSegmentEnd) const
+	TOptional<FIntersection> FindIntersectionWithSegment(const FVector2D& SegmentStart, const FVector2D& SegmentEnd) const
 	{
-		if (!IsValid())
+		if (!Segments.IsValid())
 		{
 			return {};
 		}
 
-		FVector Intersection;
-		int32 Index = -1;
-		if (IsAnyOfSegments([&](const FVector2D& EachStart, const FVector2D& EachEnd)
+		for (auto [It, End] = std::tuple{Segments.begin(), Segments.end()}; It != End; ++It)
 		{
-			Index++;
-			return FMath::SegmentIntersection2D(
-				FVector{TargetSegmentStart, 0.f},
-				FVector{TargetSegmentEnd, 0.f},
-				FVector{EachStart, 0.f},
-				FVector{EachEnd, 0.f},
-				Intersection);
-		}))
-		{
-			FIntersection Ret;
-			Ret.ExactPosition.X = Intersection.X;
-			Ret.ExactPosition.Y = Intersection.Y;
-			Ret.SegmentStartIndex = Index;
-			return Ret;
+			const auto [EachSegmentStart, EachSegmentEnd] = *It;
+			
+			FVector Intersection;
+			if (FMath::SegmentIntersection2D(
+				FVector{SegmentStart, 0.f},
+				FVector{SegmentEnd, 0.f},
+				FVector{EachSegmentStart, 0.f},
+				FVector{EachSegmentEnd, 0.f},
+				Intersection))
+			{
+				FIntersection Ret;
+				Ret.HitSegment.StartPointIndex = It.GetStartPointIndex();
+				Ret.HitSegment.EndPointIndex = It.GetEndPointIndex();
+				Ret.PointOfIntersection = FVector2D{Intersection};
+				return Ret;
+			}
 		}
 
 		return {};
@@ -82,16 +79,14 @@ public:
 
 	void Replace(int32 FirstIndex, int32 LastIndex, const TArray<FVector2D>& NewPoints)
 	{
-		const int32 Count = FMath::Min(LastIndex - FirstIndex + 1, Points.Num());
-		Points.RemoveAt(FirstIndex, Count);
-		Points.Insert(NewPoints, FirstIndex);
+		Segments.ReplacePoints(FirstIndex, LastIndex, NewPoints);
 	}
 
 	void SetSelfInDynamicMesh(UDynamicMesh* DynamicMesh) const
 	{
 		DynamicMesh->Reset();
-		
-		if (!IsValid())
+
+		if (!Segments.IsValid())
 		{
 			return;
 		}
@@ -102,7 +97,7 @@ public:
 			DynamicMesh,
 			{},
 			FTransform{FVector{0.f, 0.f, 100.f}},
-			Points,
+			Segments.GetPoints(),
 			{},
 			{},
 			PositionsToVertexIds,
@@ -110,44 +105,7 @@ public:
 	}
 
 private:
-	TArray<FVector2D> Points;
-
-	template <typename FuncType>
-	TOptional<int32> ForEachSegment(FuncType&& Func) const
-	{
-		for (int32 i = 0; i < Points.Num() - 1; i++)
-		{
-			if (!Func(Points[i], Points[i + 1]))
-			{
-				return i;
-			}
-		}
-
-		if (!Func(Points.Last(), Points[0]))
-		{
-			return Points.Num() - 1;
-		}
-
-		return {};
-	}
-
-	template <typename FuncType>
-	bool AreAllOfSegments(FuncType&& Func) const
-	{
-		return !ForEachSegment([&](const FVector2D& Start, const FVector2D& End)
-		{
-			return Func(Start, End);
-		});
-	}
-
-	template <typename FuncType>
-	bool IsAnyOfSegments(FuncType&& Func) const
-	{
-		return !!ForEachSegment([&](const FVector2D& Start, const FVector2D& End)
-		{
-			return !Func(Start, End);
-		});
-	}
+	FLoopedSegmentArray2D Segments;
 };
 
 
@@ -185,7 +143,7 @@ private:
 		const TArray<FVector2D> VertexPositions = [&]()
 		{
 			const FTransform Transform{FQuat{}, GetOwner()->GetActorLocation(), FVector{100.f}};
-			
+
 			TArray<FVector2D> Ret;
 			for (int32 AngleStep = 0; AngleStep < 16; AngleStep++)
 			{
