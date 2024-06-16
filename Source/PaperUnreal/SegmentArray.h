@@ -19,6 +19,23 @@ public:
 		return Points;
 	}
 
+	int32 PointCount() const
+	{
+		return Points.Num();
+	}
+
+	FVector2D GetLastPoint(int32 IndexFromLast = 0) const
+	{
+		return Points[Points.Num() - IndexFromLast - 1];
+	}
+
+	FVector2D GetLastSegmentDirection(int32 IndexFromLast = 0) const
+	{
+		const FVector2D Position0 = GetLastPoint(IndexFromLast + 1);
+		const FVector2D Position1 = GetLastPoint(IndexFromLast);
+		return (Position1 - Position0).GetSafeNormal();
+	}
+
 	bool IsValid() const
 	{
 		if constexpr (bLoop)
@@ -28,12 +45,27 @@ public:
 
 		return Points.Num() >= 2;
 	}
+	
+	void AddPoint(const FVector2D& Position)
+	{
+		Points.Add(Position);
+	}
+
+	void SetLastPoint(const FVector2D& NewPosition)
+	{
+		Points.Last() = NewPosition;
+	}
 
 	void ReplacePoints(int32 FirstIndex, int32 LastIndex, const TArray<FVector2D>& NewPoints)
 	{
 		const int32 Count = FMath::Min(LastIndex - FirstIndex + 1, Points.Num());
 		Points.RemoveAt(FirstIndex, Count);
 		Points.Insert(NewPoints, FirstIndex);
+	}
+	
+	void Empty()
+	{
+		Points.Empty();
 	}
 
 	class FSegmentConstIterator

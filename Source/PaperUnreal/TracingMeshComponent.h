@@ -3,10 +3,48 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "SegmentArray.h"
 #include "Components/ActorComponent.h"
 #include "Components/DynamicMeshComponent.h"
 #include "Engine/AssetManager.h"
 #include "TracingMeshComponent.generated.h"
+
+
+class FDynamicMeshSegment2D
+{
+public:
+	void SetDynamicMesh(UDynamicMesh* InDynamicMesh)
+	{
+		DynamicMesh = InDynamicMesh;
+		Segments.Empty();
+		DynamicMeshVertexIndices.Empty();
+	}
+
+	void AddVertex(const FVector2D& Position)
+	{
+		Segments.AddPoint(Position);
+		DynamicMeshVertexIndices.Push(DynamicMesh->GetMeshRef().AppendVertex(FVector{Position, 50.f}));
+	}
+
+	void SetLastVertexPosition(const FVector2D& NewPosition)
+	{
+		if (!DynamicMeshVertexIndices.IsEmpty())
+		{
+			Segments.SetLastPoint(NewPosition);
+			DynamicMesh->GetMeshRef().SetVertex(DynamicMeshVertexIndices.Last(), FVector{NewPosition, 50.f});
+		}
+	}
+
+	int GetLastVertexDynamicIndex(int32 IndexFromLast = 0) const
+	{
+		return DynamicMeshVertexIndices[DynamicMeshVertexIndices.Num() - IndexFromLast - 1];
+	}
+	
+private:
+	FSegmentArray2D Segments;
+	TWeakObjectPtr<UDynamicMesh> DynamicMesh;
+	TArray<int> DynamicMeshVertexIndices;
+};
 
 
 class FTracingMeshEditor
@@ -29,36 +67,42 @@ public:
 		UVOverlay->AppendElement({0.f, 1.f});
 		UVOverlay->AppendElement({1.f, 1.f});
 
-		LastVertexId0.Reset();
-		LastVertexId1.Reset();
+		CenterSegments.Empty();
+		LeftSegments.SetDynamicMesh(InTarget->GetDynamicMesh());
+		RightSegments.SetDynamicMesh(InTarget->GetDynamicMesh());
 	}
 
 	void Trace(const AActor* ActorToTrace)
 	{
-		const FTracePoint TracePoint{ActorToTrace};
-
-		if (!LastTracePoint)
-		{
-			ExtrudeMesh(TracePoint);
-			return;
-		}
-
-		if (*LastTracePoint == TracePoint)
+		if (!TargetComponent.IsValid())
 		{
 			return;
 		}
 
-		if (!LastLastTracePoint)
+		if (CenterSegments.PointCount() == 0)
 		{
-			ExtrudeMesh(TracePoint);
+			ExtrudeMesh(ActorToTrace);
+			return;
+		}
+
+		const FVector2D ActorLocation2D{ActorToTrace->GetActorLocation()};
+
+		if (CenterSegments.GetLastPoint().Equals(ActorLocation2D))
+		{
+			return;
+		}
+
+		if (CenterSegments.PointCount() < 3)
+		{
+			ExtrudeMesh(ActorToTrace);
 			return;
 		}
 
 		const float Curvature = [&]()
 		{
-			const FVector& Position0 = LastLastTracePoint->Location;
-			const FVector& Position1 = LastTracePoint->Location;
-			const FVector& Position2 = TracePoint.Location;
+			const FVector2D& Position0 = CenterSegments.GetLastPoint(1);
+			const FVector2D& Position1 = CenterSegments.GetLastPoint();
+			const FVector2D& Position2 = ActorLocation2D;
 
 			const float ASideLength = (Position1 - Position2).Length();
 			const float BSideLength = (Position0 - Position2).Length();
@@ -74,102 +118,73 @@ public:
 
 		const float CurrentDeviation = [&]()
 		{
-			const FVector D = TracePoint.Location - LastTracePoint->Location;
-			const FVector Proj = D.ProjectOnToNormal(LastTracePoint->ForwardVector);
-			return (D - Proj).Length();
+			const FVector2D DeviatingVector = ActorLocation2D - CenterSegments.GetLastPoint(1);
+			const FVector2D StraightVector = CenterSegments.GetLastSegmentDirection(1);
+			const FVector2D Proj = StraightVector * DeviatingVector.Dot(StraightVector);
+			return (DeviatingVector - Proj).Length();
 		}();
 
 		if (Curvature > 0.005f || CurrentDeviation > 10.f)
 		{
-			ExtrudeMesh(TracePoint);
+			ExtrudeMesh(ActorToTrace);
 		}
 		else
 		{
-			ElongateMesh(TracePoint);
+			ElongateMesh(ActorToTrace);
 		}
 	}
 
 private:
 	TWeakObjectPtr<UDynamicMeshComponent> TargetComponent;
+	FDynamicMeshSegment2D LeftSegments;
+	FSegmentArray2D CenterSegments;
+	FDynamicMeshSegment2D RightSegments;
 
-	struct FTracePoint
+	void ExtrudeMesh(const AActor* ActorToTrace)
 	{
-		FVector Location;
-		FVector ForwardVector;
-		FVector RightVector;
+		const auto [Left, Center, Right] = CreateVertexPositions(ActorToTrace);
+		LeftSegments.AddVertex(Left);
+		CenterSegments.AddPoint(Center);
+		RightSegments.AddVertex(Right);
 
-		FTracePoint(const AActor* Actor)
-			: Location(Actor->GetActorLocation())
+		if (CenterSegments.PointCount() >= 2)
 		{
-			ForwardVector = Actor->GetActorForwardVector();
-			ForwardVector.Z = 0.f;
-			ForwardVector.Normalize();
+			const int V0 = LeftSegments.GetLastVertexDynamicIndex(1);
+			const int V1 = RightSegments.GetLastVertexDynamicIndex(1);
+			const int V2 = LeftSegments.GetLastVertexDynamicIndex();
+			const int V3 = RightSegments.GetLastVertexDynamicIndex();
 
-			RightVector = FVector::UnitZ().Cross(ForwardVector);
-		}
-
-		TTuple<FVector, FVector> MakeVertexPositions() const
-		{
-			return MakeTuple(Location - 50.f * RightVector, Location + 50.f * RightVector);
-		}
-
-		friend bool operator==(const FTracePoint& Left, const FTracePoint& Right)
-		{
-			return Left.Location == Right.Location;
-		}
-	};
-
-	TOptional<int> LastVertexId0;
-	TOptional<int> LastVertexId1;
-
-	TOptional<FTracePoint> LastLastTracePoint;
-	TOptional<FTracePoint> LastTracePoint;
-
-	void ExtrudeMesh(const FTracePoint& TracePoint)
-	{
-		if (TargetComponent.IsValid())
-		{
 			FDynamicMesh3* Mesh = TargetComponent->GetMesh();
 
-			const TOptional<int> LastLastVertexId0 = LastVertexId0;
-			const TOptional<int> LastLastVertexId1 = LastVertexId1;
+			const int Tri0 = Mesh->AppendTriangle(V0, V1, V2);
+			const int Tri1 = Mesh->AppendTriangle(V1, V3, V2);
 
-			const auto& [LeftVertexPosition, RightVertexPosition] = TracePoint.MakeVertexPositions();
-			LastVertexId0 = Mesh->AppendVertex(LeftVertexPosition);
-			LastVertexId1 = Mesh->AppendVertex(RightVertexPosition);
+			Mesh->Attributes()->PrimaryNormals()->SetTriangle(Tri0, {0, 1, 2});
+			Mesh->Attributes()->PrimaryNormals()->SetTriangle(Tri1, {0, 1, 2});
+			Mesh->Attributes()->PrimaryUV()->SetTriangle(Tri0, {0, 1, 2});
+			Mesh->Attributes()->PrimaryUV()->SetTriangle(Tri1, {1, 3, 2});
+		}
 
-			if (LastLastVertexId0 && LastLastVertexId1)
-			{
-				const int V0 = *LastLastVertexId0;
-				const int V1 = *LastLastVertexId1;
-				const int V2 = *LastVertexId0;
-				const int V3 = *LastVertexId1;
+		TargetComponent->NotifyMeshModified();
+	}
 
-				const int Tri0 = Mesh->AppendTriangle(V0, V1, V2);
-				const int Tri1 = Mesh->AppendTriangle(V1, V3, V2);
-
-				Mesh->Attributes()->PrimaryNormals()->SetTriangle(Tri0, {0, 1, 2});
-				Mesh->Attributes()->PrimaryNormals()->SetTriangle(Tri1, {0, 1, 2});
-				Mesh->Attributes()->PrimaryUV()->SetTriangle(Tri0, {0, 1, 2});
-				Mesh->Attributes()->PrimaryUV()->SetTriangle(Tri1, {1, 3, 2});
-			}
-
-			TargetComponent->NotifyMeshModified();
-
-			LastLastTracePoint = LastTracePoint;
-			LastTracePoint = TracePoint;
+	void ElongateMesh(const AActor* ActorToTrace)
+	{
+		if (CenterSegments.PointCount() > 0)
+		{
+			const auto [Left, Center, Right] = CreateVertexPositions(ActorToTrace);
+			LeftSegments.SetLastVertexPosition(Left);
+			CenterSegments.SetLastPoint(Center);
+			RightSegments.SetLastVertexPosition(Right);
+			TargetComponent->FastNotifyPositionsUpdated();
 		}
 	}
 
-	void ElongateMesh(const FTracePoint& TracePoint)
+	static std::tuple<FVector2D, FVector2D, FVector2D> CreateVertexPositions(const AActor* ActorToTrace)
 	{
-		if (TargetComponent.IsValid() && LastVertexId0 && LastVertexId1)
-		{
-			const auto& [LeftVertexPosition, RightVertexPosition] = TracePoint.MakeVertexPositions();
-			TargetComponent->GetMesh()->SetVertex(*LastVertexId0, LeftVertexPosition);
-			TargetComponent->GetMesh()->SetVertex(*LastVertexId1, RightVertexPosition);
-			TargetComponent->FastNotifyPositionsUpdated();
-		}
+		const FVector2D ActorLocation2D{ActorToTrace->GetActorLocation()};
+		const FVector2D ActorRight2D = FVector2D{ActorToTrace->GetActorRightVector()}.GetSafeNormal();
+		return {ActorLocation2D - 50.f * ActorRight2D, ActorLocation2D, ActorLocation2D + 50.f * ActorRight2D};
 	}
 };
 
