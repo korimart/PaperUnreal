@@ -23,6 +23,7 @@ public:
 	void AddVertex(const FVector2D& Position)
 	{
 		Segments.AddPoint(Position);
+		// TODO 50 조절 가능하게
 		DynamicMeshVertexIndices.Push(DynamicMesh->GetMeshRef().AppendVertex(FVector{Position, 50.f}));
 	}
 
@@ -31,6 +32,7 @@ public:
 		if (!DynamicMeshVertexIndices.IsEmpty())
 		{
 			Segments.SetLastPoint(NewPosition);
+			// TODO 50 조절 가능하게
 			DynamicMesh->GetMeshRef().SetVertex(DynamicMeshVertexIndices.Last(), FVector{NewPosition, 50.f});
 		}
 	}
@@ -50,12 +52,19 @@ private:
 class FTracingMeshEditor
 {
 public:
+	static std::tuple<FVector2D, FVector2D, FVector2D> CreateVertexPositions(const AActor* ActorToTrace)
+	{
+		const FVector2D ActorLocation2D{ActorToTrace->GetActorLocation()};
+		const FVector2D ActorRight2D = FVector2D{ActorToTrace->GetActorRightVector()}.GetSafeNormal();
+		return {ActorLocation2D - 50.f * ActorRight2D, ActorLocation2D, ActorLocation2D + 50.f * ActorRight2D};
+	}
+
 	FTracingMeshEditor(UDynamicMeshComponent* InTargetComponent)
 		: TargetComponent(InTargetComponent)
 	{
 		Reset();
 	}
-	
+
 	void Reset()
 	{
 		TargetComponent->GetDynamicMesh()->Reset();
@@ -183,13 +192,6 @@ private:
 			TargetComponent->FastNotifyPositionsUpdated();
 		}
 	}
-
-	static std::tuple<FVector2D, FVector2D, FVector2D> CreateVertexPositions(const AActor* ActorToTrace)
-	{
-		const FVector2D ActorLocation2D{ActorToTrace->GetActorLocation()};
-		const FVector2D ActorRight2D = FVector2D{ActorToTrace->GetActorRightVector()}.GetSafeNormal();
-		return {ActorLocation2D - 50.f * ActorRight2D, ActorLocation2D, ActorLocation2D + 50.f * ActorRight2D};
-	}
 };
 
 
@@ -199,7 +201,7 @@ class UTracingMeshComponent : public UActorComponent
 	GENERATED_BODY()
 
 public:
-	void SetDrawingEnabled(bool bEnabled)
+	void SetTracingEnabled(bool bEnabled)
 	{
 		if (bEnabled && !TracingMeshEditor)
 		{
@@ -209,6 +211,22 @@ public:
 		{
 			TracingMeshEditor.Reset();
 		}
+	}
+
+	bool IsTracing() const
+	{
+		return !!TracingMeshEditor;
+	}
+
+	std::tuple<FVector, FVector, FVector> GetTracerWouldBePoints(const AActor* Actor) const
+	{
+		static_cast<const void*>(this);
+		
+		// TODO Tracer Mesh의 width를 조절할 수 있게 수정 필요
+		const auto [Left, Center, Right] = FTracingMeshEditor::CreateVertexPositions(Actor);
+
+		// TODO 50 조절 가능하게
+		return {FVector{Left, 50.f}, FVector{Center, 50.f}, FVector{Right, 50.f}};
 	}
 
 private:

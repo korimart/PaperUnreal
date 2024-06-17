@@ -41,7 +41,7 @@ public:
 			const FVector2D Line = std::get<1>(SegmentEnds) - std::get<0>(SegmentEnds);
 			const FVector2D ToPoint = Point - std::get<0>(SegmentEnds);
 			const double CrossProduct = FVector2D::CrossProduct(Line, ToPoint);
-			return CrossProduct < 0.;
+			return CrossProduct > 0.;
 		};
 
 		return Algo::AllOf(Segments, IsSegmentToTheRightOfPoint);
@@ -96,7 +96,8 @@ public:
 		UGeometryScriptLibrary_MeshPrimitiveFunctions::AppendDelaunayTriangulation2D(
 			DynamicMesh,
 			{},
-			FTransform{FVector{0.f, 0.f, 100.f}},
+			// TODO 50 조절 가능하게
+			FTransform{FVector{0.f, 0.f, 50.f}},
 			Segments.GetPoints(),
 			{},
 			{},
@@ -114,6 +115,12 @@ class UAreaMeshComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
+public:
+	bool IsInside(const FVector& Point) const
+	{
+		return AreaBoundary.IsInside(FVector2D{Point});
+	}
+	
 private:
 	UPROPERTY()
 	UDynamicMeshComponent* DynamicMeshComponent;
