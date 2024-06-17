@@ -39,7 +39,7 @@ public:
 	{
 		return DynamicMeshVertexIndices[DynamicMeshVertexIndices.Num() - IndexFromLast - 1];
 	}
-	
+
 private:
 	FSegmentArray2D Segments;
 	TWeakObjectPtr<UDynamicMesh> DynamicMesh;
@@ -50,11 +50,15 @@ private:
 class FTracingMeshEditor
 {
 public:
-	void SetTargetMeshComponent(UDynamicMeshComponent* InTarget)
+	FTracingMeshEditor(UDynamicMeshComponent* InTargetComponent)
+		: TargetComponent(InTargetComponent)
 	{
-		TargetComponent = InTarget;
+		Reset();
+	}
+	
+	void Reset()
+	{
 		TargetComponent->GetDynamicMesh()->Reset();
-		TargetComponent->GetMesh()->EnableAttributes();
 
 		UE::Geometry::FDynamicMeshNormalOverlay* NormalOverlay = TargetComponent->GetMesh()->Attributes()->PrimaryNormals();
 		NormalOverlay->AppendElement(FVector3f::UnitZ());
@@ -68,8 +72,8 @@ public:
 		UVOverlay->AppendElement({1.f, 1.f});
 
 		CenterSegments.Empty();
-		LeftSegments.SetDynamicMesh(InTarget->GetDynamicMesh());
-		RightSegments.SetDynamicMesh(InTarget->GetDynamicMesh());
+		LeftSegments.SetDynamicMesh(TargetComponent->GetDynamicMesh());
+		RightSegments.SetDynamicMesh(TargetComponent->GetDynamicMesh());
 	}
 
 	void Trace(const AActor* ActorToTrace)
@@ -194,6 +198,19 @@ class UTracingMeshComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
+public:
+	void SetDrawingEnabled(bool bEnabled)
+	{
+		if (bEnabled && !TracingMeshEditor)
+		{
+			TracingMeshEditor.Emplace(DynamicMeshComponent);
+		}
+		else if (!bEnabled && TracingMeshEditor)
+		{
+			TracingMeshEditor.Reset();
+		}
+	}
+
 private:
 	UPROPERTY(EditAnywhere)
 	TSoftObjectPtr<UMaterialInstance> TraceMaterial;
@@ -201,7 +218,7 @@ private:
 	UPROPERTY()
 	UDynamicMeshComponent* DynamicMeshComponent;
 
-	FTracingMeshEditor TracingMeshEditor;
+	TOptional<FTracingMeshEditor> TracingMeshEditor;
 
 	UTracingMeshComponent()
 	{
@@ -214,8 +231,6 @@ private:
 
 		DynamicMeshComponent = NewObject<UDynamicMeshComponent>(GetOwner(), TEXT("DynamicMeshComponent"));
 		DynamicMeshComponent->RegisterComponent();
-
-		TracingMeshEditor.SetTargetMeshComponent(DynamicMeshComponent);
 
 		UAssetManager::GetStreamableManager().RequestAsyncLoad(
 			TraceMaterial.ToSoftObjectPath(),
@@ -237,6 +252,9 @@ private:
 	{
 		Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-		TracingMeshEditor.Trace(GetOwner());
+		if (TracingMeshEditor)
+		{
+			TracingMeshEditor->Trace(GetOwner());
+		}
 	}
 };
