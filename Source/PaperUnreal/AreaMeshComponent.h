@@ -47,6 +47,27 @@ public:
 		return Algo::AllOf(Segments, IsSegmentToTheRightOfPoint);
 	}
 
+	FVector2D FindClosestPointTo(const FVector2D& Point) const
+	{
+		FVector2D Ret;
+		float Distance = TNumericLimits<float>::Max();
+		for (const auto& [EachSegmentStart, EachSegmentEnd] : Segments)
+		{
+			const FVector2D SegmentVector = EachSegmentEnd - EachSegmentStart;
+			const FVector2D ToPointVector = Point - EachSegmentStart;
+			const float ProjCoefficient = FMath::Clamp(SegmentVector.Dot(ToPointVector) / SegmentVector.SizeSquared(), 0.f, 1.f);
+			const FVector2D ProjPointOnSegment = EachSegmentStart + ProjCoefficient * SegmentVector;
+			const float DistToPoint = (Point - ProjPointOnSegment).Length();
+
+			if (DistToPoint < Distance)
+			{
+				Distance = DistToPoint;
+				Ret = ProjPointOnSegment;
+			}
+		}
+		return Ret;
+	}
+
 	TOptional<FIntersection> FindIntersectionWithSegment(const FVector2D& SegmentStart, const FVector2D& SegmentEnd) const
 	{
 		if (!Segments.IsValid())
@@ -119,6 +140,11 @@ public:
 	bool IsInside(const FVector& Point) const
 	{
 		return AreaBoundary.IsInside(FVector2D{Point});
+	}
+
+	FVector2D FindClosestPointOnBoundary2D(const FVector2D& Point) const
+	{
+		return AreaBoundary.FindClosestPointTo(Point);
 	}
 	
 private:

@@ -51,6 +51,11 @@ private:
 
 		TracingMeshComponent = GetOwner()->FindComponentByClass<UTracingMeshComponent>();
 		check(IsValid(TracingMeshComponent));
+
+		TracingMeshComponent->FirstEdgeModifier.BindWeakLambda(this,
+				[this](auto&... Vertices) { (AttachVertexOnAreaBoundary(Vertices), ...); });
+		TracingMeshComponent->LastEdgeModifier.BindWeakLambda(this,
+				[this](auto&... Vertices) { (AttachVertexOnAreaBoundary(Vertices), ...); });
 	}
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override
@@ -67,5 +72,10 @@ private:
 		{
 			TracingMeshComponent->SetTracingEnabled(true);
 		}
+	}
+
+	void AttachVertexOnAreaBoundary(FVector2D& Vertex) const
+	{
+		Vertex = AreaMeshComponent->FindClosestPointOnBoundary2D(Vertex);
 	}
 };

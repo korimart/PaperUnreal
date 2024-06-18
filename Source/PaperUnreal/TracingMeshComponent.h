@@ -37,6 +37,11 @@ public:
 		}
 	}
 
+	const FVector2D& GetLastVertexPosition() const
+	{
+		return Segments.GetLastPoint();
+	}
+	
 	int GetLastVertexDynamicIndex(int32 IndexFromLast = 0) const
 	{
 		return DynamicMeshVertexIndices[DynamicMeshVertexIndices.Num() - IndexFromLast - 1];
@@ -147,6 +152,22 @@ public:
 		}
 	}
 
+	template <typename FuncType>
+	void ModifyLastVertexPositions(FuncType&& Func)
+	{
+		FVector2D NewLeft = LeftSegments.GetLastVertexPosition();
+		FVector2D NewCenter = CenterSegments.GetLastPoint();
+		FVector2D NewRight = RightSegments.GetLastVertexPosition();
+		
+		Func(NewLeft, NewCenter, NewRight);
+		
+		LeftSegments.SetLastVertexPosition(NewLeft);
+		CenterSegments.SetLastPoint(NewCenter);
+		RightSegments.SetLastVertexPosition(NewRight);
+		
+		TargetComponent->FastNotifyPositionsUpdated();
+	}
+
 private:
 	TWeakObjectPtr<UDynamicMeshComponent> TargetComponent;
 	FDynamicMeshSegment2D LeftSegments;
@@ -185,11 +206,10 @@ private:
 	{
 		if (CenterSegments.PointCount() > 0)
 		{
-			const auto [Left, Center, Right] = CreateVertexPositions(ActorToTrace);
-			LeftSegments.SetLastVertexPosition(Left);
-			CenterSegments.SetLastPoint(Center);
-			RightSegments.SetLastVertexPosition(Right);
-			TargetComponent->FastNotifyPositionsUpdated();
+			ModifyLastVertexPositions([&](auto& Left, auto& Center, auto& Right)
+			{
+				std::tie(Left, Center, Right) = CreateVertexPositions(ActorToTrace);
+			});
 		}
 	}
 };
@@ -201,14 +221,27 @@ class UTracingMeshComponent : public UActorComponent
 	GENERATED_BODY()
 
 public:
+	DECLARE_DELEGATE_ThreeParams(FEdgeModifier, FVector2D&, FVector2D&, FVector2D&);
+	FEdgeModifier FirstEdgeModifier;
+	FEdgeModifier LastEdgeModifier;
+	
 	void SetTracingEnabled(bool bEnabled)
 	{
 		if (bEnabled && !TracingMeshEditor)
 		{
 			TracingMeshEditor.Emplace(DynamicMeshComponent);
+			TracingMeshEditor->Trace(GetOwner());
+			TracingMeshEditor->ModifyLastVertexPositions([this](auto&... Vertices)
+			{
+				FirstEdgeModifier.ExecuteIfBound(Vertices...);
+			});
 		}
 		else if (!bEnabled && TracingMeshEditor)
 		{
+			TracingMeshEditor->ModifyLastVertexPositions([this](auto&... Vertices)
+			{
+				LastEdgeModifier.ExecuteIfBound(Vertices...);
+			});
 			TracingMeshEditor.Reset();
 		}
 	}
@@ -216,17 +249,6 @@ public:
 	bool IsTracing() const
 	{
 		return !!TracingMeshEditor;
-	}
-
-	std::tuple<FVector, FVector, FVector> GetTracerWouldBePoints(const AActor* Actor) const
-	{
-		static_cast<const void*>(this);
-		
-		// TODO Tracer Mesh의 width를 조절할 수 있게 수정 필요
-		const auto [Left, Center, Right] = FTracingMeshEditor::CreateVertexPositions(Actor);
-
-		// TODO 50 조절 가능하게
-		return {FVector{Left, 50.f}, FVector{Center, 50.f}, FVector{Right, 50.f}};
 	}
 
 private:
