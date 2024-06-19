@@ -41,7 +41,7 @@ public:
 	{
 		return Segments.GetLastPoint();
 	}
-	
+
 	int GetLastVertexDynamicIndex(int32 IndexFromLast = 0) const
 	{
 		return DynamicMeshVertexIndices[DynamicMeshVertexIndices.Num() - IndexFromLast - 1];
@@ -64,9 +64,14 @@ public:
 		return {ActorLocation2D - 50.f * ActorRight2D, ActorLocation2D, ActorLocation2D + 50.f * ActorRight2D};
 	}
 
-	FTracingMeshEditor(UDynamicMeshComponent* InTargetComponent)
-		: TargetComponent(InTargetComponent)
+	const FSegmentArray2D& GetCenterSegmentArray2D() const
 	{
+		return CenterSegments;
+	}
+
+	void SetDynamicMeshComponent(UDynamicMeshComponent* Component)
+	{
+		TargetComponent = Component;
 		Reset();
 	}
 
@@ -158,13 +163,13 @@ public:
 		FVector2D NewLeft = LeftSegments.GetLastVertexPosition();
 		FVector2D NewCenter = CenterSegments.GetLastPoint();
 		FVector2D NewRight = RightSegments.GetLastVertexPosition();
-		
+
 		Func(NewLeft, NewCenter, NewRight);
-		
+
 		LeftSegments.SetLastVertexPosition(NewLeft);
 		CenterSegments.SetLastPoint(NewCenter);
 		RightSegments.SetLastVertexPosition(NewRight);
-		
+
 		TargetComponent->FastNotifyPositionsUpdated();
 	}
 
@@ -224,31 +229,41 @@ public:
 	DECLARE_DELEGATE_ThreeParams(FEdgeModifier, FVector2D&, FVector2D&, FVector2D&);
 	FEdgeModifier FirstEdgeModifier;
 	FEdgeModifier LastEdgeModifier;
-	
-	void SetTracingEnabled(bool bEnabled)
+
+	void SetTracingEnabled(bool bEnable)
 	{
-		if (bEnabled && !TracingMeshEditor)
+		if (bEnable)
 		{
-			TracingMeshEditor.Emplace(DynamicMeshComponent);
-			TracingMeshEditor->Trace(GetOwner());
-			TracingMeshEditor->ModifyLastVertexPositions([this](auto&... Vertices)
+			TracingMeshEditor.Trace(GetOwner());
+			TracingMeshEditor.ModifyLastVertexPositions([this](auto&... Vertices)
 			{
 				FirstEdgeModifier.ExecuteIfBound(Vertices...);
 			});
 		}
-		else if (!bEnabled && TracingMeshEditor)
+		else
 		{
-			TracingMeshEditor->ModifyLastVertexPositions([this](auto&... Vertices)
+			TracingMeshEditor.ModifyLastVertexPositions([this](auto&... Vertices)
 			{
 				LastEdgeModifier.ExecuteIfBound(Vertices...);
 			});
-			TracingMeshEditor.Reset();
 		}
+
+		SetComponentTickEnabled(bEnable);
 	}
 
 	bool IsTracing() const
 	{
-		return !!TracingMeshEditor;
+		return IsComponentTickEnabled();
+	}
+
+	void Reset()
+	{
+		TracingMeshEditor.Reset();
+	}
+
+	const FSegmentArray2D& GetCenterSegmentArray2D() const
+	{
+		return TracingMeshEditor.GetCenterSegmentArray2D();
 	}
 
 private:
@@ -258,11 +273,12 @@ private:
 	UPROPERTY()
 	UDynamicMeshComponent* DynamicMeshComponent;
 
-	TOptional<FTracingMeshEditor> TracingMeshEditor;
+	FTracingMeshEditor TracingMeshEditor;
 
 	UTracingMeshComponent()
 	{
 		PrimaryComponentTick.bCanEverTick = true;
+		PrimaryComponentTick.bStartWithTickEnabled = false;
 	}
 
 	virtual void BeginPlay() override
@@ -271,6 +287,8 @@ private:
 
 		DynamicMeshComponent = NewObject<UDynamicMeshComponent>(GetOwner(), TEXT("DynamicMeshComponent"));
 		DynamicMeshComponent->RegisterComponent();
+
+		TracingMeshEditor.SetDynamicMeshComponent(DynamicMeshComponent);
 
 		UAssetManager::GetStreamableManager().RequestAsyncLoad(
 			TraceMaterial.ToSoftObjectPath(),
@@ -292,9 +310,6 @@ private:
 	{
 		Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-		if (TracingMeshEditor)
-		{
-			TracingMeshEditor->Trace(GetOwner());
-		}
+		TracingMeshEditor.Trace(GetOwner());
 	}
 };

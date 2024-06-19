@@ -22,7 +22,7 @@ public:
 		int32 StartPointIndex;
 		int32 EndPointIndex;
 	};
-	
+
 	struct FIntersection
 	{
 		FSegment HitSegment;
@@ -47,12 +47,14 @@ public:
 		return Algo::AllOf(Segments, IsSegmentToTheRightOfPoint);
 	}
 
-	FVector2D FindClosestPointTo(const FVector2D& Point) const
+	FIntersection FindClosestPointTo(const FVector2D& Point) const
 	{
-		FVector2D Ret;
+		FIntersection Ret{};
 		float Distance = TNumericLimits<float>::Max();
-		for (const auto& [EachSegmentStart, EachSegmentEnd] : Segments)
+		for (auto [It, End] = std::tuple{Segments.begin(), Segments.end()}; It != End; ++It)
 		{
+			const auto [EachSegmentStart, EachSegmentEnd] = *It;
+
 			const FVector2D SegmentVector = EachSegmentEnd - EachSegmentStart;
 			const FVector2D ToPointVector = Point - EachSegmentStart;
 			const float ProjCoefficient = FMath::Clamp(SegmentVector.Dot(ToPointVector) / SegmentVector.SizeSquared(), 0.f, 1.f);
@@ -62,7 +64,9 @@ public:
 			if (DistToPoint < Distance)
 			{
 				Distance = DistToPoint;
-				Ret = ProjPointOnSegment;
+				Ret.HitSegment.StartPointIndex = It.GetStartPointIndex();
+				Ret.HitSegment.EndPointIndex = It.GetEndPointIndex();
+				Ret.PointOfIntersection = ProjPointOnSegment;
 			}
 		}
 		return Ret;
@@ -78,7 +82,7 @@ public:
 		for (auto [It, End] = std::tuple{Segments.begin(), Segments.end()}; It != End; ++It)
 		{
 			const auto [EachSegmentStart, EachSegmentEnd] = *It;
-			
+
 			FVector Intersection;
 			if (FMath::SegmentIntersection2D(
 				FVector{SegmentStart, 0.f},
@@ -137,16 +141,23 @@ class UAreaMeshComponent : public UActorComponent
 	GENERATED_BODY()
 
 public:
+	using FIntersection = FPolygonBoundary2D::FIntersection;
+
 	bool IsInside(const FVector& Point) const
 	{
 		return AreaBoundary.IsInside(FVector2D{Point});
 	}
 
-	FVector2D FindClosestPointOnBoundary2D(const FVector2D& Point) const
+	FIntersection FindClosestPointOnBoundary2D(const FVector2D& Point) const
 	{
 		return AreaBoundary.FindClosestPointTo(Point);
 	}
-	
+
+	void ExpandByEnclosingPath(const FSegmentArray2D& Path)
+	{
+		// TODO implement
+	}
+
 private:
 	UPROPERTY()
 	UDynamicMeshComponent* DynamicMeshComponent;

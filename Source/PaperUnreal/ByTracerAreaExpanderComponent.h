@@ -22,8 +22,6 @@ private:
 	UPROPERTY()
 	UTracingMeshComponent* TracingMeshComponent;
 
-	TOptional<FVector> TracingStartPoint;
-
 	UByTracerAreaExpanderComponent()
 	{
 		PrimaryComponentTick.bCanEverTick = true;
@@ -36,8 +34,7 @@ private:
 		check(GetOwner()->IsA<APawn>());
 
 		// TODO replace this with team based search and more efficient one
-		AreaMeshComponent = [&]() -> UAreaMeshComponent*
-		{
+		AreaMeshComponent = [&]() -> UAreaMeshComponent* {
 			for (FActorIterator It{GetWorld()}; It; ++It)
 			{
 				if (const auto Found = It->FindComponentByClass<UAreaMeshComponent>())
@@ -52,10 +49,10 @@ private:
 		TracingMeshComponent = GetOwner()->FindComponentByClass<UTracingMeshComponent>();
 		check(IsValid(TracingMeshComponent));
 
-		TracingMeshComponent->FirstEdgeModifier.BindWeakLambda(this,
-				[this](auto&... Vertices) { (AttachVertexOnAreaBoundary(Vertices), ...); });
-		TracingMeshComponent->LastEdgeModifier.BindWeakLambda(this,
-				[this](auto&... Vertices) { (AttachVertexOnAreaBoundary(Vertices), ...); });
+		TracingMeshComponent->FirstEdgeModifier.BindWeakLambda(
+			this, [this](auto&... Vertices) { (AttachVertexToAreaBoundary(Vertices), ...); });
+		TracingMeshComponent->LastEdgeModifier.BindWeakLambda(
+			this, [this](auto&... Vertices) { (AttachVertexToAreaBoundary(Vertices), ...); });
 	}
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override
@@ -67,15 +64,17 @@ private:
 		if (TracingMeshComponent->IsTracing() && bOwnerIsInsideArea)
 		{
 			TracingMeshComponent->SetTracingEnabled(false);
+			AreaMeshComponent->ExpandByEnclosingPath(TracingMeshComponent->GetCenterSegmentArray2D());
 		}
 		else if (!TracingMeshComponent->IsTracing() && !bOwnerIsInsideArea)
 		{
+			TracingMeshComponent->Reset();
 			TracingMeshComponent->SetTracingEnabled(true);
 		}
 	}
 
-	void AttachVertexOnAreaBoundary(FVector2D& Vertex) const
+	void AttachVertexToAreaBoundary(FVector2D& Vertex) const
 	{
-		Vertex = AreaMeshComponent->FindClosestPointOnBoundary2D(Vertex);
+		Vertex = AreaMeshComponent->FindClosestPointOnBoundary2D(Vertex).PointOfIntersection;
 	}
 };
