@@ -133,12 +133,20 @@ public:
 
 	bool IsInside(const FVector& Point) const
 	{
-		return AreaBoundary.IsInside(FVector2D{Point});
+		return AreaBoundary.IsInside(FVector2D{GetOwner()->GetActorTransform().InverseTransformPosition(Point)});
+	}
+
+	FVector2D World2DToLocal2D(const FVector2D& World2D) const
+	{
+		return FVector2D{GetOwner()->GetActorTransform().InverseTransformPosition(FVector{World2D, 0.f})};
 	}
 
 	FIntersection FindClosestPointOnBoundary2D(const FVector2D& Point) const
 	{
-		return AreaBoundary.FindClosestPointTo(Point);
+		FIntersection Ret = AreaBoundary.FindClosestPointTo(World2DToLocal2D(Point));
+		const FVector WorldPoint = GetOwner()->GetActorTransform().TransformPosition(FVector{Ret.PointOfIntersection, 0.f});
+		Ret.PointOfIntersection = FVector2D{WorldPoint};
+		return Ret;
 	}
 
 	void ExpandByEnclosingPath(FSegmentArray2D Path)
@@ -149,8 +157,10 @@ public:
 			Path.ReverseVertexOrder();
 		}
 
-		const FIntersection BoundarySrcSegment = FindClosestPointOnBoundary2D(Path.GetPoints()[0]);
-		const FIntersection BoundaryDestSegment = FindClosestPointOnBoundary2D(Path.GetLastPoint());
+		Path.ApplyToEachPoint([this](FVector2D& Each) { Each = World2DToLocal2D(Each); });
+
+		const FIntersection BoundarySrcSegment = AreaBoundary.FindClosestPointTo(Path.GetPoints()[0]);
+		const FIntersection BoundaryDestSegment = AreaBoundary.FindClosestPointTo(Path.GetLastPoint());
 
 		FLoopedSegmentArray2D Option0 = AreaBoundary.GetBoundarySegmentArray();
 		Option0.ReplacePoints(
@@ -186,6 +196,7 @@ private:
 		Super::BeginPlay();
 
 		DynamicMeshComponent = NewObject<UDynamicMeshComponent>(GetOwner(), TEXT("DynamicMeshComponent"));
+		DynamicMeshComponent->AttachToComponent(GetOwner()->GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);
 		DynamicMeshComponent->RegisterComponent();
 
 		SetCurrentAsStartingPoint();
@@ -203,14 +214,11 @@ private:
 	{
 		const TArray<FVector2D> VertexPositions = [&]()
 		{
-			const FTransform Transform{FQuat{}, GetOwner()->GetActorLocation(), FVector{100.f}};
-
 			TArray<FVector2D> Ret;
 			for (int32 AngleStep = 0; AngleStep < 16; AngleStep++)
 			{
 				const float ThisAngle = 2.f * UE_PI / 16.f * -AngleStep;
-				const FVector Vertex = Transform.TransformPosition(FVector{FMath::Cos(ThisAngle), FMath::Sin(ThisAngle), 0.f});
-				Ret.Add(FVector2D{Vertex});
+				Ret.Add(FVector2D{100.f * FMath::Cos(ThisAngle), 100.f * FMath::Sin(ThisAngle)});
 			}
 			return Ret;
 		}();

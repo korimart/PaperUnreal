@@ -124,6 +124,15 @@ public:
 		Points.Empty();
 	}
 
+	template <typename FuncType>
+	void ApplyToEachPoint(FuncType&& Func)
+	{
+		for (auto& Each : Points)
+		{
+			Func(Each);
+		}
+	}
+
 	class FSegmentConstIterator
 	{
 	public:
