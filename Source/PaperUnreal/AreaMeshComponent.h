@@ -7,12 +7,12 @@
 #include "Algo/AllOf.h"
 #include "Components/ActorComponent.h"
 #include "Components/DynamicMeshComponent.h"
-#include "GeometryScript/MeshPrimitiveFunctions.h"
+#include "Generators/PlanarPolygonMeshGenerator.h"
 #include "AreaMeshComponent.generated.h"
 
 
 /**
- * clockwise
+ * counter-clockwise
  */
 class FPolygonBoundary2D
 {
@@ -28,7 +28,7 @@ public:
 		FSegment HitSegment;
 		FVector2D PointOfIntersection;
 	};
-	
+
 	FPolygonBoundary2D& operator=(FLoopedSegmentArray2D&& Other)
 	{
 		Segments = MoveTemp(Other);
@@ -42,15 +42,15 @@ public:
 			return false;
 		}
 
-		const auto IsSegmentToTheRightOfPoint = [&](const std::tuple<FVector2D, FVector2D>& SegmentEnds)
+		const auto IsSegmentToTheLeftOfPoint = [&](const std::tuple<FVector2D, FVector2D>& SegmentEnds)
 		{
 			const FVector2D Line = std::get<1>(SegmentEnds) - std::get<0>(SegmentEnds);
 			const FVector2D ToPoint = Point - std::get<0>(SegmentEnds);
 			const double CrossProduct = FVector2D::CrossProduct(Line, ToPoint);
-			return CrossProduct > 0.;
+			return CrossProduct < 0.;
 		};
 
-		return Algo::AllOf(Segments, IsSegmentToTheRightOfPoint);
+		return Algo::AllOf(Segments, IsSegmentToTheLeftOfPoint);
 	}
 
 	const FLoopedSegmentArray2D& GetBoundarySegmentArray() const
@@ -118,29 +118,6 @@ public:
 		Segments.ReplacePoints(FirstIndex, LastIndex, NewPoints);
 	}
 
-	void SetSelfInDynamicMesh(UDynamicMesh* DynamicMesh) const
-	{
-		DynamicMesh->Reset();
-
-		if (!Segments.IsValid())
-		{
-			return;
-		}
-
-		TArray<int32> PositionsToVertexIds;
-		bool bHasDuplicateVertices;
-		UGeometryScriptLibrary_MeshPrimitiveFunctions::AppendDelaunayTriangulation2D(
-			DynamicMesh,
-			{},
-			// TODO 50 조절 가능하게
-			FTransform{FVector{0.f, 0.f, 50.f}},
-			Segments.GetPoints(),
-			{},
-			{},
-			PositionsToVertexIds,
-			bHasDuplicateVertices);
-	}
-
 private:
 	FLoopedSegmentArray2D Segments;
 };
@@ -166,12 +143,12 @@ public:
 
 	void ExpandByEnclosingPath(FSegmentArray2D Path)
 	{
-		const bool bPathIsCounterClockwise = Path.CalculateNetAngleDelta() < 0.f;
-		if (bPathIsCounterClockwise)
+		const bool bPathIsClockwise = Path.CalculateNetAngleDelta() > 0.f;
+		if (bPathIsClockwise)
 		{
 			Path.ReverseVertexOrder();
 		}
-		
+
 		const FIntersection BoundarySrcSegment = FindClosestPointOnBoundary2D(Path.GetPoints()[0]);
 		const FIntersection BoundaryDestSegment = FindClosestPointOnBoundary2D(Path.GetLastPoint());
 
@@ -193,9 +170,9 @@ public:
 		const float Area1 = Option1.CalculateArea();
 
 		FLoopedSegmentArray2D& Bigger = Area0 > Area1 ? Option0 : Option1;
-		
+
 		AreaBoundary = MoveTemp(Bigger);
-		AreaBoundary.SetSelfInDynamicMesh(DynamicMeshComponent->GetDynamicMesh());
+		TriangulateAreaAndSetInDynamicMesh();
 	}
 
 private:
@@ -231,7 +208,7 @@ private:
 			TArray<FVector2D> Ret;
 			for (int32 AngleStep = 0; AngleStep < 16; AngleStep++)
 			{
-				const float ThisAngle = 2.f * UE_PI / 16.f * AngleStep;
+				const float ThisAngle = 2.f * UE_PI / 16.f * -AngleStep;
 				const FVector Vertex = Transform.TransformPosition(FVector{FMath::Cos(ThisAngle), FMath::Sin(ThisAngle), 0.f});
 				Ret.Add(FVector2D{Vertex});
 			}
@@ -239,6 +216,15 @@ private:
 		}();
 
 		AreaBoundary.Replace(0, 0, VertexPositions);
-		AreaBoundary.SetSelfInDynamicMesh(DynamicMeshComponent->GetDynamicMesh());
+		TriangulateAreaAndSetInDynamicMesh();
+	}
+
+	void TriangulateAreaAndSetInDynamicMesh()
+	{
+		UE::Geometry::FPlanarPolygonMeshGenerator Generator;
+		Generator.Polygon = UE::Geometry::FPolygon2d{AreaBoundary.GetBoundarySegmentArray().GetPoints()};
+		Generator.Generate();
+		DynamicMeshComponent->GetMesh()->Copy(&Generator);
+		DynamicMeshComponent->NotifyMeshUpdated();
 	}
 };
