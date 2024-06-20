@@ -28,6 +28,12 @@ public:
 		FSegment HitSegment;
 		FVector2D PointOfIntersection;
 	};
+	
+	FPolygonBoundary2D& operator=(FLoopedSegmentArray2D&& Other)
+	{
+		Segments = MoveTemp(Other);
+		return *this;
+	}
 
 	bool IsInside(const FVector2D& Point) const
 	{
@@ -45,6 +51,11 @@ public:
 		};
 
 		return Algo::AllOf(Segments, IsSegmentToTheRightOfPoint);
+	}
+
+	const FLoopedSegmentArray2D& GetBoundarySegmentArray() const
+	{
+		return Segments;
 	}
 
 	FIntersection FindClosestPointTo(const FVector2D& Point) const
@@ -153,9 +164,34 @@ public:
 		return AreaBoundary.FindClosestPointTo(Point);
 	}
 
-	void ExpandByEnclosingPath(const FSegmentArray2D& Path)
+	void ExpandByEnclosingPath(FSegmentArray2D Path)
 	{
-		// TODO implement
+		Path.RearrangeVertices(false);
+
+		const FIntersection BoundarySrcSegment = FindClosestPointOnBoundary2D(Path.GetPoints()[0]);
+		const FIntersection BoundaryDestSegment = FindClosestPointOnBoundary2D(Path.GetLastPoint());
+
+		FLoopedSegmentArray2D Option0 = AreaBoundary.GetBoundarySegmentArray();
+		Option0.ReplacePointsLooped(
+			BoundarySrcSegment.HitSegment.StartPointIndex + 1,
+			BoundaryDestSegment.HitSegment.EndPointIndex,
+			Path.GetPoints());
+
+		FLoopedSegmentArray2D Option1 = AreaBoundary.GetBoundarySegmentArray();
+		Option1.ReplacePointsLooped(
+			BoundarySrcSegment.HitSegment.EndPointIndex + 1,
+			BoundaryDestSegment.HitSegment.StartPointIndex,
+			Path.GetPoints());
+
+		const float Area0 = Option0.CalculateArea();
+		const float Area1 = Option1.CalculateArea();
+
+		UE_LOG(LogTemp, Warning, TEXT("%f, %f"), Area0, Area1);
+
+		FLoopedSegmentArray2D& Bigger = Area0 > Area1 ? Option0 : Option1;
+
+		AreaBoundary = MoveTemp(Bigger);
+		AreaBoundary.SetSelfInDynamicMesh(DynamicMeshComponent->GetDynamicMesh());
 	}
 
 private:

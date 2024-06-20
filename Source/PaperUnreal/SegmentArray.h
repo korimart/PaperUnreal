@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Algo/Accumulate.h"
 
 
 template <bool bLoop>
@@ -45,7 +46,42 @@ public:
 
 		return Points.Num() >= 2;
 	}
-	
+
+	float CalculateNetAngleDelta() const
+	{
+		float Ret = 0.f;
+
+		auto It = begin();
+		auto ItPlusOne = begin();
+		++ItPlusOne;
+		auto End = end();
+
+		while (ItPlusOne != End)
+		{
+			const auto [Segment0Start, Segment0End] = *It;
+			const auto [Segment1Start, Segment1End] = *ItPlusOne;
+			const FVector2D Segment0 = (Segment0End - Segment0Start).GetSafeNormal();
+			const FVector2D Segment1 = (Segment1End - Segment1Start).GetSafeNormal();
+			Ret += FMath::Asin(FVector2D::CrossProduct(Segment0, Segment1));
+
+			++It;
+			++ItPlusOne;
+		}
+
+		return Ret;
+	}
+
+	template <bool bLoop2 = bLoop>
+	std::enable_if_t<bLoop2, float> CalculateArea() const
+	{
+		// Shoelace formula
+		return 0.5f * FMath::Abs(Algo::Accumulate(*this, 0.f, [](auto, const auto& Segment)
+		{
+			const auto& [SegmentStart, SegmentEnd] = Segment;
+			return SegmentStart.X * SegmentEnd.Y - SegmentStart.Y * SegmentEnd.X;
+		}));
+	}
+
 	void AddPoint(const FVector2D& Position)
 	{
 		Points.Add(Position);
@@ -56,13 +92,44 @@ public:
 		Points.Last() = NewPosition;
 	}
 
-	void ReplacePoints(int32 FirstIndex, int32 LastIndex, const TArray<FVector2D>& NewPoints)
+	void ReplacePoints(int32 FirstIndex, int32 LastIndex, TArrayView<const FVector2D> NewPoints)
 	{
 		const int32 Count = FMath::Min(LastIndex - FirstIndex + 1, Points.Num());
 		Points.RemoveAt(FirstIndex, Count);
-		Points.Insert(NewPoints, FirstIndex);
+
+		if (!NewPoints.IsEmpty())
+		{
+			Points.Insert(NewPoints.GetData(), NewPoints.Num(), FirstIndex);
+		}
 	}
-	
+
+	template <bool bLoop2 = bLoop>
+	std::enable_if_t<bLoop2> ReplacePointsLooped(int32 FirstIndex, int32 LastIndex, TArrayView<const FVector2D> NewPoints)
+	{
+		FirstIndex = FirstIndex % Points.Num();
+		LastIndex = LastIndex % Points.Num();
+
+		if (FirstIndex < LastIndex)
+		{
+			ReplacePoints(FirstIndex, LastIndex, NewPoints);
+			return;
+		}
+
+		ReplacePoints(FirstIndex, Points.Num() - 1, NewPoints);
+		ReplacePoints(0, LastIndex, {});
+	}
+
+	void RearrangeVertices(bool bClockwise)
+	{
+		const bool bCurrentWinding = CalculateNetAngleDelta() > 0.f;
+		const bool bTargetWinding = bClockwise;
+
+		if (bCurrentWinding != bTargetWinding)
+		{
+			std::reverse(Points.begin(), Points.end());
+		}
+	}
+
 	void Empty()
 	{
 		Points.Empty();
@@ -98,7 +165,7 @@ public:
 					return {Origin->Points[CurrentIndex], Origin->Points[0]};
 				}
 			}
-			
+
 			return {Origin->Points[CurrentIndex], Origin->Points[CurrentIndex + 1]};
 		}
 
@@ -112,7 +179,7 @@ public:
 			{
 				CurrentIndex = FMath::Min(Origin->Points.Num() - 1, CurrentIndex + 1);
 			}
-			
+
 			return *this;
 		}
 
