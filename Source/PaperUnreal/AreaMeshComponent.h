@@ -12,7 +12,7 @@
 
 
 /**
- * counter-clockwise
+ * clockwise
  */
 class FPolygonBoundary2D
 {
@@ -166,30 +166,34 @@ public:
 
 	void ExpandByEnclosingPath(FSegmentArray2D Path)
 	{
-		Path.RearrangeVertices(false);
-
+		const bool bPathIsCounterClockwise = Path.CalculateNetAngleDelta() < 0.f;
+		if (bPathIsCounterClockwise)
+		{
+			Path.ReverseVertexOrder();
+		}
+		
 		const FIntersection BoundarySrcSegment = FindClosestPointOnBoundary2D(Path.GetPoints()[0]);
 		const FIntersection BoundaryDestSegment = FindClosestPointOnBoundary2D(Path.GetLastPoint());
 
 		FLoopedSegmentArray2D Option0 = AreaBoundary.GetBoundarySegmentArray();
-		Option0.ReplacePointsLooped(
-			BoundarySrcSegment.HitSegment.StartPointIndex + 1,
-			BoundaryDestSegment.HitSegment.EndPointIndex,
-			Path.GetPoints());
-
-		FLoopedSegmentArray2D Option1 = AreaBoundary.GetBoundarySegmentArray();
-		Option1.ReplacePointsLooped(
-			BoundarySrcSegment.HitSegment.EndPointIndex + 1,
+		Option0.ReplacePoints(
+			BoundarySrcSegment.HitSegment.EndPointIndex,
 			BoundaryDestSegment.HitSegment.StartPointIndex,
 			Path.GetPoints());
+
+		Path.ReverseVertexOrder();
+		FLoopedSegmentArray2D Option1 = AreaBoundary.GetBoundarySegmentArray();
+		Option1.ReplacePoints(
+			BoundaryDestSegment.HitSegment.EndPointIndex,
+			BoundarySrcSegment.HitSegment.StartPointIndex,
+			Path.GetPoints());
+		Option1.ReverseVertexOrder();
 
 		const float Area0 = Option0.CalculateArea();
 		const float Area1 = Option1.CalculateArea();
 
-		UE_LOG(LogTemp, Warning, TEXT("%f, %f"), Area0, Area1);
-
 		FLoopedSegmentArray2D& Bigger = Area0 > Area1 ? Option0 : Option1;
-
+		
 		AreaBoundary = MoveTemp(Bigger);
 		AreaBoundary.SetSelfInDynamicMesh(DynamicMeshComponent->GetDynamicMesh());
 	}

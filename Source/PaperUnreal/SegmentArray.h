@@ -92,42 +92,31 @@ public:
 		Points.Last() = NewPosition;
 	}
 
-	void ReplacePoints(int32 FirstIndex, int32 LastIndex, TArrayView<const FVector2D> NewPoints)
+	template <bool bLoop2 = bLoop, typename... ArgTypes>
+	std::enable_if_t<!bLoop2> ReplacePoints(ArgTypes&&... Args)
 	{
-		const int32 Count = FMath::Min(LastIndex - FirstIndex + 1, Points.Num());
-		Points.RemoveAt(FirstIndex, Count);
-
-		if (!NewPoints.IsEmpty())
-		{
-			Points.Insert(NewPoints.GetData(), NewPoints.Num(), FirstIndex);
-		}
+		ReplacePointsNoLoop(Forward<ArgTypes>(Args)...);
 	}
 
 	template <bool bLoop2 = bLoop>
-	std::enable_if_t<bLoop2> ReplacePointsLooped(int32 FirstIndex, int32 LastIndex, TArrayView<const FVector2D> NewPoints)
+	std::enable_if_t<bLoop2> ReplacePoints(int32 FirstIndex, int32 LastIndex, TArrayView<const FVector2D> NewPoints)
 	{
-		FirstIndex = FirstIndex % Points.Num();
-		LastIndex = LastIndex % Points.Num();
+		FirstIndex = FirstIndex % FMath::Max(Points.Num(), 1);
+		LastIndex = LastIndex % FMath::Max(Points.Num(), 1);
 
-		if (FirstIndex < LastIndex)
+		if (FirstIndex <= LastIndex)
 		{
-			ReplacePoints(FirstIndex, LastIndex, NewPoints);
+			ReplacePointsNoLoop(FirstIndex, LastIndex, NewPoints);
 			return;
 		}
 
-		ReplacePoints(FirstIndex, Points.Num() - 1, NewPoints);
-		ReplacePoints(0, LastIndex, {});
+		ReplacePointsNoLoop(FirstIndex, Points.Num() - 1, NewPoints);
+		ReplacePointsNoLoop(0, LastIndex, {});
 	}
 
-	void RearrangeVertices(bool bClockwise)
+	void ReverseVertexOrder()
 	{
-		const bool bCurrentWinding = CalculateNetAngleDelta() > 0.f;
-		const bool bTargetWinding = bClockwise;
-
-		if (bCurrentWinding != bTargetWinding)
-		{
-			std::reverse(Points.begin(), Points.end());
-		}
+		std::reverse(Points.begin(), Points.end());
 	}
 
 	void Empty()
@@ -228,6 +217,17 @@ public:
 
 private:
 	TArray<FVector2D> Points;
+	
+	void ReplacePointsNoLoop(int32 FirstIndex, int32 LastIndex, TArrayView<const FVector2D> NewPoints)
+	{
+		const int32 Count = FMath::Min(LastIndex - FirstIndex + 1, Points.Num());
+		Points.RemoveAt(FirstIndex, Count);
+
+		if (!NewPoints.IsEmpty())
+		{
+			Points.Insert(NewPoints.GetData(), NewPoints.Num(), FirstIndex);
+		}
+	}
 };
 
 
