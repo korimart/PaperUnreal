@@ -75,11 +75,11 @@ public:
 	std::enable_if_t<bLoop2, float> CalculateArea() const
 	{
 		// Shoelace formula
-		return 0.5f * FMath::Abs(Algo::Accumulate(*this, 0.f, [](auto, const auto& Segment)
+		return 0.5f * FMath::Abs(Algo::TransformAccumulate(*this, [](const auto& Segment)
 		{
 			const auto& [SegmentStart, SegmentEnd] = Segment;
 			return SegmentStart.X * SegmentEnd.Y - SegmentStart.Y * SegmentEnd.X;
-		}));
+		}, 0.f));
 	}
 
 	void AddPoint(const FVector2D& Position)
