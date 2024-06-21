@@ -138,19 +138,19 @@ class UAreaMeshComponent : public UActorComponent
 public:
 	using FIntersection = FPolygonBoundary2D::FIntersection;
 
-	bool IsInside(const FVector& Point) const
-	{
-		return AreaBoundary.IsInside(FVector2D{GetOwner()->GetActorTransform().InverseTransformPosition(Point)});
-	}
-
-	FVector2D World2DToLocal2D(const FVector2D& World2D) const
+	FVector2D WorldToLocal2D(const FVector2D& World2D) const
 	{
 		return FVector2D{GetOwner()->GetActorTransform().InverseTransformPosition(FVector{World2D, 0.f})};
 	}
 
+	bool IsInside(const FVector& Point) const
+	{
+		return AreaBoundary.IsInside(WorldToLocal2D(FVector2D{Point}));
+	}
+
 	FIntersection FindClosestPointOnBoundary2D(const FVector2D& Point) const
 	{
-		FIntersection Ret = AreaBoundary.FindClosestPointTo(World2DToLocal2D(Point));
+		FIntersection Ret = AreaBoundary.FindClosestPointTo(WorldToLocal2D(Point));
 		const FVector WorldPoint = GetOwner()->GetActorTransform().TransformPosition(FVector{Ret.PointOfIntersection, 0.f});
 		Ret.PointOfIntersection = FVector2D{WorldPoint};
 		return Ret;
@@ -164,7 +164,7 @@ public:
 			Path.ReverseVertexOrder();
 		}
 
-		Path.ApplyToEachPoint([this](FVector2D& Each) { Each = World2DToLocal2D(Each); });
+		Path.ApplyToEachPoint([this](FVector2D& Each) { Each = WorldToLocal2D(Each); });
 
 		const FIntersection BoundarySrcSegment = AreaBoundary.FindClosestPointTo(Path.GetPoints()[0]);
 		const FIntersection BoundaryDestSegment = AreaBoundary.FindClosestPointTo(Path.GetLastPoint());
