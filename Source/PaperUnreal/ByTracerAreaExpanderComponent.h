@@ -86,8 +86,8 @@ private:
 		{
 			const FVector2D PointOfDeparture = CenterSegmentArray.GetPoints()[0];
 			const UAreaMeshComponent::FIntersection Intersection = AreaMeshComponent->FindClosestPointOnBoundary2D(PointOfDeparture);
-			const FVector2D PathDirection = CenterSegmentArray.GetPoints()[1] - CenterSegmentArray.GetPoints()[0];
-			const FVector2D HitSegmentDirection = Intersection.HitSegment.EndPoint - Intersection.HitSegment.StartPoint;
+			const FVector2D PathDirection = CenterSegmentArray[0].Direction;
+			const FVector2D HitSegmentDirection = Intersection.HitSegment.Points.Direction;
 			const bool bCavityIsToTheRight = FVector2D::CrossProduct(PathDirection, HitSegmentDirection) > 0.;
 
 			if (bCavityIsToTheRight)

@@ -16,18 +16,16 @@
 class FPolygonBoundary2D
 {
 public:
-	struct FSegment
+	struct FHitSegment
 	{
+		FSegment2D Points;
 		int32 StartPointIndex;
-		FVector2D StartPoint;
-		
 		int32 EndPointIndex;
-		FVector2D EndPoint;
 	};
 
 	struct FIntersection
 	{
-		FSegment HitSegment;
+		FHitSegment HitSegment;
 		FVector2D PointOfIntersection;
 	};
 
@@ -45,13 +43,11 @@ public:
 		}
 
 		int32 IntersectionCount = 0;
-		for (const auto& [SegmentStart, SegmentEnd] : Segments)
+		for (const FSegment2D& Each : Segments)
 		{
-			if (FMath::Min(SegmentStart.Y, SegmentEnd.Y) <= Point.Y
-				&& Point.Y < FMath::Max(SegmentStart.Y, SegmentEnd.Y))
+			if (Each.ContainsY(Point.Y))
 			{
-				const float Slope = (SegmentEnd.X - SegmentStart.X) / (SegmentEnd.Y - SegmentStart.Y);
-				const int32 IntersectionX = SegmentStart.X + (Point.Y - SegmentStart.Y) * Slope;
+				const int32 IntersectionX = Each.StartPoint().X + (Point.Y - Each.StartPoint().Y) * Each.Slope();
 
 				if (Point.X < IntersectionX)
 				{
@@ -71,31 +67,26 @@ public:
 	FIntersection FindClosestPointTo(const FVector2D& Point) const
 	{
 		FIntersection Ret{};
-		float Distance = TNumericLimits<float>::Max();
+		float ShortestDistance = TNumericLimits<float>::Max();
 		for (auto [It, End] = std::tuple{Segments.begin(), Segments.end()}; It != End; ++It)
 		{
-			const auto [EachSegmentStart, EachSegmentEnd] = *It;
+			const FSegment2D& EachSegment = *It;
+			const FSegment2D SegmentToPoint = EachSegment.Perp(Point);
+			const float DistanceToPoint = SegmentToPoint.Length();
 
-			const FVector2D SegmentVector = EachSegmentEnd - EachSegmentStart;
-			const FVector2D ToPointVector = Point - EachSegmentStart;
-			const float ProjCoefficient = FMath::Clamp(SegmentVector.Dot(ToPointVector) / SegmentVector.SizeSquared(), 0.f, 1.f);
-			const FVector2D ProjPointOnSegment = EachSegmentStart + ProjCoefficient * SegmentVector;
-			const float DistToPoint = (Point - ProjPointOnSegment).Length();
-
-			if (DistToPoint < Distance)
+			if (ShortestDistance < DistanceToPoint)
 			{
-				Distance = DistToPoint;
+				ShortestDistance = DistanceToPoint;
+				Ret.HitSegment.Points = EachSegment;
 				Ret.HitSegment.StartPointIndex = It.GetStartPointIndex();
-				Ret.HitSegment.StartPoint = EachSegmentStart;
 				Ret.HitSegment.EndPointIndex = It.GetEndPointIndex();
-				Ret.HitSegment.EndPoint = EachSegmentEnd;
-				Ret.PointOfIntersection = ProjPointOnSegment;
+				Ret.PointOfIntersection = SegmentToPoint.StartPoint();
 			}
 		}
 		return Ret;
 	}
 
-	TOptional<FIntersection> FindIntersectionWithSegment(const FVector2D& SegmentStart, const FVector2D& SegmentEnd) const
+	TOptional<FIntersection> FindIntersectionWithSegment(const UE::Geometry::FSegment2d& Segment) const
 	{
 		if (!Segments.IsValid())
 		{
@@ -104,22 +95,14 @@ public:
 
 		for (auto [It, End] = std::tuple{Segments.begin(), Segments.end()}; It != End; ++It)
 		{
-			const auto [EachSegmentStart, EachSegmentEnd] = *It;
-
-			FVector Intersection;
-			if (FMath::SegmentIntersection2D(
-				FVector{SegmentStart, 0.f},
-				FVector{SegmentEnd, 0.f},
-				FVector{EachSegmentStart, 0.f},
-				FVector{EachSegmentEnd, 0.f},
-				Intersection))
+			const FSegment2D& EachSegment = *It;
+			if (TOptional<FVector2D> Intersection = EachSegment.Intersects(Segment))
 			{
 				FIntersection Ret;
+				Ret.HitSegment.Points = EachSegment;
 				Ret.HitSegment.StartPointIndex = It.GetStartPointIndex();
-				Ret.HitSegment.StartPoint = EachSegmentStart;
 				Ret.HitSegment.EndPointIndex = It.GetEndPointIndex();
-				Ret.HitSegment.EndPoint = EachSegmentEnd;
-				Ret.PointOfIntersection = FVector2D{Intersection};
+				Ret.PointOfIntersection = *Intersection;
 				return Ret;
 			}
 		}

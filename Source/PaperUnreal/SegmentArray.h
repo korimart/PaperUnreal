@@ -3,7 +3,53 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "SegmentTypes.h"
 #include "Algo/Accumulate.h"
+
+
+struct FSegment2D : UE::Geometry::FSegment2d
+{
+	using Super = UE::Geometry::FSegment2d;
+	using Super::Super;
+	
+	bool ContainsX(float X) const
+	{
+		return FMath::Min(StartPoint().X, EndPoint().X) <= X
+				&& X < FMath::Max(StartPoint().X, EndPoint().X);
+	}
+	
+	bool ContainsY(float Y) const
+	{
+		return FMath::Min(StartPoint().Y, EndPoint().Y) <= Y
+				&& Y < FMath::Max(StartPoint().Y, EndPoint().Y);
+	}
+
+	float Slope() const
+	{
+		return (EndPoint().X - StartPoint().X) / (EndPoint().Y - StartPoint().Y);
+	}
+
+	FSegment2D Perp(const FVector2D& Point) const
+	{
+		return {PointBetween(ProjectUnitRange(Point)), Point};
+	}
+
+	TOptional<FVector2D> Intersects(const UE::Geometry::FSegment2d& Segment) const
+	{
+		FVector Intersection;
+		if (FMath::SegmentIntersection2D(
+			FVector{Segment.StartPoint(), 0.f},
+			FVector{Segment.EndPoint(), 0.f},
+			FVector{StartPoint(), 0.f},
+			FVector{EndPoint(), 0.f},
+			Intersection))
+		{
+			return FVector2D{ Intersection };
+		}
+
+		return {};
+	}
+};
 
 
 template <bool bLoop>
@@ -14,7 +60,7 @@ public:
 		: Points(InitPoints)
 	{
 	}
-
+	
 	const TArray<FVector2D>& GetPoints() const
 	{
 		return Points;
@@ -23,6 +69,18 @@ public:
 	int32 PointCount() const
 	{
 		return Points.Num();
+	}
+
+	int32 SegmentCount() const
+	{
+		if constexpr (bLoop)
+		{
+			return PointCount();
+		}
+		else
+		{
+			return PointCount() - 1;
+		}
 	}
 
 	FVector2D GetLastPoint(int32 IndexFromLast = 0) const
@@ -58,11 +116,9 @@ public:
 
 		while (ItPlusOne != End)
 		{
-			const auto [Segment0Start, Segment0End] = *It;
-			const auto [Segment1Start, Segment1End] = *ItPlusOne;
-			const FVector2D Segment0 = (Segment0End - Segment0Start).GetSafeNormal();
-			const FVector2D Segment1 = (Segment1End - Segment1Start).GetSafeNormal();
-			Ret += FMath::Asin(FVector2D::CrossProduct(Segment0, Segment1));
+			const FSegment2D Segment0 = *It;
+			const FSegment2D Segment1 = *ItPlusOne;
+			Ret += FMath::Asin(FVector2D::CrossProduct(Segment0.Direction, Segment1.Direction));
 
 			++It;
 			++ItPlusOne;
@@ -91,12 +147,10 @@ public:
 
 		while (ItPlusOne != End)
 		{
-			const auto [Segment0Start, Segment0End] = *It;
-			const auto [Segment1Start, Segment1End] = *ItPlusOne;
-			const FVector2D Segment0 = (Segment0End - Segment0Start).GetSafeNormal();
-			const FVector2D Segment1 = (Segment1End - Segment1Start).GetSafeNormal();
+			const FSegment2D Segment0 = *It;
+			const FSegment2D Segment1 = *ItPlusOne;
 
-			if (!Segment0.Equals(Segment1))
+			if (!Segment0.Direction.Equals(Segment1.Direction))
 			{
 				return false;
 			}
@@ -172,52 +226,41 @@ public:
 		}
 	}
 
+	FSegment2D operator[](int32 Index) const
+	{
+		if constexpr (bLoop)
+		{
+			if (Index == SegmentCount() - 1)
+			{
+				return {Points[Index], Points[0]};
+			}
+		}
+		
+		return {Points[Index], Points[Index + 1]};
+	}
+
 	class FSegmentConstIterator
 	{
 	public:
-		// TODO: FSegment 클래스를 만들어서 편의 함수를 제공하는 것이 좋을 것 같다.
-		using value_type = std::tuple<FVector2D, FVector2D>;
+		using value_type = FSegment2D;
 
 		FSegmentConstIterator(const TSegmentArray2D* InOrigin, bool bEnd = false)
 			: Origin(InOrigin)
 		{
 			if (bEnd)
 			{
-				if constexpr (bLoop)
-				{
-					CurrentIndex = Origin->Points.Num();
-				}
-				else
-				{
-					CurrentIndex = Origin->Points.Num() - 1;
-				}
+				CurrentIndex = Origin->SegmentCount();
 			}
 		}
 
 		value_type operator*() const
 		{
-			if constexpr (bLoop)
-			{
-				if (CurrentIndex == Origin->Points.Num() - 1)
-				{
-					return {Origin->Points[CurrentIndex], Origin->Points[0]};
-				}
-			}
-
-			return {Origin->Points[CurrentIndex], Origin->Points[CurrentIndex + 1]};
+			return Origin->operator[](CurrentIndex);
 		}
 
 		FSegmentConstIterator& operator++()
 		{
-			if constexpr (bLoop)
-			{
-				CurrentIndex = FMath::Min(Origin->Points.Num(), CurrentIndex + 1);
-			}
-			else
-			{
-				CurrentIndex = FMath::Min(Origin->Points.Num() - 1, CurrentIndex + 1);
-			}
-
+			CurrentIndex++;
 			return *this;
 		}
 
@@ -240,7 +283,7 @@ public:
 		{
 			if constexpr (bLoop)
 			{
-				if (CurrentIndex + 1 == Origin->Points.Num())
+				if (CurrentIndex == Origin->SegmentCount() - 1)
 				{
 					return 0;
 				}
