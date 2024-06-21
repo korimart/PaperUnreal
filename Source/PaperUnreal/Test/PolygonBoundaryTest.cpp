@@ -15,7 +15,7 @@ bool PolygonBoundaryTest::RunTest(const FString& Parameters)
 	};
 
 	FPolygonBoundary2D PolygonBoundary;
-	PolygonBoundary.Replace(0, 0, VertexPositions);
+	PolygonBoundary.ReplacePoints(0, 0, VertexPositions);
 	TestTrue(TEXT(""), PolygonBoundary.IsInside({0.f, 0.f}));
 	
 	return true;

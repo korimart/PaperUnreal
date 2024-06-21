@@ -82,6 +82,37 @@ public:
 		}, 0.f));
 	}
 
+	bool IsStraight() const
+	{
+		auto It = begin();
+		auto ItPlusOne = begin();
+		++ItPlusOne;
+		auto End = end();
+
+		while (ItPlusOne != End)
+		{
+			const auto [Segment0Start, Segment0End] = *It;
+			const auto [Segment1Start, Segment1End] = *ItPlusOne;
+			const FVector2D Segment0 = (Segment0End - Segment0Start).GetSafeNormal();
+			const FVector2D Segment1 = (Segment1End - Segment1Start).GetSafeNormal();
+
+			if (!Segment0.Equals(Segment1))
+			{
+				return false;
+			}
+			
+			++It;
+			++ItPlusOne;
+		}
+
+		return true;
+	}
+
+	bool IsClockwise() const
+	{
+		return CalculateNetAngleDelta() > 0.f;
+	}
+
 	void AddPoint(const FVector2D& Position)
 	{
 		Points.Add(Position);
@@ -90,6 +121,14 @@ public:
 	void SetLastPoint(const FVector2D& NewPosition)
 	{
 		Points.Last() = NewPosition;
+	}
+
+	void InsertPoints(int32 Index, TArrayView<const FVector2D> NewPoints)
+	{
+		if (!NewPoints.IsEmpty())
+		{
+			Points.Insert(NewPoints.GetData(), NewPoints.Num(), Index);
+		}
 	}
 
 	template <bool bLoop2 = bLoop, typename... ArgTypes>
@@ -227,16 +266,12 @@ public:
 
 private:
 	TArray<FVector2D> Points;
-	
+
 	void ReplacePointsNoLoop(int32 FirstIndex, int32 LastIndex, TArrayView<const FVector2D> NewPoints)
 	{
 		const int32 Count = FMath::Min(LastIndex - FirstIndex + 1, Points.Num());
 		Points.RemoveAt(FirstIndex, Count);
-
-		if (!NewPoints.IsEmpty())
-		{
-			Points.Insert(NewPoints.GetData(), NewPoints.Num(), FirstIndex);
-		}
+		InsertPoints(FirstIndex, NewPoints);
 	}
 };
 

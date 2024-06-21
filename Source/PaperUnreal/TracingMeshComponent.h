@@ -37,6 +37,11 @@ public:
 		}
 	}
 
+	const FSegmentArray2D& GetSegmentArray() const
+	{
+		return Segments;
+	}
+
 	const FVector2D& GetLastVertexPosition() const
 	{
 		return Segments.GetLastPoint();
@@ -63,10 +68,20 @@ public:
 		const FVector2D ActorRight2D = FVector2D{ActorToTrace->GetActorRightVector()}.GetSafeNormal();
 		return {ActorLocation2D - 50.f * ActorRight2D, ActorLocation2D, ActorLocation2D + 50.f * ActorRight2D};
 	}
+	
+	const FSegmentArray2D& GetLeftSegmentArray2D() const
+	{
+		return LeftSegments.GetSegmentArray();
+	}
 
 	const FSegmentArray2D& GetCenterSegmentArray2D() const
 	{
 		return CenterSegments;
+	}
+	
+	const FSegmentArray2D& GetRightSegmentArray2D() const
+	{
+		return RightSegments.GetSegmentArray();
 	}
 
 	void SetDynamicMeshComponent(UDynamicMeshComponent* Component)
@@ -260,10 +275,20 @@ public:
 	{
 		TracingMeshEditor.Reset();
 	}
+	
+	const FSegmentArray2D& GetLeftSegmentArray2D() const
+	{
+		return TracingMeshEditor.GetLeftSegmentArray2D();
+	}
 
 	const FSegmentArray2D& GetCenterSegmentArray2D() const
 	{
 		return TracingMeshEditor.GetCenterSegmentArray2D();
+	}
+	
+	const FSegmentArray2D& GetRightSegmentArray2D() const
+	{
+		return TracingMeshEditor.GetRightSegmentArray2D();
 	}
 
 private:

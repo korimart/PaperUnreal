@@ -19,7 +19,10 @@ public:
 	struct FSegment
 	{
 		int32 StartPointIndex;
+		FVector2D StartPoint;
+		
 		int32 EndPointIndex;
+		FVector2D EndPoint;
 	};
 
 	struct FIntersection
@@ -83,7 +86,9 @@ public:
 			{
 				Distance = DistToPoint;
 				Ret.HitSegment.StartPointIndex = It.GetStartPointIndex();
+				Ret.HitSegment.StartPoint = EachSegmentStart;
 				Ret.HitSegment.EndPointIndex = It.GetEndPointIndex();
+				Ret.HitSegment.EndPoint = EachSegmentEnd;
 				Ret.PointOfIntersection = ProjPointOnSegment;
 			}
 		}
@@ -111,7 +116,9 @@ public:
 			{
 				FIntersection Ret;
 				Ret.HitSegment.StartPointIndex = It.GetStartPointIndex();
+				Ret.HitSegment.StartPoint = EachSegmentStart;
 				Ret.HitSegment.EndPointIndex = It.GetEndPointIndex();
+				Ret.HitSegment.EndPoint = EachSegmentEnd;
 				Ret.PointOfIntersection = FVector2D{Intersection};
 				return Ret;
 			}
@@ -119,8 +126,13 @@ public:
 
 		return {};
 	}
+	
+	void InsertPoints(int32 Index, const TArray<FVector2D>& NewPoints)
+	{
+		Segments.InsertPoints(Index, NewPoints);
+	}
 
-	void Replace(int32 FirstIndex, int32 LastIndex, const TArray<FVector2D>& NewPoints)
+	void ReplacePoints(int32 FirstIndex, int32 LastIndex, const TArray<FVector2D>& NewPoints)
 	{
 		Segments.ReplacePoints(FirstIndex, LastIndex, NewPoints);
 	}
@@ -156,39 +168,25 @@ public:
 		return Ret;
 	}
 
-	void ExpandByEnclosingPath(FSegmentArray2D Path)
+	void ExpandByCounterClockwisePath(FSegmentArray2D Path)
 	{
-		const bool bPathIsClockwise = Path.CalculateNetAngleDelta() > 0.f;
-		if (bPathIsClockwise)
-		{
-			Path.ReverseVertexOrder();
-		}
-
 		Path.ApplyToEachPoint([this](FVector2D& Each) { Each = WorldToLocal2D(Each); });
-
+		
 		const FIntersection BoundarySrcSegment = AreaBoundary.FindClosestPointTo(Path.GetPoints()[0]);
 		const FIntersection BoundaryDestSegment = AreaBoundary.FindClosestPointTo(Path.GetLastPoint());
 
-		FLoopedSegmentArray2D Option0 = AreaBoundary.GetBoundarySegmentArray();
-		Option0.ReplacePoints(
-			BoundarySrcSegment.HitSegment.EndPointIndex,
-			BoundaryDestSegment.HitSegment.StartPointIndex,
-			Path.GetPoints());
-
-		Path.ReverseVertexOrder();
-		FLoopedSegmentArray2D Option1 = AreaBoundary.GetBoundarySegmentArray();
-		Option1.ReplacePoints(
-			BoundaryDestSegment.HitSegment.EndPointIndex,
-			BoundarySrcSegment.HitSegment.StartPointIndex,
-			Path.GetPoints());
-		Option1.ReverseVertexOrder();
-
-		const float Area0 = Option0.CalculateArea();
-		const float Area1 = Option1.CalculateArea();
-
-		FLoopedSegmentArray2D& Bigger = Area0 > Area1 ? Option0 : Option1;
-
-		AreaBoundary = MoveTemp(Bigger);
+		if (BoundarySrcSegment.HitSegment.StartPointIndex == BoundaryDestSegment.HitSegment.StartPointIndex)
+		{
+			AreaBoundary.InsertPoints(BoundarySrcSegment.HitSegment.EndPointIndex, Path.GetPoints());
+		}
+		else
+		{
+			AreaBoundary.ReplacePoints(
+				BoundarySrcSegment.HitSegment.EndPointIndex,
+				BoundaryDestSegment.HitSegment.StartPointIndex,
+				Path.GetPoints());
+		}
+		
 		TriangulateAreaAndSetInDynamicMesh();
 	}
 
@@ -230,7 +228,7 @@ private:
 			return Ret;
 		}();
 
-		AreaBoundary.Replace(0, 0, VertexPositions);
+		AreaBoundary.ReplacePoints(0, 0, VertexPositions);
 		TriangulateAreaAndSetInDynamicMesh();
 	}
 
