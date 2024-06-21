@@ -136,6 +136,7 @@ public:
 	class FSegmentConstIterator
 	{
 	public:
+		// TODO: FSegment 클래스를 만들어서 편의 함수를 제공하는 것이 좋을 것 같다.
 		using value_type = std::tuple<FVector2D, FVector2D>;
 
 		FSegmentConstIterator(const TSegmentArray2D* InOrigin, bool bEnd = false)

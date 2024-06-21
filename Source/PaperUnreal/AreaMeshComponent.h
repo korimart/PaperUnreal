@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "SegmentArray.h"
-#include "Algo/AllOf.h"
 #include "Components/ActorComponent.h"
 #include "Components/DynamicMeshComponent.h"
 #include "Generators/PlanarPolygonMeshGenerator.h"
@@ -42,15 +41,23 @@ public:
 			return false;
 		}
 
-		const auto IsSegmentToTheLeftOfPoint = [&](const std::tuple<FVector2D, FVector2D>& SegmentEnds)
+		int32 IntersectionCount = 0;
+		for (const auto& [SegmentStart, SegmentEnd] : Segments)
 		{
-			const FVector2D Line = std::get<1>(SegmentEnds) - std::get<0>(SegmentEnds);
-			const FVector2D ToPoint = Point - std::get<0>(SegmentEnds);
-			const double CrossProduct = FVector2D::CrossProduct(Line, ToPoint);
-			return CrossProduct < 0.;
-		};
+			if (FMath::Min(SegmentStart.Y, SegmentEnd.Y) <= Point.Y
+				&& Point.Y < FMath::Max(SegmentStart.Y, SegmentEnd.Y))
+			{
+				const float Slope = (SegmentEnd.X - SegmentStart.X) / (SegmentEnd.Y - SegmentStart.Y);
+				const int32 IntersectionX = SegmentStart.X + (Point.Y - SegmentStart.Y) * Slope;
 
-		return Algo::AllOf(Segments, IsSegmentToTheLeftOfPoint);
+				if (Point.X < IntersectionX)
+				{
+					IntersectionCount++;
+				}
+			}
+		}
+
+		return IntersectionCount % 2 == 1;
 	}
 
 	const FLoopedSegmentArray2D& GetBoundarySegmentArray() const

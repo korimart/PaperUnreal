@@ -2,5 +2,6 @@
 	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=9d44309a_002Dade8_002D4324_002D9bc9_002D4d57db2dfcb0/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="PolygonBoundrayTest" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
   &lt;TestAncestor&gt;&#xD;
     &lt;TestId&gt;UnrealTest::241F7428-1CCB-3242-9A80-11AAFDE3E84E::Windows,Version=v10.0.22621::PaperUnreal.PaperUnreal.Test.SegmentArrayTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;UnrealTest::241F7428-1CCB-3242-9A80-11AAFDE3E84E::Windows,Version=v10.0.22621::PaperUnreal.PaperUnreal.Test.PolygonBoundaryTest&lt;/TestId&gt;&#xD;
   &lt;/TestAncestor&gt;&#xD;
 &lt;/SessionState&gt;</s:String></wpf:ResourceDictionary>
