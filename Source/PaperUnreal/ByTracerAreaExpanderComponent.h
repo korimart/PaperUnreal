@@ -75,7 +75,7 @@ private:
 
 	void AttachVertexToAreaBoundary(FVector2D& Vertex) const
 	{
-		Vertex = AreaMeshComponent->FindClosestPointOnBoundary2D(Vertex).PointOfIntersection;
+		Vertex = AreaMeshComponent->FindClosestPointOnBoundary2D(Vertex).GetPoint();
 	}
 
 	FSegmentArray2D FindPathThatYieldsLargestArea() const
@@ -85,9 +85,8 @@ private:
 		if (CenterSegmentArray.IsStraight())
 		{
 			const FVector2D PointOfDeparture = CenterSegmentArray.GetPoints()[0];
-			const UAreaMeshComponent::FIntersection Intersection = AreaMeshComponent->FindClosestPointOnBoundary2D(PointOfDeparture);
 			const FVector2D PathDirection = CenterSegmentArray[0].Direction;
-			const FVector2D HitSegmentDirection = Intersection.HitSegment.Points.Direction;
+			const FVector2D HitSegmentDirection = AreaMeshComponent->FindClosestPointOnBoundary2D(PointOfDeparture).Segment.Direction;
 			const bool bCavityIsToTheRight = FVector2D::CrossProduct(PathDirection, HitSegmentDirection) > 0.;
 
 			if (bCavityIsToTheRight)

@@ -16,11 +16,25 @@ class UAreaMeshComponent : public UActorComponent
 	GENERATED_BODY()
 
 public:
-	using FIntersection = FLoopedSegmentArray2D::FIntersection;
+	struct FPointOnBoundary
+	{
+		FSegment2D Segment;
+		float Alpha;
+
+		FVector2D GetPoint() const
+		{
+			return Segment.PointBetween(Alpha);
+		}
+	};
 
 	FVector2D WorldToLocal2D(const FVector2D& World2D) const
 	{
 		return FVector2D{GetOwner()->GetActorTransform().InverseTransformPosition(FVector{World2D, 0.f})};
+	}
+
+	FVector2D LocalToWorld2D(const FVector2D& Local2D) const
+	{
+		return FVector2D{GetOwner()->GetActorTransform().TransformPosition(FVector{Local2D, 0.f})};
 	}
 
 	bool IsInside(const FVector& Point) const
@@ -28,33 +42,23 @@ public:
 		return AreaBoundary.IsInside(WorldToLocal2D(FVector2D{Point}));
 	}
 
-	FIntersection FindClosestPointOnBoundary2D(const FVector2D& Point) const
+	FPointOnBoundary FindClosestPointOnBoundary2D(const FVector2D& Point) const
 	{
-		FIntersection Ret = AreaBoundary.FindClosestPointTo(WorldToLocal2D(Point));
-		const FVector WorldPoint = GetOwner()->GetActorTransform().TransformPosition(FVector{Ret.PointOfIntersection, 0.f});
-		Ret.PointOfIntersection = FVector2D{WorldPoint};
+		using FIntersection = FLoopedSegmentArray2D::FIntersection;
+		const FIntersection Intersection = AreaBoundary.FindClosestPointTo(WorldToLocal2D(Point));
+		const FSegment2D& HitSegment = AreaBoundary[Intersection.SegmentIndex];
+
+		FPointOnBoundary Ret;
+		Ret.Segment = FSegment2D { LocalToWorld2D(HitSegment.StartPoint()), LocalToWorld2D(HitSegment.EndPoint()), };
+		Ret.Alpha = Intersection.Alpha;
+
 		return Ret;
 	}
 
 	void ExpandByCounterClockwisePath(FSegmentArray2D Path)
 	{
 		Path.ApplyToEachPoint([this](FVector2D& Each) { Each = WorldToLocal2D(Each); });
-		
-		const FIntersection BoundarySrcSegment = AreaBoundary.FindClosestPointTo(Path.GetPoints()[0]);
-		const FIntersection BoundaryDestSegment = AreaBoundary.FindClosestPointTo(Path.GetLastPoint());
-
-		if (BoundarySrcSegment.HitSegment.StartPointIndex == BoundaryDestSegment.HitSegment.StartPointIndex)
-		{
-			AreaBoundary.InsertPoints(BoundarySrcSegment.HitSegment.EndPointIndex, Path.GetPoints());
-		}
-		else
-		{
-			AreaBoundary.ReplacePoints(
-				BoundarySrcSegment.HitSegment.EndPointIndex,
-				BoundaryDestSegment.HitSegment.StartPointIndex,
-				Path.GetPoints());
-		}
-		
+		AreaBoundary.Union(Path);
 		TriangulateAreaAndSetInDynamicMesh();
 	}
 

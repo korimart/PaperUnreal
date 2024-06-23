@@ -34,7 +34,7 @@ struct FSegment2D : UE::Geometry::FSegment2d
 		return {PointBetween(ProjectUnitRange(Point)), Point};
 	}
 
-	TOptional<FVector2D> Intersects(const UE::Geometry::FSegment2d& Segment) const
+	TOptional<float> Intersects(const UE::Geometry::FSegment2d& Segment) const
 	{
 		FVector Intersection;
 		if (FMath::SegmentIntersection2D(
@@ -44,7 +44,7 @@ struct FSegment2D : UE::Geometry::FSegment2d
 			FVector{EndPoint(), 0.f},
 			Intersection))
 		{
-			return FVector2D{Intersection};
+			return ProjectUnitRange(FVector2D{Intersection});
 		}
 
 		return {};
@@ -56,19 +56,12 @@ template <bool bLoop>
 class TSegmentArray2D
 {
 public:
-	struct FHitSegment
-	{
-		FSegment2D Points;
-		int32 StartPointIndex;
-		int32 EndPointIndex;
-	};
-
 	struct FIntersection
 	{
-		FHitSegment HitSegment;
-		FVector2D PointOfIntersection;
+		int32 SegmentIndex;
+		float Alpha;
 	};
-	
+
 	TSegmentArray2D(const TArray<FVector2D>& InitPoints = {})
 		: Points(InitPoints)
 	{
@@ -94,6 +87,24 @@ public:
 		{
 			return PointCount() - 1;
 		}
+	}
+
+	static int32 SegmentIndexToStartPointIndex(int32 Index)
+	{
+		return Index;
+	}
+
+	int32 SegmentIndexToEndPointIndex(int32 Index) const
+	{
+		if constexpr (bLoop)
+		{
+			if (Index == SegmentCount() - 1)
+			{
+				return 0;
+			}
+		}
+
+		return Index + 1;
 	}
 
 	FVector2D GetLastPoint(int32 IndexFromLast = 0) const
@@ -122,19 +133,11 @@ public:
 	{
 		float Ret = 0.f;
 
-		auto It = begin();
-		auto ItPlusOne = begin();
-		++ItPlusOne;
-		auto End = end();
-
-		while (ItPlusOne != End)
+		for (int32 i = 0; i < SegmentCount() - 2; i++)
 		{
-			const FSegment2D Segment0 = *It;
-			const FSegment2D Segment1 = *ItPlusOne;
+			const FSegment2D Segment0 = operator[](i);
+			const FSegment2D Segment1 = operator[](i + 1);
 			Ret += FMath::Asin(FVector2D::CrossProduct(Segment0.Direction, Segment1.Direction));
-
-			++It;
-			++ItPlusOne;
 		}
 
 		return Ret;
@@ -153,23 +156,15 @@ public:
 
 	bool IsStraight() const
 	{
-		auto It = begin();
-		auto ItPlusOne = begin();
-		++ItPlusOne;
-		auto End = end();
-
-		while (ItPlusOne != End)
+		for (int32 i = 0; i < SegmentCount() - 2; i++)
 		{
-			const FSegment2D Segment0 = *It;
-			const FSegment2D Segment1 = *ItPlusOne;
+			const FSegment2D Segment0 = operator[](i);
+			const FSegment2D Segment1 = operator[](i + 1);
 
 			if (!Segment0.Direction.Equals(Segment1.Direction))
 			{
 				return false;
 			}
-
-			++It;
-			++ItPlusOne;
 		}
 
 		return true;
@@ -204,26 +199,26 @@ public:
 
 		return IntersectionCount % 2 == 1;
 	}
-	
+
 	FIntersection FindClosestPointTo(const FVector2D& Point) const
 	{
 		FIntersection Ret{};
 		float ShortestDistance = TNumericLimits<float>::Max();
-		for (auto [It, End] = std::tuple{begin(), end()}; It != End; ++It)
+
+		for (int32 i = 0; i < SegmentCount(); i++)
 		{
-			const FSegment2D& EachSegment = *It;
+			const FSegment2D& EachSegment = operator[](i);
 			const FSegment2D SegmentToPoint = EachSegment.Perp(Point);
 			const float DistanceToPoint = SegmentToPoint.Length();
 
 			if (ShortestDistance < DistanceToPoint)
 			{
 				ShortestDistance = DistanceToPoint;
-				Ret.HitSegment.Points = EachSegment;
-				Ret.HitSegment.StartPointIndex = It.GetStartPointIndex();
-				Ret.HitSegment.EndPointIndex = It.GetEndPointIndex();
-				Ret.PointOfIntersection = SegmentToPoint.StartPoint();
+				Ret.SegmentIndex = i;
+				Ret.Alpha = EachSegment.ProjectUnitRange(SegmentToPoint.StartPoint());
 			}
 		}
+
 		return Ret;
 	}
 
@@ -234,23 +229,21 @@ public:
 			return {};
 		}
 
-		for (auto [It, End] = std::tuple{begin(), end()}; It != End; ++It)
+		for (int32 i = 0; i < SegmentCount(); i++)
 		{
-			const FSegment2D& EachSegment = *It;
-			if (TOptional<FVector2D> Intersection = EachSegment.Intersects(Segment))
+			const FSegment2D& EachSegment = operator[](i);
+			if (TOptional<float> Intersection = EachSegment.Intersects(Segment))
 			{
 				FIntersection Ret;
-				Ret.HitSegment.Points = EachSegment;
-				Ret.HitSegment.StartPointIndex = It.GetStartPointIndex();
-				Ret.HitSegment.EndPointIndex = It.GetEndPointIndex();
-				Ret.PointOfIntersection = *Intersection;
+				Ret.SegmentIndex = i;
+				Ret.Alpha = Intersection;
 				return Ret;
 			}
 		}
 
 		return {};
 	}
-	
+
 	void AddPoint(const FVector2D& Position)
 	{
 		Points.Add(Position);
@@ -291,6 +284,25 @@ public:
 		ReplacePointsNoLoop(0, LastIndex, {});
 	}
 
+	template <bool bLoop2 = bLoop>
+	std::enable_if_t<bLoop2> Union(const TSegmentArray2D<false>& Path)
+	{
+		const FIntersection BoundarySrcSegment = FindClosestPointTo(Path.GetPoints()[0]);
+		const FIntersection BoundaryDestSegment = FindClosestPointTo(Path.GetLastPoint());
+
+		if (BoundarySrcSegment.SegmentIndex == BoundaryDestSegment.SegmentIndex)
+		{
+			InsertPoints(SegmentIndexToEndPointIndex(BoundarySrcSegment.SegmentIndex), Path.GetPoints());
+		}
+		else
+		{
+			ReplacePoints(
+				SegmentIndexToEndPointIndex(BoundarySrcSegment.SegmentIndex),
+				SegmentIndexToStartPointIndex(BoundaryDestSegment.SegmentIndex),
+				Path.GetPoints());
+		}
+	}
+
 	void ReverseVertexOrder()
 	{
 		std::reverse(Points.begin(), Points.end());
@@ -312,15 +324,11 @@ public:
 
 	FSegment2D operator[](int32 Index) const
 	{
-		if constexpr (bLoop)
+		return
 		{
-			if (Index == SegmentCount() - 1)
-			{
-				return {Points[Index], Points[0]};
-			}
-		}
-
-		return {Points[Index], Points[Index + 1]};
+			Points[SegmentIndexToStartPointIndex(Index)],
+			Points[SegmentIndexToEndPointIndex(Index)],
+		};
 	}
 
 	class FSegmentConstIterator
@@ -328,13 +336,9 @@ public:
 	public:
 		using value_type = FSegment2D;
 
-		FSegmentConstIterator(const TSegmentArray2D* InOrigin, bool bEnd = false)
-			: Origin(InOrigin)
+		FSegmentConstIterator(const TSegmentArray2D* InOrigin, int32 Index)
+			: Origin(InOrigin), CurrentIndex(Index)
 		{
-			if (bEnd)
-			{
-				CurrentIndex = Origin->SegmentCount();
-			}
 		}
 
 		value_type operator*() const
@@ -358,24 +362,6 @@ public:
 			return !(Left == Right);
 		}
 
-		int32 GetStartPointIndex() const
-		{
-			return CurrentIndex;
-		}
-
-		int32 GetEndPointIndex() const
-		{
-			if constexpr (bLoop)
-			{
-				if (CurrentIndex == Origin->SegmentCount() - 1)
-				{
-					return 0;
-				}
-			}
-
-			return CurrentIndex + 1;
-		}
-
 	private:
 		const TSegmentArray2D* Origin;
 		int32 CurrentIndex = 0;
@@ -383,12 +369,12 @@ public:
 
 	FSegmentConstIterator begin() const
 	{
-		return {this};
+		return {this, 0};
 	}
 
 	FSegmentConstIterator end() const
 	{
-		return {this, true};
+		return {this, SegmentCount()};
 	}
 
 private:
