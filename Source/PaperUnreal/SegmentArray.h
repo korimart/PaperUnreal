@@ -11,17 +11,17 @@ struct FSegment2D : UE::Geometry::FSegment2d
 {
 	using Super = UE::Geometry::FSegment2d;
 	using Super::Super;
-	
+
 	bool ContainsX(float X) const
 	{
 		return FMath::Min(StartPoint().X, EndPoint().X) <= X
-				&& X < FMath::Max(StartPoint().X, EndPoint().X);
+			&& X < FMath::Max(StartPoint().X, EndPoint().X);
 	}
-	
+
 	bool ContainsY(float Y) const
 	{
 		return FMath::Min(StartPoint().Y, EndPoint().Y) <= Y
-				&& Y < FMath::Max(StartPoint().Y, EndPoint().Y);
+			&& Y < FMath::Max(StartPoint().Y, EndPoint().Y);
 	}
 
 	float Slope() const
@@ -44,7 +44,7 @@ struct FSegment2D : UE::Geometry::FSegment2d
 			FVector{EndPoint(), 0.f},
 			Intersection))
 		{
-			return FVector2D{ Intersection };
+			return FVector2D{Intersection};
 		}
 
 		return {};
@@ -56,11 +56,24 @@ template <bool bLoop>
 class TSegmentArray2D
 {
 public:
+	struct FHitSegment
+	{
+		FSegment2D Points;
+		int32 StartPointIndex;
+		int32 EndPointIndex;
+	};
+
+	struct FIntersection
+	{
+		FHitSegment HitSegment;
+		FVector2D PointOfIntersection;
+	};
+	
 	TSegmentArray2D(const TArray<FVector2D>& InitPoints = {})
 		: Points(InitPoints)
 	{
 	}
-	
+
 	const TArray<FVector2D>& GetPoints() const
 	{
 		return Points;
@@ -154,7 +167,7 @@ public:
 			{
 				return false;
 			}
-			
+
 			++It;
 			++ItPlusOne;
 		}
@@ -167,6 +180,77 @@ public:
 		return CalculateNetAngleDelta() > 0.f;
 	}
 
+	template <bool bLoop2 = bLoop>
+	std::enable_if_t<bLoop2, bool> IsInside(const FVector2D& Point) const
+	{
+		if (!IsValid())
+		{
+			return false;
+		}
+
+		int32 IntersectionCount = 0;
+		for (const FSegment2D& Each : *this)
+		{
+			if (Each.ContainsY(Point.Y))
+			{
+				const int32 IntersectionX = Each.StartPoint().X + (Point.Y - Each.StartPoint().Y) * Each.Slope();
+
+				if (Point.X < IntersectionX)
+				{
+					IntersectionCount++;
+				}
+			}
+		}
+
+		return IntersectionCount % 2 == 1;
+	}
+	
+	FIntersection FindClosestPointTo(const FVector2D& Point) const
+	{
+		FIntersection Ret{};
+		float ShortestDistance = TNumericLimits<float>::Max();
+		for (auto [It, End] = std::tuple{begin(), end()}; It != End; ++It)
+		{
+			const FSegment2D& EachSegment = *It;
+			const FSegment2D SegmentToPoint = EachSegment.Perp(Point);
+			const float DistanceToPoint = SegmentToPoint.Length();
+
+			if (ShortestDistance < DistanceToPoint)
+			{
+				ShortestDistance = DistanceToPoint;
+				Ret.HitSegment.Points = EachSegment;
+				Ret.HitSegment.StartPointIndex = It.GetStartPointIndex();
+				Ret.HitSegment.EndPointIndex = It.GetEndPointIndex();
+				Ret.PointOfIntersection = SegmentToPoint.StartPoint();
+			}
+		}
+		return Ret;
+	}
+
+	TOptional<FIntersection> FindIntersection(const UE::Geometry::FSegment2d& Segment) const
+	{
+		if (!IsValid())
+		{
+			return {};
+		}
+
+		for (auto [It, End] = std::tuple{begin(), end()}; It != End; ++It)
+		{
+			const FSegment2D& EachSegment = *It;
+			if (TOptional<FVector2D> Intersection = EachSegment.Intersects(Segment))
+			{
+				FIntersection Ret;
+				Ret.HitSegment.Points = EachSegment;
+				Ret.HitSegment.StartPointIndex = It.GetStartPointIndex();
+				Ret.HitSegment.EndPointIndex = It.GetEndPointIndex();
+				Ret.PointOfIntersection = *Intersection;
+				return Ret;
+			}
+		}
+
+		return {};
+	}
+	
 	void AddPoint(const FVector2D& Position)
 	{
 		Points.Add(Position);
@@ -235,7 +319,7 @@ public:
 				return {Points[Index], Points[0]};
 			}
 		}
-		
+
 		return {Points[Index], Points[Index + 1]};
 	}
 

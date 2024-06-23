@@ -10,128 +10,13 @@
 #include "AreaMeshComponent.generated.h"
 
 
-/**
- * counter-clockwise
- */
-class FPolygonBoundary2D
-{
-public:
-	struct FHitSegment
-	{
-		FSegment2D Points;
-		int32 StartPointIndex;
-		int32 EndPointIndex;
-	};
-
-	struct FIntersection
-	{
-		FHitSegment HitSegment;
-		FVector2D PointOfIntersection;
-	};
-
-	FPolygonBoundary2D& operator=(FLoopedSegmentArray2D&& Other)
-	{
-		Segments = MoveTemp(Other);
-		return *this;
-	}
-
-	bool IsInside(const FVector2D& Point) const
-	{
-		if (!Segments.IsValid())
-		{
-			return false;
-		}
-
-		int32 IntersectionCount = 0;
-		for (const FSegment2D& Each : Segments)
-		{
-			if (Each.ContainsY(Point.Y))
-			{
-				const int32 IntersectionX = Each.StartPoint().X + (Point.Y - Each.StartPoint().Y) * Each.Slope();
-
-				if (Point.X < IntersectionX)
-				{
-					IntersectionCount++;
-				}
-			}
-		}
-
-		return IntersectionCount % 2 == 1;
-	}
-
-	const FLoopedSegmentArray2D& GetBoundarySegmentArray() const
-	{
-		return Segments;
-	}
-
-	FIntersection FindClosestPointTo(const FVector2D& Point) const
-	{
-		FIntersection Ret{};
-		float ShortestDistance = TNumericLimits<float>::Max();
-		for (auto [It, End] = std::tuple{Segments.begin(), Segments.end()}; It != End; ++It)
-		{
-			const FSegment2D& EachSegment = *It;
-			const FSegment2D SegmentToPoint = EachSegment.Perp(Point);
-			const float DistanceToPoint = SegmentToPoint.Length();
-
-			if (ShortestDistance < DistanceToPoint)
-			{
-				ShortestDistance = DistanceToPoint;
-				Ret.HitSegment.Points = EachSegment;
-				Ret.HitSegment.StartPointIndex = It.GetStartPointIndex();
-				Ret.HitSegment.EndPointIndex = It.GetEndPointIndex();
-				Ret.PointOfIntersection = SegmentToPoint.StartPoint();
-			}
-		}
-		return Ret;
-	}
-
-	TOptional<FIntersection> FindIntersectionWithSegment(const UE::Geometry::FSegment2d& Segment) const
-	{
-		if (!Segments.IsValid())
-		{
-			return {};
-		}
-
-		for (auto [It, End] = std::tuple{Segments.begin(), Segments.end()}; It != End; ++It)
-		{
-			const FSegment2D& EachSegment = *It;
-			if (TOptional<FVector2D> Intersection = EachSegment.Intersects(Segment))
-			{
-				FIntersection Ret;
-				Ret.HitSegment.Points = EachSegment;
-				Ret.HitSegment.StartPointIndex = It.GetStartPointIndex();
-				Ret.HitSegment.EndPointIndex = It.GetEndPointIndex();
-				Ret.PointOfIntersection = *Intersection;
-				return Ret;
-			}
-		}
-
-		return {};
-	}
-	
-	void InsertPoints(int32 Index, const TArray<FVector2D>& NewPoints)
-	{
-		Segments.InsertPoints(Index, NewPoints);
-	}
-
-	void ReplacePoints(int32 FirstIndex, int32 LastIndex, const TArray<FVector2D>& NewPoints)
-	{
-		Segments.ReplacePoints(FirstIndex, LastIndex, NewPoints);
-	}
-
-private:
-	FLoopedSegmentArray2D Segments;
-};
-
-
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class UAreaMeshComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
 public:
-	using FIntersection = FPolygonBoundary2D::FIntersection;
+	using FIntersection = FLoopedSegmentArray2D::FIntersection;
 
 	FVector2D WorldToLocal2D(const FVector2D& World2D) const
 	{
@@ -177,7 +62,7 @@ private:
 	UPROPERTY()
 	UDynamicMeshComponent* DynamicMeshComponent;
 
-	FPolygonBoundary2D AreaBoundary;
+	FLoopedSegmentArray2D AreaBoundary;
 
 	virtual void BeginPlay() override
 	{
@@ -218,7 +103,7 @@ private:
 	void TriangulateAreaAndSetInDynamicMesh()
 	{
 		UE::Geometry::FPlanarPolygonMeshGenerator Generator;
-		Generator.Polygon = UE::Geometry::FPolygon2d{AreaBoundary.GetBoundarySegmentArray().GetPoints()};
+		Generator.Polygon = UE::Geometry::FPolygon2d{AreaBoundary.GetPoints()};
 		Generator.Generate();
 		DynamicMeshComponent->GetMesh()->Copy(&Generator);
 		DynamicMeshComponent->NotifyMeshUpdated();
