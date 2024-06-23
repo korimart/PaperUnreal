@@ -49,6 +49,13 @@ struct FSegment2D : UE::Geometry::FSegment2d
 
 		return {};
 	}
+
+	friend bool operator==(const FSegment2D& Left, const FSegment2D& Right)
+	{
+		return Left.Center.Equals(Right.Center)
+			&& Left.Direction.Equals(Right.Direction)
+			&& FMath::IsNearlyEqual(Left.Extent, Right.Extent);
+	}
 };
 
 
@@ -211,7 +218,7 @@ public:
 			const FSegment2D SegmentToPoint = EachSegment.Perp(Point);
 			const float DistanceToPoint = SegmentToPoint.Length();
 
-			if (ShortestDistance < DistanceToPoint)
+			if (DistanceToPoint < ShortestDistance)
 			{
 				ShortestDistance = DistanceToPoint;
 				Ret.SegmentIndex = i;

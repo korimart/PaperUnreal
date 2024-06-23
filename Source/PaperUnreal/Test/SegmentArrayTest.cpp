@@ -7,7 +7,11 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 {
 	const auto TestPointsEqual = [&](const auto& Points0, const auto& Points1)
 	{
-		TestEqual(TEXT(""), Points0.Num(), Points1.Num());
+		if (!TestEqual(TEXT(""), Points0.Num(), Points1.Num()))
+		{
+			return;
+		}
+		
 		for (int32 i = 0; i < Points0.Num(); i++)
 		{
 			TestEqual(TEXT(""), Points0[i], Points1[i]);
@@ -45,9 +49,17 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			{1.f, 1.f},
 		};
 
-		FLoopedSegmentArray2D SegmentArray{VertexPositions};
-		SegmentArray.ReplacePoints(1, 2, Path);
-		TestPointsEqual(SegmentArray.GetPoints(), Joined);
+		{
+			FLoopedSegmentArray2D SegmentArray{VertexPositions};
+			SegmentArray.ReplacePoints(1, 2, Path);
+			TestPointsEqual(SegmentArray.GetPoints(), Joined);
+		}
+
+		{
+			FLoopedSegmentArray2D SegmentArray{VertexPositions};
+			SegmentArray.Union(Path);
+			TestPointsEqual(SegmentArray.GetPoints(), Joined);
+		}
 	}
 
 	{
@@ -81,9 +93,17 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			{-1.f, 0.f},
 		};
 
-		FLoopedSegmentArray2D SegmentArray{VertexPositions};
-		SegmentArray.ReplacePoints(3, 0, Path);
-		TestPointsEqual(SegmentArray.GetPoints(), Joined);
+		{
+			FLoopedSegmentArray2D SegmentArray{VertexPositions};
+			SegmentArray.ReplacePoints(3, 0, Path);
+			TestPointsEqual(SegmentArray.GetPoints(), Joined);
+		}
+
+		{
+			FLoopedSegmentArray2D SegmentArray{VertexPositions};
+			SegmentArray.Union(Path);
+			TestPointsEqual(SegmentArray.GetPoints(), Joined);
+		}
 	}
 
 	{
