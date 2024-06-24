@@ -11,7 +11,7 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 		{
 			return;
 		}
-		
+
 		for (int32 i = 0; i < Points0.Num(); i++)
 		{
 			TestEqual(TEXT(""), Points0[i], Points1[i]);
@@ -60,6 +60,14 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			SegmentArray.Union(Path);
 			TestPointsEqual(SegmentArray.GetPoints(), Joined);
 		}
+		
+		{
+			auto ReversedPath = Path;
+			std::reverse(ReversedPath.begin(), ReversedPath.end());
+			FLoopedSegmentArray2D SegmentArray{VertexPositions};
+			SegmentArray.Union(ReversedPath);
+			TestPointsEqual(SegmentArray.GetPoints(), Joined);
+		}
 	}
 
 	{
@@ -104,6 +112,14 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			SegmentArray.Union(Path);
 			TestPointsEqual(SegmentArray.GetPoints(), Joined);
 		}
+		
+		{
+			auto ReversedPath = Path;
+			std::reverse(ReversedPath.begin(), ReversedPath.end());
+			FLoopedSegmentArray2D SegmentArray{VertexPositions};
+			SegmentArray.Union(ReversedPath);
+			TestPointsEqual(SegmentArray.GetPoints(), Joined);
+		}
 	}
 
 	{
@@ -116,8 +132,44 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			{1.f, 1.f},
 		};
 
-		FLoopedSegmentArray2D SegmentArray{Square};
+		const FLoopedSegmentArray2D SegmentArray{Square};
 		TestTrue(TEXT(""), SegmentArray.IsInside({0.f, 0.f}));
+	}
+
+	{
+		const TArray<FVector2D> VertexPositions
+		{
+			{-1.f, 1.f},
+			{-1.f, -1.f},
+			{1.f, -1.f},
+			{1.f, 1.f},
+		};
+
+		const TArray<FVector2D> Path
+		{
+			{-1.f, 0.f},
+			{-2.f, 0.f},
+			{-2.f, -2.f},
+			{2.f, -2.f},
+			{2.f, 0.f},
+			{1.f, 0.f},
+		};
+
+		const TArray<FVector2D> Joined
+		{
+			{-1.f, 1.f},
+			{-1.f, 0.f},
+			{-2.f, 0.f},
+			{-2.f, -2.f},
+			{2.f, -2.f},
+			{2.f, -0.f},
+			{1.f, -0.f},
+			{1.f, 1.f},
+		};
+
+		FLoopedSegmentArray2D SegmentArray{VertexPositions};
+		SegmentArray.Union(Path);
+		TestPointsEqual(SegmentArray.GetPoints(), Joined);
 	}
 
 	return true;
