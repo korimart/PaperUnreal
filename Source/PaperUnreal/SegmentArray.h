@@ -63,6 +63,9 @@ template <bool bLoop>
 class TSegmentArray2D
 {
 public:
+	using FSegmentArray2D = TSegmentArray2D<false>;
+	using FLoopedSegmentArray2D = TSegmentArray2D<true>;
+
 	struct FIntersection
 	{
 		int32 SegmentIndex;
@@ -154,10 +157,9 @@ public:
 	std::enable_if_t<bLoop2, float> CalculateArea() const
 	{
 		// Shoelace formula
-		return 0.5f * FMath::Abs(Algo::TransformAccumulate(*this, [](const auto& Segment)
+		return 0.5f * FMath::Abs(Algo::TransformAccumulate(*this, [](const FSegment2D& Segment)
 		{
-			const auto& [SegmentStart, SegmentEnd] = Segment;
-			return SegmentStart.X * SegmentEnd.Y - SegmentStart.Y * SegmentEnd.X;
+			return Segment.StartPoint().X * Segment.EndPoint().Y - Segment.StartPoint().Y * Segment.EndPoint().X;
 		}, 0.f));
 	}
 
@@ -292,22 +294,54 @@ public:
 	}
 
 	template <bool bLoop2 = bLoop>
-	std::enable_if_t<bLoop2> Union(const TSegmentArray2D<false>& Path)
+	std::enable_if_t<bLoop2> Union(FSegmentArray2D Path)
 	{
+		const auto ReplacePoints = [this](
+			FLoopedSegmentArray2D& Target,
+			int32 StartSegment, int32 EndSegment,
+			const TArray<FVector2D>& Points)
+		{
+			if (StartSegment == EndSegment)
+			{
+				Target.InsertPoints(SegmentIndexToEndPointIndex(StartSegment), Points);
+			}
+			else
+			{
+				Target.ReplacePoints(
+					SegmentIndexToEndPointIndex(StartSegment),
+					SegmentIndexToStartPointIndex(EndSegment),
+					Points);
+			}
+		};
+
 		const FIntersection BoundarySrcSegment = FindClosestPointTo(Path.GetPoints()[0]);
 		const FIntersection BoundaryDestSegment = FindClosestPointTo(Path.GetLastPoint());
 
-		if (BoundarySrcSegment.SegmentIndex == BoundaryDestSegment.SegmentIndex)
+		FLoopedSegmentArray2D SrcToDestReplaced = *this;
+		ReplacePoints(
+			SrcToDestReplaced,
+			BoundarySrcSegment.SegmentIndex,
+			BoundaryDestSegment.SegmentIndex,
+			Path.GetPoints());
+
+		Path.ReverseVertexOrder();
+		FLoopedSegmentArray2D DestToSrcReplaced = *this;
+		ReplacePoints(
+			DestToSrcReplaced,
+			BoundaryDestSegment.SegmentIndex,
+			BoundarySrcSegment.SegmentIndex,
+			Path.GetPoints());
+
+		const float CurrentArea = CalculateArea();
+		const float Area0 = SrcToDestReplaced.CalculateArea();
+		const float Area1 = DestToSrcReplaced.CalculateArea();
+
+		if (CurrentArea > Area0 && CurrentArea > Area1)
 		{
-			InsertPoints(SegmentIndexToEndPointIndex(BoundarySrcSegment.SegmentIndex), Path.GetPoints());
+			return;
 		}
-		else
-		{
-			ReplacePoints(
-				SegmentIndexToEndPointIndex(BoundarySrcSegment.SegmentIndex),
-				SegmentIndexToStartPointIndex(BoundaryDestSegment.SegmentIndex),
-				Path.GetPoints());
-		}
+
+		Points = Area0 < Area1 ? MoveTemp(DestToSrcReplaced.Points) : MoveTemp(SrcToDestReplaced.Points);
 	}
 
 	void ReverseVertexOrder()
