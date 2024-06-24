@@ -24,7 +24,7 @@ public:
 	{
 		Segments.AddPoint(Position);
 		// TODO 50 조절 가능하게
-		DynamicMeshVertexIndices.Push(DynamicMesh->GetMeshRef().AppendVertex(FVector{Position, 50.f}));
+		DynamicMeshVertexIndices.Push(DynamicMesh->GetMeshRef().AppendVertex(FVector{Position, 51.f}));
 	}
 
 	void SetLastVertexPosition(const FVector2D& NewPosition)
@@ -33,7 +33,7 @@ public:
 		{
 			Segments.SetLastPoint(NewPosition);
 			// TODO 50 조절 가능하게
-			DynamicMesh->GetMeshRef().SetVertex(DynamicMeshVertexIndices.Last(), FVector{NewPosition, 50.f});
+			DynamicMesh->GetMeshRef().SetVertex(DynamicMeshVertexIndices.Last(), FVector{NewPosition, 51.f});
 		}
 	}
 
@@ -66,7 +66,7 @@ public:
 	{
 		const FVector2D ActorLocation2D{ActorToTrace->GetActorLocation()};
 		const FVector2D ActorRight2D = FVector2D{ActorToTrace->GetActorRightVector()}.GetSafeNormal();
-		return {ActorLocation2D - 50.f * ActorRight2D, ActorLocation2D, ActorLocation2D + 50.f * ActorRight2D};
+		return {ActorLocation2D - 5.f * ActorRight2D, ActorLocation2D, ActorLocation2D + 5.f * ActorRight2D};
 	}
 	
 	const FSegmentArray2D& GetLeftSegmentArray2D() const

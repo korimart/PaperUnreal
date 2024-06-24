@@ -64,10 +64,7 @@ private:
 		if (TracingMeshComponent->IsTracing() && bOwnerIsInsideArea)
 		{
 			TracingMeshComponent->SetTracingEnabled(false);
-			AreaMeshComponent->ExpandByUnionOfPaths(
-				TracingMeshComponent->GetLeftSegmentArray2D(),
-				TracingMeshComponent->GetCenterSegmentArray2D(),
-				TracingMeshComponent->GetRightSegmentArray2D());
+			AreaMeshComponent->ExpandByPath(TracingMeshComponent->GetCenterSegmentArray2D());
 		}
 		else if (!TracingMeshComponent->IsTracing() && !bOwnerIsInsideArea)
 		{

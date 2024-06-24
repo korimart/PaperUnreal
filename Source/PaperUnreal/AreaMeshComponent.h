@@ -54,18 +54,11 @@ public:
 
 		return Ret;
 	}
-
-	template <typename... PathTypes>
-		requires std::conjunction_v<std::is_same<std::decay_t<PathTypes>, FSegmentArray2D>...>
-	void ExpandByUnionOfPaths(PathTypes&&... Paths)
+	
+	void ExpandByPath(FSegmentArray2D Path)
 	{
-		const auto ApplyPathToArea = [this](auto Path)
-		{
-			Path.ApplyToEachPoint([this](FVector2D& Each) { Each = WorldToLocal2D(Each); });
-			AreaBoundary.Union(Path);
-		};
-
-		(ApplyPathToArea(Forward<PathTypes>(Paths)), ...);
+		Path.ApplyToEachPoint([this](FVector2D& Each) { Each = WorldToLocal2D(Each); });
+		AreaBoundary.Union(Path);
 		TriangulateAreaAndSetInDynamicMesh();
 	}
 
