@@ -49,16 +49,23 @@ public:
 		const FSegment2D& HitSegment = AreaBoundary[Intersection.SegmentIndex];
 
 		FPointOnBoundary Ret;
-		Ret.Segment = FSegment2D { LocalToWorld2D(HitSegment.StartPoint()), LocalToWorld2D(HitSegment.EndPoint()), };
+		Ret.Segment = FSegment2D{LocalToWorld2D(HitSegment.StartPoint()), LocalToWorld2D(HitSegment.EndPoint()),};
 		Ret.Alpha = Intersection.Alpha;
 
 		return Ret;
 	}
 
-	void ExpandByCounterClockwisePath(FSegmentArray2D Path)
+	template <typename... PathTypes>
+		requires std::conjunction_v<std::is_same<std::decay_t<PathTypes>, FSegmentArray2D>...>
+	void ExpandByUnionOfPaths(PathTypes&&... Paths)
 	{
-		Path.ApplyToEachPoint([this](FVector2D& Each) { Each = WorldToLocal2D(Each); });
-		AreaBoundary.Union(Path);
+		const auto ApplyPathToArea = [this](auto Path)
+		{
+			Path.ApplyToEachPoint([this](FVector2D& Each) { Each = WorldToLocal2D(Each); });
+			AreaBoundary.Union(Path);
+		};
+
+		(ApplyPathToArea(Forward<PathTypes>(Paths)), ...);
 		TriangulateAreaAndSetInDynamicMesh();
 	}
 

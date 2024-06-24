@@ -64,7 +64,10 @@ private:
 		if (TracingMeshComponent->IsTracing() && bOwnerIsInsideArea)
 		{
 			TracingMeshComponent->SetTracingEnabled(false);
-			AreaMeshComponent->ExpandByCounterClockwisePath(FindPathThatYieldsLargestArea());
+			AreaMeshComponent->ExpandByUnionOfPaths(
+				TracingMeshComponent->GetLeftSegmentArray2D(),
+				TracingMeshComponent->GetCenterSegmentArray2D(),
+				TracingMeshComponent->GetRightSegmentArray2D());
 		}
 		else if (!TracingMeshComponent->IsTracing() && !bOwnerIsInsideArea)
 		{
@@ -76,36 +79,5 @@ private:
 	void AttachVertexToAreaBoundary(FVector2D& Vertex) const
 	{
 		Vertex = AreaMeshComponent->FindClosestPointOnBoundary2D(Vertex).GetPoint();
-	}
-
-	FSegmentArray2D FindPathThatYieldsLargestArea() const
-	{
-		const FSegmentArray2D& CenterSegmentArray = TracingMeshComponent->GetCenterSegmentArray2D();
-		
-		if (CenterSegmentArray.IsStraight())
-		{
-			const FVector2D PointOfDeparture = CenterSegmentArray.GetPoints()[0];
-			const FVector2D PathDirection = CenterSegmentArray[0].Direction;
-			const FVector2D HitSegmentDirection = AreaMeshComponent->FindClosestPointOnBoundary2D(PointOfDeparture).Segment.Direction;
-			const bool bCavityIsToTheRight = FVector2D::CrossProduct(PathDirection, HitSegmentDirection) > 0.;
-
-			if (bCavityIsToTheRight)
-			{
-				FSegmentArray2D Ret = TracingMeshComponent->GetLeftSegmentArray2D();
-				Ret.ReverseVertexOrder();
-				return Ret;
-			}
-			
-			return TracingMeshComponent->GetRightSegmentArray2D();
-		}
-		
-		if (CenterSegmentArray.IsClockwise())
-		{
-			FSegmentArray2D Ret = TracingMeshComponent->GetLeftSegmentArray2D();
-			Ret.ReverseVertexOrder();
-			return Ret;
-		}
-		
-		return TracingMeshComponent->GetRightSegmentArray2D();
 	}
 };
