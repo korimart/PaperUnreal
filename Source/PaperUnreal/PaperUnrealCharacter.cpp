@@ -1,9 +1,11 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "PaperUnrealCharacter.h"
+
+#include "ByTracerAreaExpanderComponent.h"
+#include "TracingMeshComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Camera/CameraComponent.h"
-#include "Components/DecalComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
@@ -43,6 +45,9 @@ APaperUnrealCharacter::APaperUnrealCharacter()
 	// Activate ticking in order to update the cursor every frame.
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
+
+	TracingMeshComponent = CreateDefaultSubobject<UTracingMeshComponent>(TEXT("TracingMeshComponent"));
+	AreaExpanderComponent = CreateDefaultSubobject<UByTracerAreaExpanderComponent>(TEXT("AreaExpanderComponent"));
 }
 
 void APaperUnrealCharacter::Tick(float DeltaSeconds)

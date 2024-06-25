@@ -2,11 +2,13 @@
 
 #include "PaperUnrealGameMode.h"
 #include "PaperUnrealPlayerController.h"
-#include "PaperUnrealCharacter.h"
+#include "PaperUnrealGameState.h"
 #include "UObject/ConstructorHelpers.h"
 
 APaperUnrealGameMode::APaperUnrealGameMode()
 {
+	GameStateClass = APaperUnrealGameState::StaticClass();
+	
 	// use our custom PlayerController class
 	PlayerControllerClass = APaperUnrealPlayerController::StaticClass();
 
