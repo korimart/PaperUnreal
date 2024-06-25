@@ -235,7 +235,7 @@ private:
 };
 
 
-UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+UCLASS()
 class UTracingMeshComponent : public UActorComponent
 {
 	GENERATED_BODY()

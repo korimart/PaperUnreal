@@ -10,7 +10,7 @@
 #include "ByTracerAreaExpanderComponent.generated.h"
 
 
-UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+UCLASS()
 class UByTracerAreaExpanderComponent : public UActorComponent
 {
 	GENERATED_BODY()

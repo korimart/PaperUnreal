@@ -10,7 +10,7 @@
 #include "AreaMeshComponent.generated.h"
 
 
-UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+UCLASS()
 class UAreaMeshComponent : public UActorComponent
 {
 	GENERATED_BODY()
