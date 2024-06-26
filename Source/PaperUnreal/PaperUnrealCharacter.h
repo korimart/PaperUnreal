@@ -35,6 +35,6 @@ private:
 	class UTracingMeshComponent* TracingMeshComponent;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Custom, meta = (AllowPrivateAccess = "true"))
-	class UByTracerAreaExpanderComponent* AreaExpanderComponent;
+	class UTracerAreaExpanderComponent* AreaExpanderComponent;
 };
 

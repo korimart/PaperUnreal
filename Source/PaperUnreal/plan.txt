@@ -56,7 +56,7 @@ Tracer의 책임
 -> 데디에서 버텍스를 받아오기 위해서는 2번 책임을 별도의 클래스로 분리할 필요가 있음
 
 
-ByTracerAreaExpander의 책임
+TracerAreaExpander의 책임
 1. Tracer의 2번 책임을 컨트롤 (영역 안에 플레이어가 위치하는지에 껐다 킴)
 2. Tracer가 꺼질 때마다 Tracer가 차지하는 영역을 Area에 더함
 -> 데디에서만 이루어져야 하므로 컴포넌트는 데디에만 붙이면 됨

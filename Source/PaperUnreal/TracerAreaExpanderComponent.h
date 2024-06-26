@@ -7,11 +7,11 @@
 #include "EngineUtils.h"
 #include "TracingMeshComponent.h"
 #include "Components/ActorComponent.h"
-#include "ByTracerAreaExpanderComponent.generated.h"
+#include "TracerAreaExpanderComponent.generated.h"
 
 
 UCLASS()
-class UByTracerAreaExpanderComponent : public UActorComponent
+class UTracerAreaExpanderComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
@@ -22,7 +22,7 @@ private:
 	UPROPERTY()
 	UTracingMeshComponent* TracingMeshComponent;
 
-	UByTracerAreaExpanderComponent()
+	UTracerAreaExpanderComponent()
 	{
 		PrimaryComponentTick.bCanEverTick = true;
 	}
