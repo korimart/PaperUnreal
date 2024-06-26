@@ -41,23 +41,28 @@ class UUECoroutineTestValueProvider : public UObject
 	GENERATED_BODY()
 
 public:
-	FSimpleAwaitable FetchValue()
+	FWeakAwaitableInt32 FetchInt()
 	{
-		FSimpleAwaitable Ret;
-		Proxies.Add(Ret.Proxy);
+		FWeakAwaitableInt32 Ret;
+		Handles.Add(Ret.GetHandle());
 		return Ret;
 	}
 
 	void IssueValue(int32 Value)
 	{
-		if (!Proxies.IsEmpty())
+		if (!Handles.IsEmpty())
 		{
-			const auto Proxy = Proxies[0];
-			Proxies.RemoveAt(0);
-			Proxy->SetValue(Value);
+			auto Handle = MoveTemp(Handles[0]);
+			Handles.RemoveAt(0);
+			Handle.SetValue(Value);
 		}
 	}
 
+	void ClearRequests()
+	{
+		Handles.Empty();
+	}
+
 private:
-	TArray<TSharedPtr<FSimpleProxy>> Proxies;
+	TArray<FWeakAwaitableHandleInt32> Handles;
 };
