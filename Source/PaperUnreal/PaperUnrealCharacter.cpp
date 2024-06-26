@@ -4,6 +4,7 @@
 
 #include "TracerAreaExpanderComponent.h"
 #include "TracerMeshComponent.h"
+#include "UECoroutine.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -47,10 +48,25 @@ APaperUnrealCharacter::APaperUnrealCharacter()
 	PrimaryActorTick.bStartWithTickEnabled = true;
 
 	TracerMeshComponent = CreateDefaultSubobject<UTracerMeshComponent>(TEXT("TracerMeshComponent"));
-	AreaExpanderComponent = CreateDefaultSubobject<UTracerAreaExpanderComponent>(TEXT("AreaExpanderComponent"));
 }
 
-void APaperUnrealCharacter::Tick(float DeltaSeconds)
+void APaperUnrealCharacter::BeginPlay()
 {
-    Super::Tick(DeltaSeconds);
+	Super::BeginPlay();
+
+	if (GetNetMode() != NM_Client)
+	{
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
+		{
+			// TODO
+			// wait for team info
+
+			// get team area
+			
+			AreaExpanderComponent = NewObject<UTracerAreaExpanderComponent>(this);
+			AreaExpanderComponent->SetExpansionTarget(nullptr);
+			AreaExpanderComponent->RegisterComponent();
+			co_return;
+		});
+	}
 }

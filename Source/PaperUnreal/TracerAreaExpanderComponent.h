@@ -15,6 +15,12 @@ class UTracerAreaExpanderComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
+public:
+	void SetExpansionTarget(UAreaMeshComponent* Target)
+	{
+		AreaMeshComponent = Target;
+	}
+
 private:
 	UPROPERTY()
 	UAreaMeshComponent* AreaMeshComponent;
@@ -35,19 +41,6 @@ private:
 		Super::BeginPlay();
 
 		check(GetOwner()->IsA<APawn>());
-
-		// TODO replace this with team based search and more efficient one
-		AreaMeshComponent = [&]() -> UAreaMeshComponent* {
-			for (FActorIterator It{GetWorld()}; It; ++It)
-			{
-				if (const auto Found = It->FindComponentByClass<UAreaMeshComponent>())
-				{
-					return Found;
-				}
-			}
-			return nullptr;
-		}();
-		check(IsValid(AreaMeshComponent));
 
 		TracerMeshComponent = GetOwner()->FindComponentByClass<UTracerMeshComponent>();
 		check(IsValid(TracerMeshComponent));

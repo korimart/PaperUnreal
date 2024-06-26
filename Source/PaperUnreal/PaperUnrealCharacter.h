@@ -14,9 +14,6 @@ class APaperUnrealCharacter : public ACharacter
 public:
 	APaperUnrealCharacter();
 
-	// Called every frame.
-	virtual void Tick(float DeltaSeconds) override;
-
 	/** Returns TopDownCameraComponent subobject **/
 	FORCEINLINE class UCameraComponent* GetTopDownCameraComponent() const { return TopDownCameraComponent; }
 	/** Returns CameraBoom subobject **/
@@ -36,5 +33,6 @@ private:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Custom, meta = (AllowPrivateAccess = "true"))
 	class UTracerAreaExpanderComponent* AreaExpanderComponent;
-};
 
+	virtual void BeginPlay() override;
+};
