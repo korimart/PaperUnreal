@@ -6,6 +6,9 @@
 #include <coroutine>
 
 
+struct FSimpleAwaitable;
+
+
 struct FWeakCoroutine
 {
 	struct promise_type
@@ -13,17 +16,17 @@ struct FWeakCoroutine
 		TWeakObjectPtr<UObject> Lifetime;
 		TSharedPtr<TUniqueFunction<FWeakCoroutine()>> LambdaCaptures;
 		TSharedPtr<bool> Destroyed = MakeShared<bool>(false);
-		
+
 		FWeakCoroutine get_return_object()
 		{
 			return std::coroutine_handle<promise_type>::from_promise(*this);
 		}
-		
+
 		std::suspend_always initial_suspend() const
 		{
 			return {};
 		}
-		
+
 		std::suspend_never final_suspend() const noexcept
 		{
 			*Destroyed = true;
@@ -37,6 +40,13 @@ struct FWeakCoroutine
 		void unhandled_exception() const
 		{
 		}
+
+		template <typename AwaitableType>
+		decltype(auto) await_transform(AwaitableType&& Awaitable)
+		{
+			static_assert(std::is_same_v<AwaitableType, FSimpleAwaitable>);
+			return Forward<AwaitableType>(Awaitable);
+		}
 	};
 
 	void Init(UObject* Lifetime, TSharedPtr<TUniqueFunction<FWeakCoroutine()>> LambdaCaptures)
@@ -48,7 +58,7 @@ struct FWeakCoroutine
 
 private:
 	std::coroutine_handle<promise_type> Handle;
-	
+
 	FWeakCoroutine(std::coroutine_handle<promise_type> InHandle)
 		: Handle(InHandle)
 	{
@@ -96,14 +106,12 @@ struct FSimpleAwaitable
 
 	void await_suspend(std::coroutine_handle<FWeakCoroutine::promise_type> Handle)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("suspended"));
 		Proxy->Destroyed = Handle.promise().Destroyed;
 		Proxy->Handle = Handle;
 	}
 
 	int32 await_resume()
 	{
-		UE_LOG(LogTemp, Warning, TEXT("resumed"));
 		return *Proxy->Value;
 	}
 };

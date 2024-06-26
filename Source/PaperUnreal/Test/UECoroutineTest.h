@@ -7,43 +7,57 @@
 #include "UECoroutineTest.generated.h"
 
 
-class FUECoroutineCheckDestroy
+struct FUECoroutineTestLifetime
 {
-public:
-	FUECoroutineCheckDestroy() = default;
-	
-	~FUECoroutineCheckDestroy()
+	TSharedPtr<bool> bDestroyed = MakeShared<bool>(false);
+
+	~FUECoroutineTestLifetime()
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Destoryed"));
+		*bDestroyed = true;
+	}
+};
+
+
+struct FUECoroutineTestIncompatibleAwaitable
+{
+	bool await_ready() const
+	{
+		return false;
+	}
+
+	void await_suspend(std::coroutine_handle<FWeakCoroutine::promise_type> Handle)
+	{
+	}
+
+	void await_resume()
+	{
 	}
 };
 
 
 UCLASS()
-class UUECoroutineTestObject : public UObject
+class UUECoroutineTestValueProvider : public UObject
 {
 	GENERATED_BODY()
 
 public:
-	TSharedPtr<FSimpleProxy> Proxy;
-	
-	void DoSomeCoroutine()
-	{
-		RunWeakCoroutine(this, [this, SomeObject = MakeUnique<FUECoroutineCheckDestroy>()]() -> FWeakCoroutine
-		{
-			UE_LOG(LogTemp, Warning, TEXT("Hi"));
-			int32 Value = co_await WaitForValue();
-			UE_LOG(LogTemp, Warning, TEXT("Got %d"), Value);
-			
-			UE_LOG(LogTemp, Warning, TEXT("returning"));
-			co_return;
-		});
-	}
-
-	FSimpleAwaitable WaitForValue()
+	FSimpleAwaitable FetchValue()
 	{
 		FSimpleAwaitable Ret;
-		Proxy = Ret.Proxy;
+		Proxies.Add(Ret.Proxy);
 		return Ret;
 	}
+
+	void IssueValue(int32 Value)
+	{
+		if (!Proxies.IsEmpty())
+		{
+			const auto Proxy = Proxies[0];
+			Proxies.RemoveAt(0);
+			Proxy->SetValue(Value);
+		}
+	}
+
+private:
+	TArray<TSharedPtr<FSimpleProxy>> Proxies;
 };
