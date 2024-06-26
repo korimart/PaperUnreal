@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "AreaMeshComponent.h"
 #include "EngineUtils.h"
-#include "TracingMeshComponent.h"
+#include "TracerMeshComponent.h"
 #include "Components/ActorComponent.h"
 #include "TracerAreaExpanderComponent.generated.h"
 
@@ -18,9 +18,12 @@ class UTracerAreaExpanderComponent : public UActorComponent
 private:
 	UPROPERTY()
 	UAreaMeshComponent* AreaMeshComponent;
+	
+	UPROPERTY()
+	UTracerMeshComponent* TracerMeshComponent;
 
 	UPROPERTY()
-	UTracingMeshComponent* TracingMeshComponent;
+	UTracerVertexGeneratorComponent* VertexGeneratorComponent;
 
 	UTracerAreaExpanderComponent()
 	{
@@ -46,13 +49,16 @@ private:
 		}();
 		check(IsValid(AreaMeshComponent));
 
-		TracingMeshComponent = GetOwner()->FindComponentByClass<UTracingMeshComponent>();
-		check(IsValid(TracingMeshComponent));
+		TracerMeshComponent = GetOwner()->FindComponentByClass<UTracerMeshComponent>();
+		check(IsValid(TracerMeshComponent));
 
-		TracingMeshComponent->FirstEdgeModifier.BindWeakLambda(
+		VertexGeneratorComponent = NewObject<UTracerVertexGeneratorComponent>(GetOwner());
+		VertexGeneratorComponent->SetGenerationDestination(TracerMeshComponent);
+		VertexGeneratorComponent->FirstEdgeModifier.BindWeakLambda(
 			this, [this](auto&... Vertices) { (AttachVertexToAreaBoundary(Vertices), ...); });
-		TracingMeshComponent->LastEdgeModifier.BindWeakLambda(
+		VertexGeneratorComponent->LastEdgeModifier.BindWeakLambda(
 			this, [this](auto&... Vertices) { (AttachVertexToAreaBoundary(Vertices), ...); });
+		VertexGeneratorComponent->RegisterComponent();
 	}
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override
@@ -61,16 +67,24 @@ private:
 
 		const bool bOwnerIsInsideArea = AreaMeshComponent->IsInside(GetOwner()->GetActorLocation());
 
-		if (TracingMeshComponent->IsTracing() && bOwnerIsInsideArea)
+		if (VertexGeneratorComponent->IsGenerating() && bOwnerIsInsideArea)
 		{
-			TracingMeshComponent->SetTracingEnabled(false);
-			AreaMeshComponent->ExpandByPath(TracingMeshComponent->GetCenterSegmentArray2D());
+			VertexGeneratorComponent->SetGenerationEnabled(false);
+			AreaMeshComponent->ExpandByPath(TracerMeshComponent->GetCenterSegmentArray2D());
 		}
-		else if (!TracingMeshComponent->IsTracing() && !bOwnerIsInsideArea)
+		else if (!VertexGeneratorComponent->IsGenerating() && !bOwnerIsInsideArea)
 		{
-			TracingMeshComponent->Reset();
-			TracingMeshComponent->SetTracingEnabled(true);
+			TracerMeshComponent->Reset();
+			VertexGeneratorComponent->SetGenerationEnabled(true);
 		}
+	}
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override
+	{
+		Super::EndPlay(EndPlayReason);
+		
+		VertexGeneratorComponent->DestroyComponent();
+		VertexGeneratorComponent = nullptr;
 	}
 
 	void AttachVertexToAreaBoundary(FVector2D& Vertex) const

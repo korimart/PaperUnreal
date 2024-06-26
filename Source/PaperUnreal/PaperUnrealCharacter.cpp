@@ -3,7 +3,7 @@
 #include "PaperUnrealCharacter.h"
 
 #include "TracerAreaExpanderComponent.h"
-#include "TracingMeshComponent.h"
+#include "TracerMeshComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -46,7 +46,7 @@ APaperUnrealCharacter::APaperUnrealCharacter()
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
 
-	TracingMeshComponent = CreateDefaultSubobject<UTracingMeshComponent>(TEXT("TracingMeshComponent"));
+	TracerMeshComponent = CreateDefaultSubobject<UTracerMeshComponent>(TEXT("TracerMeshComponent"));
 	AreaExpanderComponent = CreateDefaultSubobject<UTracerAreaExpanderComponent>(TEXT("AreaExpanderComponent"));
 }
 

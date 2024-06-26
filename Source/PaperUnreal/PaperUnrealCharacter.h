@@ -32,7 +32,7 @@ private:
 	class USpringArmComponent* CameraBoom;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Custom, meta = (AllowPrivateAccess = "true"))
-	class UTracingMeshComponent* TracingMeshComponent;
+	class UTracerMeshComponent* TracerMeshComponent;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Custom, meta = (AllowPrivateAccess = "true"))
 	class UTracerAreaExpanderComponent* AreaExpanderComponent;
