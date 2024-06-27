@@ -3,6 +3,7 @@
 #include "PaperUnrealGameMode.h"
 #include "PaperUnrealPlayerController.h"
 #include "PaperUnrealGameState.h"
+#include "PaperUnrealPlayerState.h"
 #include "UObject/ConstructorHelpers.h"
 
 APaperUnrealGameMode::APaperUnrealGameMode()
@@ -11,6 +12,8 @@ APaperUnrealGameMode::APaperUnrealGameMode()
 	
 	// use our custom PlayerController class
 	PlayerControllerClass = APaperUnrealPlayerController::StaticClass();
+
+	PlayerStateClass = APaperUnrealPlayerState::StaticClass();
 
 	// set default pawn class to our Blueprinted character
 	static ConstructorHelpers::FClassFinder<APawn> PlayerPawnBPClass(TEXT("/Game/TopDown/Blueprints/BP_TopDownCharacter"));
@@ -25,4 +28,19 @@ APaperUnrealGameMode::APaperUnrealGameMode()
 	{
 		PlayerControllerClass = PlayerControllerBPClass.Class;
 	}
+}
+
+void APaperUnrealGameMode::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// TODO
+	GetGameState<APaperUnrealGameState>()->AreaSpawnerComponent->SpawnAreaAtRandomEmptyLocation(0);
+	GetGameState<APaperUnrealGameState>()->AreaSpawnerComponent->SpawnAreaAtRandomEmptyLocation(1);
+}
+
+void APaperUnrealGameMode::OnPostLogin(AController* NewPlayer)
+{
+	Super::OnPostLogin(NewPlayer);
+	NewPlayer->GetPlayerState<APaperUnrealPlayerState>()->TeamComponent->SetTeamIndex(NextTeamIndex++);
 }

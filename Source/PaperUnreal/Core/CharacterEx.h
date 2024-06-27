@@ -17,7 +17,12 @@ public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnControllerChanged, AController*);
 	FOnControllerChanged OnControllerChanged;
 	
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnPlayerStateChanged, APlayerState*);
+	FOnPlayerStateChanged OnNewPlayerState;
+	
 	TWeakAwaitable<AController*> WaitForController();
+	TWeakAwaitable<APlayerState*> WaitForPlayerState();
 
 	virtual void NotifyControllerChanged() override;
+	virtual void OnPlayerStateChanged(APlayerState* NewPlayerState, APlayerState* OldPlayerState) override;
 };

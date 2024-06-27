@@ -15,9 +15,13 @@ class APaperUnrealGameState : public AGameStateBase
 {
 	GENERATED_BODY()
 
+public:
+	UPROPERTY()
+	UAreaSpawnerComponent* AreaSpawnerComponent;
+
 private:
 	APaperUnrealGameState()
 	{
-		CreateDefaultSubobject<UAreaSpawnerComponent>(TEXT("AreaSpawnerComponent"));
+		AreaSpawnerComponent = CreateDefaultSubobject<UAreaSpawnerComponent>(TEXT("AreaSpawnerComponent"));
 	}
 };

@@ -11,8 +11,14 @@ class APaperUnrealGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
 
-public:
+private:
+	// TODO
+	int32 NextTeamIndex = 0;
+	
 	APaperUnrealGameMode();
+
+	virtual void BeginPlay() override;
+	virtual void OnPostLogin(AController* NewPlayer) override;
 };
 
 

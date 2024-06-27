@@ -16,9 +16,16 @@ public:
 	UPROPERTY()
 	UAreaMeshComponent* AreaMeshComponent;
 
+	int32 GetTeamIndex() const { return TeamIndex; }
+	void SetTeamIndex(int32 Index) { TeamIndex = Index; }
+
 private:
+	int32 TeamIndex = 0;
+	
 	AAreaActor()
 	{
+		bReplicates = true;
+		bAlwaysRelevant = true;
 		RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("RootComponent"));
 		AreaMeshComponent = CreateDefaultSubobject<UAreaMeshComponent>(TEXT("AreaMeshComponent"));
 	}

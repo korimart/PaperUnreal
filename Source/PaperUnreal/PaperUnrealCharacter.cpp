@@ -4,6 +4,7 @@
 
 #include "AreaActor.h"
 #include "AreaSpawnerComponent.h"
+#include "TeamComponent.h"
 #include "TracerAreaExpanderComponent.h"
 #include "TracerMeshComponent.h"
 #include "Core/UECoroutine.h"
@@ -17,6 +18,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Materials/Material.h"
 #include "Engine/World.h"
+#include "GameFramework/PlayerState.h"
 
 APaperUnrealCharacter::APaperUnrealCharacter()
 {
@@ -62,10 +64,10 @@ void APaperUnrealCharacter::BeginPlay()
 	{
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
-			AController* Controller = co_await WaitForController();
 			AGameStateBase* GameState = co_await WaitForGameState(GetWorld());
-			UAreaSpawnerComponent* AreaSpawner = co_await WaitForComponent<UAreaSpawnerComponent>(GameState);
-			AAreaActor* Area = co_await AreaSpawner->WaitForAreaBelongingTo(Controller);
+			UAreaSpawnerComponent* AreaSpawnerComponent = co_await WaitForComponent<UAreaSpawnerComponent>(GameState);
+			UTeamComponent* TeamComponent = co_await WaitForComponent<UTeamComponent>(co_await WaitForPlayerState());
+			AAreaActor* Area = co_await AreaSpawnerComponent->WaitForAreaBelongingTo(co_await TeamComponent->WaitForTeamIndex());
 
 			UTracerAreaExpanderComponent* AreaExpanderComponent = NewObject<UTracerAreaExpanderComponent>(this);
 			AreaExpanderComponent->SetExpansionTarget(Area->AreaMeshComponent);
