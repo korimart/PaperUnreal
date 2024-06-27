@@ -4,15 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "AreaRegistryComponent.generated.h"
+#include "ActorComponentEx.generated.h"
 
 
 UCLASS()
-class UAreaRegistryComponent : public UActorComponent
+class UActorComponentEx : public UActorComponent
 {
 	GENERATED_BODY()
 
 public:
-
-private:
+	virtual void BeginPlay() override;
 };

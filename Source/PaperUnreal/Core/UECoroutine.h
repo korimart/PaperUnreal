@@ -27,6 +27,16 @@ template <typename T, template <typename...> typename Template>
 inline constexpr bool TIsInstantiationOf_V = TIsInstantiationOf<T, Template>::value;
 
 
+template <typename SignatureType>
+struct TGetFirstParam;
+
+template <typename RetType, typename First, typename... Rest>
+struct TGetFirstParam<RetType(First, Rest...)>
+{
+	using Type = First;
+};
+
+
 template <typename>
 class TWeakAwaitable;
 
@@ -160,7 +170,7 @@ public:
 	template <typename ArgType>
 	void SetValue(ArgType&& Arg)
 	{
-		Value = Forward<ArgType>(Arg);
+		Value.Emplace(Forward<ArgType>(Arg));
 		Handle.Resume();
 	}
 
@@ -233,6 +243,7 @@ public:
 	TWeakAwaitable() = default;
 
 	template <typename T>
+		requires std::is_convertible_v<std::decay_t<T>, std::decay_t<ValueType>>
 	TWeakAwaitable(T&& Ready)
 	{
 		Value->SetValue(Forward<T>(Ready));
@@ -245,9 +256,20 @@ public:
 		return {Value};
 	}
 
-	// TODO write a test for this
 	template <typename DelegateType>
 	void SetValueFromMulticastDelegate(UObject* Lifetime, DelegateType& MulticastDelegate)
+	{
+		SetValueFromMulticastDelegate(
+			Lifetime,
+			MulticastDelegate,
+			[]<typename ArgType>(ArgType&& Pass) -> decltype(auto)
+			{
+				return Forward<ArgType>(Pass);
+			});
+	}
+
+	template <typename DelegateType, typename TransformFuncType>
+	void SetValueFromMulticastDelegate(UObject* Lifetime, DelegateType& MulticastDelegate, TransformFuncType&& TransformFunc)
 	{
 		auto DelegateUnbinder = MakeShared<bool>();
 
@@ -260,12 +282,13 @@ public:
 			[
 				SharedHandle = MakeShared<TWeakAwaitableHandle<ValueType>>(GetHandle()),
 				DelegateUnbinder = DelegateUnbinder.ToSharedPtr(),
-				Lifetime = TWeakObjectPtr{Lifetime}
+				Lifetime = TWeakObjectPtr{Lifetime},
+				TransformFunc = Forward<TransformFuncType>(TransformFunc)
 			]<typename ArgType>(ArgType&& Arg) mutable
 			{
 				if (Lifetime.IsValid())
 				{
-					SharedHandle->SetValueIfNotSet(Forward<ArgType>(Arg));
+					SharedHandle->SetValueIfNotSet(TransformFunc(Forward<ArgType>(Arg)));
 				}
 
 				DelegateUnbinder = nullptr;
@@ -293,7 +316,7 @@ public:
 		{
 			Handle.promise().bCustomSuspended = false;
 		}
-		
+
 		return Value->GetValue();
 	}
 
@@ -342,6 +365,31 @@ template <typename T>
 TReadyWeakAwaitable<T> CreateReadyWeakAwaitable(T&& Value)
 {
 	return TReadyWeakAwaitable<T>{Forward<T>(Value)};
+}
+
+
+template <
+	typename MulticastDelegateType,
+	typename ReturnType = typename TGetFirstParam<typename MulticastDelegateType::FDelegate::TFuncType>::Type>
+TWeakAwaitable<ReturnType> WaitForBroadcast(UObject* Lifetime, MulticastDelegateType& Delegate)
+{
+	TWeakAwaitable<ReturnType> Ret;
+	Ret.SetValueFromMulticastDelegate(Lifetime, Delegate);
+	return Ret;
+}
+
+
+template <
+	typename MulticastDelegateType,
+	typename TransformFuncType>
+auto WaitForBroadcast(UObject* Lifetime, MulticastDelegateType& Delegate, TransformFuncType&& TransformFunc)
+{
+	using DelegateReturnType = typename TGetFirstParam<typename MulticastDelegateType::FDelegate::TFuncType>::Type;
+	using ReturnType = decltype(std::declval<TransformFuncType>()(std::declval<DelegateReturnType>()));
+	
+	TWeakAwaitable<ReturnType> Ret;
+	Ret.SetValueFromMulticastDelegate(Lifetime, Delegate, Forward<TransformFuncType>(TransformFunc));
+	return Ret;
 }
 
 

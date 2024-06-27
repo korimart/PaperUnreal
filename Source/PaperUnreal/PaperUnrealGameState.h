@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AreaSpawnerComponent.h"
 #include "GameFramework/GameStateBase.h"
 #include "PaperUnrealGameState.generated.h"
 
@@ -13,4 +14,10 @@ UCLASS()
 class APaperUnrealGameState : public AGameStateBase
 {
 	GENERATED_BODY()
+
+private:
+	APaperUnrealGameState()
+	{
+		CreateDefaultSubobject<UAreaSpawnerComponent>(TEXT("AreaSpawnerComponent"));
+	}
 };

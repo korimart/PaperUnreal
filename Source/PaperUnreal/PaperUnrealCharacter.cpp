@@ -2,12 +2,16 @@
 
 #include "PaperUnrealCharacter.h"
 
+#include "AreaActor.h"
+#include "AreaSpawnerComponent.h"
 #include "TracerAreaExpanderComponent.h"
 #include "TracerMeshComponent.h"
 #include "Core/UECoroutine.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Core/ComponentRegistry.h"
+#include "Core/Utils.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -58,16 +62,14 @@ void APaperUnrealCharacter::BeginPlay()
 	{
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
-			// TODO
-			// wait for team info
 			AController* Controller = co_await WaitForController();
+			AGameStateBase* GameState = co_await WaitForGameState(GetWorld());
+			UAreaSpawnerComponent* AreaSpawner = co_await WaitForComponent<UAreaSpawnerComponent>(GameState);
+			AAreaActor* Area = co_await AreaSpawner->WaitForAreaBelongingTo(Controller);
 
-			// get team area
-			
 			UTracerAreaExpanderComponent* AreaExpanderComponent = NewObject<UTracerAreaExpanderComponent>(this);
-			AreaExpanderComponent->SetExpansionTarget(nullptr);
+			AreaExpanderComponent->SetExpansionTarget(Area->AreaMeshComponent);
 			AreaExpanderComponent->RegisterComponent();
-			co_return;
 		});
 	}
 }

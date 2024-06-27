@@ -12,9 +12,7 @@ TWeakAwaitable<AController*> ACharacterEx::WaitForController()
 		return ValidController;
 	}
 
-	TWeakAwaitable<AController*> Ret;
-	Ret.SetValueFromMulticastDelegate(this, OnControllerChanged);
-	return Ret;
+	return WaitForBroadcast(this, OnControllerChanged);
 }
 
 void ACharacterEx::NotifyControllerChanged()
