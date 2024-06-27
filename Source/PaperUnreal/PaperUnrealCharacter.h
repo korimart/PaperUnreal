@@ -3,11 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Character.h"
+#include "Core/CharacterEx.h"
 #include "PaperUnrealCharacter.generated.h"
 
 UCLASS(Blueprintable)
-class APaperUnrealCharacter : public ACharacter
+class APaperUnrealCharacter : public ACharacterEx
 {
 	GENERATED_BODY()
 
@@ -31,8 +31,5 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Custom, meta = (AllowPrivateAccess = "true"))
 	class UTracerMeshComponent* TracerMeshComponent;
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Custom, meta = (AllowPrivateAccess = "true"))
-	class UTracerAreaExpanderComponent* AreaExpanderComponent;
-
 	virtual void BeginPlay() override;
 };

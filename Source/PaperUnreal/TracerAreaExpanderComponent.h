@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "AreaMeshComponent.h"
-#include "EngineUtils.h"
 #include "TracerMeshComponent.h"
 #include "Components/ActorComponent.h"
 #include "TracerAreaExpanderComponent.generated.h"

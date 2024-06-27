@@ -13,6 +13,20 @@ struct TFalse
 };
 
 
+template <typename, template <typename...> typename>
+struct TIsInstantiationOf : std::false_type
+{
+};
+
+template <typename... Args, template <typename...> typename T>
+struct TIsInstantiationOf<T<Args...>, T> : std::true_type
+{
+};
+
+template <typename T, template <typename...> typename Template>
+inline constexpr bool TIsInstantiationOf_V = TIsInstantiationOf<T, Template>::value;
+
+
 template <typename>
 class TWeakAwaitable;
 
@@ -52,25 +66,20 @@ struct FWeakCoroutine
 		void unhandled_exception() const
 		{
 		}
-		
-		template <typename ValueType>
-		decltype(auto) await_transform(TReadyWeakAwaitable<ValueType>&& Awaitable)
-		{
-			return Forward<TReadyWeakAwaitable<ValueType>>(Awaitable);
-		}
-
-		template <typename ValueType>
-		decltype(auto) await_transform(TWeakAwaitable<ValueType>&& Awaitable)
-		{
-			return Forward<TWeakAwaitable<ValueType>>(Awaitable);
-		}
 
 		template <typename AwaitableType>
 		decltype(auto) await_transform(AwaitableType&& Awaitable)
 		{
-			// TODO support
-			static_assert(TFalse<AwaitableType>::Value);
-			return Forward<AwaitableType>(Awaitable);
+			if constexpr (
+				TIsInstantiationOf_V<std::decay_t<AwaitableType>, TReadyWeakAwaitable>
+				|| TIsInstantiationOf_V<std::decay_t<AwaitableType>, TWeakAwaitable>)
+			{
+				return Forward<AwaitableType>(Awaitable);
+			}
+			else
+			{
+				static_assert(TFalse<AwaitableType>::Value);
+			}
 		}
 	};
 
@@ -200,6 +209,15 @@ public:
 		Impl->SetValue(Forward<ArgType>(Arg));
 	}
 
+	template <typename ArgType>
+	void SetValueIfNotSet(ArgType&& Arg)
+	{
+		if (!bSetValue)
+		{
+			SetValue(Forward<ArgType>(Arg));
+		}
+	}
+
 	const ValueType& GetValue() const { return Impl->GetValue(); }
 
 private:
@@ -212,9 +230,49 @@ template <typename ValueType>
 class TWeakAwaitable
 {
 public:
+	TWeakAwaitable() = default;
+
+	template <typename T>
+	TWeakAwaitable(T&& Ready)
+	{
+		Value->SetValue(Forward<T>(Ready));
+	}
+
 	TWeakAwaitableHandle<ValueType> GetHandle() const
 	{
+		check(!bHandleCreated);
+		bHandleCreated = true;
 		return {Value};
+	}
+
+	// TODO write a test for this
+	template <typename DelegateType>
+	void SetValueFromMulticastDelegate(UObject* Lifetime, DelegateType& MulticastDelegate)
+	{
+		auto DelegateUnbinder = MakeShared<bool>();
+
+		// TODO 현재 멀티캐스트 델리게이트가 복사될 경우 한 델리게이트가 SetValue를 완료해도
+		// 다른 델리게이트들에서 핸들을 들고 있어서 해당 델리게이트들이 파괴되거나 한 번 호출되기 전까지
+		// Value가 메모리에 유지됨 -> Value의 크기가 클 경우 메모리 낭비가 발생할 수 있으므로
+		// indirection을 한 번 더 해서 Value가 아니라 포인터 크기 정도의 메모리만 들고 있게 해야함
+		auto Delegate = std::decay_t<decltype(MulticastDelegate)>::FDelegate::CreateSPLambda(
+			DelegateUnbinder,
+			[
+				SharedHandle = MakeShared<TWeakAwaitableHandle<ValueType>>(GetHandle()),
+				DelegateUnbinder = DelegateUnbinder.ToSharedPtr(),
+				Lifetime = TWeakObjectPtr{Lifetime}
+			]<typename ArgType>(ArgType&& Arg) mutable
+			{
+				if (Lifetime.IsValid())
+				{
+					SharedHandle->SetValueIfNotSet(Forward<ArgType>(Arg));
+				}
+
+				DelegateUnbinder = nullptr;
+			}
+		);
+
+		MulticastDelegate.Add(MoveTemp(Delegate));
 	}
 
 	bool await_ready() const
@@ -231,11 +289,16 @@ public:
 
 	ValueType await_resume()
 	{
-		Handle.promise().bCustomSuspended = false;
+		if (Handle)
+		{
+			Handle.promise().bCustomSuspended = false;
+		}
+		
 		return Value->GetValue();
 	}
 
 private:
+	mutable bool bHandleCreated = false;
 	std::coroutine_handle<FWeakCoroutine::promise_type> Handle;
 	TSharedPtr<TWeakAwaitableHandleImpl<ValueType>> Value = MakeShared<TWeakAwaitableHandleImpl<ValueType>>();
 };

@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "SegmentArray.h"
+#include "Core/SegmentArray.h"
 #include "Components/ActorComponent.h"
 #include "Components/DynamicMeshComponent.h"
 #include "Generators/PlanarPolygonMeshGenerator.h"

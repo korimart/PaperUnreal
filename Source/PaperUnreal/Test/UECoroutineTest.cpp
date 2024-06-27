@@ -80,6 +80,91 @@ bool UECoroutineTest::RunTest(const FString& Parameters)
 		RETURN_IF_FALSE(TestTrue(TEXT(""), *bFreed));
 	}
 
+	{
+		UUECoroutineTestValueProvider* Temp = NewObject<UUECoroutineTestValueProvider>();
+		
+		DECLARE_MULTICAST_DELEGATE_OneParam(FInt32MulticastDelegate, int32);
+		FInt32MulticastDelegate MulticastDelegate;
+
+		const auto CreateAwaitable = [&]()
+		{
+			FWeakAwaitableInt32 Ret;
+			Ret.SetValueFromMulticastDelegate(Temp, MulticastDelegate);
+			return Ret;
+		};
+		
+		TArray<int32> Reached;
+		RunWeakCoroutine(Temp, [&]() -> FWeakCoroutine
+		{
+			Reached.Add(co_await CreateAwaitable());
+			Reached.Add(co_await CreateAwaitable());
+			Reached.Add(co_await CreateAwaitable());
+		});
+		
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Reached.Num(), 0));
+		MulticastDelegate.Broadcast(0);
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Reached.Num(), 1));
+		MulticastDelegate.Broadcast(0);
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Reached.Num(), 2));
+		MulticastDelegate.Broadcast(0);
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Reached.Num(), 3));
+		MulticastDelegate.Broadcast(0);
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Reached.Num(), 3));
+
+		Reached.Empty();
+		RunWeakCoroutine(Temp, [&]() -> FWeakCoroutine
+		{
+			Reached.Add(co_await CreateAwaitable());
+			Reached.Add(co_await CreateAwaitable());
+			Reached.Add(co_await CreateAwaitable());
+			Reached.Add(co_await CreateAwaitable());
+			Reached.Add(co_await CreateAwaitable());
+		});
+		
+		MulticastDelegate.Broadcast(0);
+		MulticastDelegate.Broadcast(0);
+		MulticastDelegate.Broadcast(0);
+		Temp->MarkAsGarbage();
+		MulticastDelegate.Broadcast(0);
+		MulticastDelegate.Broadcast(0);
+		MulticastDelegate.Broadcast(0);
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Reached.Num(), 3));
+	}
+
+	{
+		UUECoroutineTestValueProvider* Temp = NewObject<UUECoroutineTestValueProvider>();
+		auto Lifetime = MakeUnique<FUECoroutineTestLifetime>();
+		TSharedPtr<bool> bFreed = Lifetime->bDestroyed;
+		
+		DECLARE_MULTICAST_DELEGATE_OneParam(FInt32MulticastDelegate, int32);
+		auto MulticastDelegate = MakeUnique<FInt32MulticastDelegate>();
+
+		const auto CreateAwaitable = [&]()
+		{
+			FWeakAwaitableInt32 Ret;
+			Ret.SetValueFromMulticastDelegate(Temp, *MulticastDelegate);
+			return Ret;
+		};
+		
+		TArray<int32> Reached;
+		RunWeakCoroutine(Temp, [&CreateAwaitable, &Reached, LifeTime = MoveTemp(Lifetime)]() -> FWeakCoroutine
+		{
+			Reached.Add(co_await CreateAwaitable());
+			Reached.Add(co_await CreateAwaitable());
+			Reached.Add(co_await CreateAwaitable());
+			Reached.Add(co_await CreateAwaitable());
+			Reached.Add(co_await CreateAwaitable());
+		});
+		
+		MulticastDelegate->Broadcast(0);
+		MulticastDelegate->Broadcast(0);
+		MulticastDelegate->Broadcast(0);
+		RETURN_IF_FALSE(TestFalse(TEXT(""), *bFreed));
+		MulticastDelegate = nullptr;
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Reached.Num(), 3));
+		RETURN_IF_FALSE(TestTrue(TEXT(""), *bFreed));
+	}
+	
 	return true;
 }
 

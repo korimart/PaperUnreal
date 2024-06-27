@@ -4,7 +4,7 @@
 
 #include "TracerAreaExpanderComponent.h"
 #include "TracerMeshComponent.h"
-#include "UECoroutine.h"
+#include "Core/UECoroutine.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -60,10 +60,11 @@ void APaperUnrealCharacter::BeginPlay()
 		{
 			// TODO
 			// wait for team info
+			AController* Controller = co_await WaitForController();
 
 			// get team area
 			
-			AreaExpanderComponent = NewObject<UTracerAreaExpanderComponent>(this);
+			UTracerAreaExpanderComponent* AreaExpanderComponent = NewObject<UTracerAreaExpanderComponent>(this);
 			AreaExpanderComponent->SetExpansionTarget(nullptr);
 			AreaExpanderComponent->RegisterComponent();
 			co_return;

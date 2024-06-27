@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "PaperUnreal/UECoroutine.h"
+#include "PaperUnreal/Core/UECoroutine.h"
 #include "UECoroutineTest.generated.h"
 
 
