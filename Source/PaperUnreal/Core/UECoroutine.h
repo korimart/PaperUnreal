@@ -133,6 +133,8 @@ public:
 			return;
 		}
 
+		// TODO bCustomSuspended인 경우 Value를 복사하지 않고
+		// 레퍼런스로 전달할 방법이 없을지 고민해보자
 		if (Handle.promise().bCustomSuspended)
 		{
 			Handle.resume();
@@ -370,7 +372,7 @@ TReadyWeakAwaitable<T> CreateReadyWeakAwaitable(T&& Value)
 
 template <
 	typename MulticastDelegateType,
-	typename ReturnType = typename TGetFirstParam<typename MulticastDelegateType::FDelegate::TFuncType>::Type>
+	typename ReturnType = std::decay_t<typename TGetFirstParam<typename MulticastDelegateType::FDelegate::TFuncType>::Type>>
 TWeakAwaitable<ReturnType> WaitForBroadcast(UObject* Lifetime, MulticastDelegateType& Delegate)
 {
 	TWeakAwaitable<ReturnType> Ret;
@@ -385,7 +387,7 @@ template <
 auto WaitForBroadcast(UObject* Lifetime, MulticastDelegateType& Delegate, TransformFuncType&& TransformFunc)
 {
 	using DelegateReturnType = typename TGetFirstParam<typename MulticastDelegateType::FDelegate::TFuncType>::Type;
-	using ReturnType = decltype(std::declval<TransformFuncType>()(std::declval<DelegateReturnType>()));
+	using ReturnType = std::decay_t<decltype(std::declval<TransformFuncType>()(std::declval<DelegateReturnType>()))>;
 	
 	TWeakAwaitable<ReturnType> Ret;
 	Ret.SetValueFromMulticastDelegate(Lifetime, Delegate, Forward<TransformFuncType>(TransformFunc));

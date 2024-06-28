@@ -67,7 +67,8 @@ void APaperUnrealCharacter::BeginPlay()
 			AGameStateBase* GameState = co_await WaitForGameState(GetWorld());
 			UAreaSpawnerComponent* AreaSpawnerComponent = co_await WaitForComponent<UAreaSpawnerComponent>(GameState);
 			UTeamComponent* TeamComponent = co_await WaitForComponent<UTeamComponent>(co_await WaitForPlayerState());
-			AAreaActor* Area = co_await AreaSpawnerComponent->WaitForAreaBelongingTo(co_await TeamComponent->WaitForTeamIndex());
+			const int32 TeamIndex = co_await TeamComponent->GetTeamIndex().WaitForValue(this);
+			AAreaActor* Area = co_await AreaSpawnerComponent->GetAreaFor(TeamIndex).WaitForValue(this);
 
 			UTracerAreaExpanderComponent* AreaExpanderComponent = NewObject<UTracerAreaExpanderComponent>(this);
 			AreaExpanderComponent->SetExpansionTarget(Area->AreaMeshComponent);

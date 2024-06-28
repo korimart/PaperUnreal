@@ -23,3 +23,9 @@ inline TWeakAwaitable<AGameStateBase*> WaitForGameState(UWorld* World)
 
 	return WaitForBroadcast(World, World->GameStateSetEvent);
 }
+
+
+#define DEFINE_REPPED_VAR_SETTER(VarName, NewValue)\
+	check(GetNetMode() != NM_Client);\
+	Repped##VarName = NewValue;\
+	if (GetNetMode() != NM_DedicatedServer) OnRep_##VarName();
