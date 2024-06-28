@@ -53,32 +53,37 @@ APaperUnrealCharacter::APaperUnrealCharacter()
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
 
+	// TODO 데디에 있을 필요 없음 클라에만 있으면 됨
 	TracerMeshComponent = CreateDefaultSubobject<UTracerMeshComponent>(TEXT("TracerMeshComponent"));
 }
 
 void APaperUnrealCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-
-	if (GetNetMode() != NM_Client)
+	
+	RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 	{
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
-		{
-			const auto GameState = co_await WaitForGameState(GetWorld());
-			const auto AreaSpawnerComponent = co_await WaitForComponent<UAreaSpawnerComponent>(GameState);
-			const auto TeamComponent = co_await WaitForComponent<UTeamComponent>(co_await WaitForPlayerState());
-			const int32 TeamIndex = co_await TeamComponent->GetTeamIndex().WaitForValue(this);
-			const AAreaActor* Area = co_await AreaSpawnerComponent->GetAreaFor(TeamIndex).WaitForValue(this);
+		const auto GameState = co_await WaitForGameState(GetWorld());
+		const auto TeamComponent = co_await WaitForComponent<UTeamComponent>(co_await WaitForPlayerState());
+		const int32 TeamIndex = co_await TeamComponent->GetTeamIndex().WaitForValue(this);
 
+		if (GetNetMode() != NM_Client)
+		{
+			const auto AreaSpawnerComponent = co_await WaitForComponent<UAreaSpawnerComponent>(GameState);
+			const AAreaActor* Area = co_await AreaSpawnerComponent->GetAreaFor(TeamIndex).WaitForValue(this);
+			
 			const auto AreaExpanderComponent = NewObject<UTracerAreaExpanderComponent>(this);
 			AreaExpanderComponent->SetExpansionTarget(Area->AreaMeshComponent);
 			AreaExpanderComponent->RegisterComponent();
-			
+		}
+
+		if (GetNetMode() != NM_DedicatedServer)
+		{
 			const auto RR = co_await WaitForComponent<UResourceRegistryComponent>(GameState);
 			if (co_await RR->GetbResourcesLoaded().WaitForValue(this))
 			{
 				TracerMeshComponent->ConfigureMaterialSet({RR->GetTracerMaterialFor(TeamIndex)});
 			}
-		});
-	}
+		}
+	});
 }
