@@ -5,6 +5,8 @@
 #include "CoreMinimal.h"
 #include "UECoroutine.h"
 #include "GameFramework/GameStateBase.h"
+#include "Engine/AssetManager.h"
+#include "Engine/StreamableManager.h"
 
 
 template <typename T>
@@ -22,6 +24,20 @@ inline TWeakAwaitable<AGameStateBase*> WaitForGameState(UWorld* World)
 	}
 
 	return WaitForBroadcast(World, World->GameStateSetEvent);
+}
+
+
+template <typename SoftObjectType>
+TWeakAwaitable<SoftObjectType*> RequestAsyncLoad(UObject* Lifetime, const TSoftObjectPtr<SoftObjectType>& SoftPointer)
+{
+	TWeakAwaitable<SoftObjectType*> Ret;
+	UAssetManager::GetStreamableManager().RequestAsyncLoad(
+		SoftPointer.ToSoftObjectPath(),
+		Ret.CreateSetValueDelegate<FStreamableDelegate>(Lifetime, [SoftPointer]()
+		{
+			return SoftPointer.Get();
+		}));
+	return Ret;
 }
 
 

@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "AreaSpawnerComponent.h"
+#include "ResourceRegistryComponent.h"
 #include "GameFramework/GameStateBase.h"
 #include "PaperUnrealGameState.generated.h"
 
@@ -17,11 +18,15 @@ class APaperUnrealGameState : public AGameStateBase
 
 public:
 	UPROPERTY()
+	UResourceRegistryComponent* ResourceRegistryComponent;
+	
+	UPROPERTY()
 	UAreaSpawnerComponent* AreaSpawnerComponent;
 
 private:
 	APaperUnrealGameState()
 	{
+		ResourceRegistryComponent = CreateDefaultSubobject<UResourceRegistryComponent>(TEXT("ResourceRegistryComponent"));
 		AreaSpawnerComponent = CreateDefaultSubobject<UAreaSpawnerComponent>(TEXT("AreaSpawnerComponent"));
 	}
 };

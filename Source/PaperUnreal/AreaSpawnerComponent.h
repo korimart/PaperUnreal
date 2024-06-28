@@ -28,9 +28,16 @@ public:
 		check(!TeamToAreaMap.Contains(TeamIndex));
 
 		AAreaActor* Ret = GetWorld()->SpawnActor<AAreaActor>();
-		// TODO
+		
+		// TODO 제대로 된 좌표 입력
 		Ret->SetActorLocation({1000.f + 500.f * TeamIndex, 1800.f, 50.f});
+		Ret->TeamComponent->SetTeamIndex(TeamIndex);
+		
 		TeamToAreaMap.FindOrAdd(TeamIndex) = Ret;
+
+		// TODO aareaactor의 팀 정보가 변경될 때마다
+		// TeamToAreaMap의 캐시된 팀 관계도 업데이트 해야함
+		
 		return Ret;
 	}
 

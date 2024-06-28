@@ -4,7 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "AreaMeshComponent.h"
+#include "ResourceRegistryComponent.h"
 #include "TeamComponent.h"
+#include "Core/ComponentRegistry.h"
 #include "GameFramework/Actor.h"
 #include "AreaActor.generated.h"
 
@@ -17,7 +19,7 @@ class AAreaActor : public AActor
 public:
 	UPROPERTY()
 	UAreaMeshComponent* AreaMeshComponent;
-	
+
 	UPROPERTY()
 	UTeamComponent* TeamComponent;
 
@@ -29,5 +31,29 @@ private:
 		RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("RootComponent"));
 		AreaMeshComponent = CreateDefaultSubobject<UAreaMeshComponent>(TEXT("AreaMeshComponent"));
 		TeamComponent = CreateDefaultSubobject<UTeamComponent>(TEXT("TeamComponent"));
+	}
+
+	virtual void BeginPlay() override
+	{
+		Super::BeginPlay();
+
+		if (GetNetMode() == NM_DedicatedServer)
+		{
+			return;
+		}
+
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
+		{
+			AGameStateBase* GameState = co_await WaitForGameState(GetWorld());
+			UResourceRegistryComponent* RR = co_await WaitForComponent<UResourceRegistryComponent>(GameState);
+
+			if (!co_await RR->GetbResourcesLoaded().WaitForValue(this))
+			{
+				co_return;
+			}
+
+			const int32 TeamIndex = co_await TeamComponent->GetTeamIndex().WaitForValue(this);
+			AreaMeshComponent->ConfigureMaterialSet({RR->GetAreaMaterialFor(TeamIndex)});
+		});
 	}
 };

@@ -61,6 +61,11 @@ public:
 		AreaBoundary.Union(Path);
 		TriangulateAreaAndSetInDynamicMesh();
 	}
+	
+	void ConfigureMaterialSet(const TArray<UMaterialInterface*>& NewMaterialSet)
+	{
+		DynamicMeshComponent->ConfigureMaterialSet(NewMaterialSet);
+	}
 
 private:
 	UPROPERTY()

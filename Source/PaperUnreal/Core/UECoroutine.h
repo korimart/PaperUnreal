@@ -256,21 +256,20 @@ public:
 		bHandleCreated = true;
 		return {Value};
 	}
-
+	
 	template <typename DelegateType>
-	void SetValueFromMulticastDelegate(UObject* Lifetime, DelegateType& MulticastDelegate)
+	DelegateType CreateSetValueDelegate(UObject* Lifetime)
 	{
-		SetValueFromMulticastDelegate(
+		return CreateSetValueDelegate<DelegateType>(
 			Lifetime,
-			MulticastDelegate,
 			[]<typename ArgType>(ArgType&& Pass) -> decltype(auto)
 			{
 				return Forward<ArgType>(Pass);
 			});
 	}
-
+	
 	template <typename DelegateType, typename TransformFuncType>
-	void SetValueFromMulticastDelegate(UObject* Lifetime, DelegateType& MulticastDelegate, TransformFuncType&& TransformFunc)
+	DelegateType CreateSetValueDelegate(UObject* Lifetime, TransformFuncType&& TransformFunc)
 	{
 		auto DelegateUnbinder = MakeShared<bool>();
 
@@ -278,25 +277,35 @@ public:
 		// 다른 델리게이트들에서 핸들을 들고 있어서 해당 델리게이트들이 파괴되거나 한 번 호출되기 전까지
 		// Value가 메모리에 유지됨 -> Value의 크기가 클 경우 메모리 낭비가 발생할 수 있으므로
 		// indirection을 한 번 더 해서 Value가 아니라 포인터 크기 정도의 메모리만 들고 있게 해야함
-		auto Delegate = std::decay_t<decltype(MulticastDelegate)>::FDelegate::CreateSPLambda(
+		return DelegateType::CreateSPLambda(
 			DelegateUnbinder,
 			[
 				SharedHandle = MakeShared<TWeakAwaitableHandle<ValueType>>(GetHandle()),
 				DelegateUnbinder = DelegateUnbinder.ToSharedPtr(),
 				Lifetime = TWeakObjectPtr{Lifetime},
 				TransformFunc = Forward<TransformFuncType>(TransformFunc)
-			]<typename ArgType>(ArgType&& Arg) mutable
+			]<typename... ArgTypes>(ArgTypes&&... Args) mutable
 			{
 				if (Lifetime.IsValid())
 				{
-					SharedHandle->SetValueIfNotSet(TransformFunc(Forward<ArgType>(Arg)));
+					SharedHandle->SetValueIfNotSet(TransformFunc(Forward<ArgTypes>(Args)...));
 				}
 
 				DelegateUnbinder = nullptr;
 			}
 		);
+	}
 
-		MulticastDelegate.Add(MoveTemp(Delegate));
+	template <typename MulticastDelegateType>
+	void SetValueFromMulticastDelegate(UObject* Lifetime, MulticastDelegateType& MulticastDelegate)
+	{
+		MulticastDelegate.Add(CreateSetValueDelegate<MulticastDelegateType::FDelegate>(Lifetime));
+	}
+
+	template <typename MulticastDelegateType, typename TransformFuncType>
+	void SetValueFromMulticastDelegate(UObject* Lifetime, MulticastDelegateType& MulticastDelegate, TransformFuncType&& TransformFunc)
+	{
+		MulticastDelegate.Add(CreateSetValueDelegate<MulticastDelegateType::FDelegate>(Lifetime, Forward<TransformFuncType>(TransformFunc)));
 	}
 
 	bool await_ready() const
@@ -317,6 +326,8 @@ public:
 		{
 			Handle.promise().bCustomSuspended = false;
 		}
+
+		// TODO ValueType이 UObject이면 Weak Coroutine의 Weak List에 추가해야 함
 
 		return Value->GetValue();
 	}

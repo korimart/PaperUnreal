@@ -25,6 +25,20 @@ public:
 		return *this;
 	}
 
+	template <typename ObserverType>
+	void ObserveValid(UObject* Lifetime, ObserverType&& Observer)
+	{
+		if (Value)
+		{
+			Observer(*Value);
+		}
+
+		OnChanged.AddWeakLambda(Lifetime, [Observer = Forward<ObserverType>(Observer)](const ValueType& NewValue)
+		{
+			Observer(NewValue);
+		});
+	}
+
 	TWeakAwaitable<ValueType> WaitForValue(UObject* Lifetime)
 	{
 		if (Value)
@@ -116,6 +130,12 @@ public:
 	TLiveDataView(TLiveData<ValueType>& InLiveData)
 		: LiveData(InLiveData)
 	{
+	}
+
+	template <typename ObserverType>
+	void ObserveValid(UObject* Lifetime, ObserverType&& Observer)
+	{
+		LiveData.ObserveValid(Lifetime, Forward<ObserverType>(Observer));
 	}
 
 	TWeakAwaitable<ValueType> WaitForValue(UObject* Lifetime)
