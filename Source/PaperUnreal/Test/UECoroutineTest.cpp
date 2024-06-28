@@ -13,7 +13,7 @@ bool UECoroutineTest::RunTest(const FString& Parameters)
 		UUECoroutineTestValueProvider* Temp = NewObject<UUECoroutineTestValueProvider>();
 		TArray<int32> Reached;
 
-		RunWeakCoroutine(Temp, [&]() -> FWeakCoroutine
+		RunWeakCoroutine(Temp, [&](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
 			Reached.Add(co_await CreateReadyWeakAwaitable(0));
 			Reached.Add(co_await CreateReadyWeakAwaitable(1));
@@ -31,7 +31,7 @@ bool UECoroutineTest::RunTest(const FString& Parameters)
 		UUECoroutineTestValueProvider* Temp = NewObject<UUECoroutineTestValueProvider>();
 		TArray<int32> Reached;
 
-		RunWeakCoroutine(Temp, [Provider, &Reached, Lifetime = MoveTemp(Lifetime)]() -> FWeakCoroutine
+		RunWeakCoroutine(Temp, [Provider, &Reached, Lifetime = MoveTemp(Lifetime)](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
 			Reached.Add(co_await Provider->FetchInt());
 			Reached.Add(co_await Provider->FetchInt());
@@ -65,7 +65,7 @@ bool UECoroutineTest::RunTest(const FString& Parameters)
 		UUECoroutineTestValueProvider* Temp = NewObject<UUECoroutineTestValueProvider>();
 		TArray<int32> Reached;
 
-		RunWeakCoroutine(Temp, [Provider, &Reached, Lifetime = MoveTemp(Lifetime)]() -> FWeakCoroutine
+		RunWeakCoroutine(Temp, [Provider, &Reached, Lifetime = MoveTemp(Lifetime)](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
 			Reached.Add(co_await Provider->FetchInt());
 			Reached.Add(co_await Provider->FetchInt());
@@ -94,7 +94,7 @@ bool UECoroutineTest::RunTest(const FString& Parameters)
 		};
 		
 		TArray<int32> Reached;
-		RunWeakCoroutine(Temp, [&]() -> FWeakCoroutine
+		RunWeakCoroutine(Temp, [&](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
 			Reached.Add(co_await CreateAwaitable());
 			Reached.Add(co_await CreateAwaitable());
@@ -112,7 +112,7 @@ bool UECoroutineTest::RunTest(const FString& Parameters)
 		RETURN_IF_FALSE(TestEqual(TEXT(""), Reached.Num(), 3));
 
 		Reached.Empty();
-		RunWeakCoroutine(Temp, [&]() -> FWeakCoroutine
+		RunWeakCoroutine(Temp, [&](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
 			Reached.Add(co_await CreateAwaitable());
 			Reached.Add(co_await CreateAwaitable());
@@ -147,7 +147,7 @@ bool UECoroutineTest::RunTest(const FString& Parameters)
 		};
 		
 		TArray<int32> Reached;
-		RunWeakCoroutine(Temp, [&CreateAwaitable, &Reached, LifeTime = MoveTemp(Lifetime)]() -> FWeakCoroutine
+		RunWeakCoroutine(Temp, [&CreateAwaitable, &Reached, LifeTime = MoveTemp(Lifetime)](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
 			Reached.Add(co_await CreateAwaitable());
 			Reached.Add(co_await CreateAwaitable());
@@ -163,6 +163,37 @@ bool UECoroutineTest::RunTest(const FString& Parameters)
 		MulticastDelegate = nullptr;
 		RETURN_IF_FALSE(TestEqual(TEXT(""), Reached.Num(), 3));
 		RETURN_IF_FALSE(TestTrue(TEXT(""), *bFreed));
+	}
+
+	{
+		UUECoroutineTestValueProvider* Temp0 = NewObject<UUECoroutineTestValueProvider>();
+		UUECoroutineTestValueProvider* Temp1 = NewObject<UUECoroutineTestValueProvider>();
+		UUECoroutineTestValueProvider* Temp2 = NewObject<UUECoroutineTestValueProvider>();
+		UUECoroutineTestValueProvider* Temp3 = NewObject<UUECoroutineTestValueProvider>();
+		UUECoroutineTestValueProvider* Temp4 = NewObject<UUECoroutineTestValueProvider>();
+		
+		TArray<UObject*> Reached;
+
+		RunWeakCoroutine(Provider, [&](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			Reached.Add(co_await Provider->FetchObject());
+			Reached.Add(co_await Provider->FetchObject());
+			Reached.Add(co_await Provider->FetchObject());
+			Reached.Add(co_await Provider->FetchObject());
+			Reached.Add(co_await Provider->FetchObject());
+		});
+		
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Reached.Num(), 0));
+		
+		Provider->IssueValue(Temp0);
+		Provider->IssueValue(Temp1);
+		Provider->IssueValue(Temp2);
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Reached.Num(), 3));
+		
+		Temp1->MarkAsGarbage();
+		Provider->IssueValue(Temp3);
+		Provider->IssueValue(Temp4);
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Reached.Num(), 3));
 	}
 	
 	return true;

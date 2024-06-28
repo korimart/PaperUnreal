@@ -62,7 +62,7 @@ void APaperUnrealCharacter::BeginPlay()
 
 	if (GetNetMode() != NM_Client)
 	{
-		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
+		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
 			const auto GameState = co_await WaitForGameState(GetWorld());
 			const auto AreaSpawnerComponent = co_await WaitForComponent<UAreaSpawnerComponent>(GameState);

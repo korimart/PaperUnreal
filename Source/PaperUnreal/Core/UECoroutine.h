@@ -5,6 +5,8 @@
 #include "CoreMinimal.h"
 #include <coroutine>
 
+#include "Algo/AllOf.h"
+
 
 template <typename...>
 struct TFalse
@@ -37,6 +39,8 @@ struct TGetFirstParam<RetType(First, Rest...)>
 };
 
 
+class FWeakCoroutineContext;
+	
 template <typename>
 class TWeakAwaitable;
 
@@ -48,10 +52,15 @@ struct FWeakCoroutine
 {
 	struct promise_type
 	{
-		TWeakObjectPtr<UObject> Lifetime;
-		TSharedPtr<TUniqueFunction<FWeakCoroutine()>> LambdaCaptures;
+		TArray<TWeakObjectPtr<>> WeakList;
+		TSharedPtr<TUniqueFunction<FWeakCoroutine(FWeakCoroutineContext&)>> LambdaCaptures;
 		bool bCustomSuspended = false;
 		TSharedPtr<bool> bDestroyed = MakeShared<bool>(false);
+
+		bool IsValid() const
+		{
+			return Algo::AllOf(WeakList, [](const TWeakObjectPtr<>& Each) { return Each.IsValid(); });
+		}
 
 		FWeakCoroutine get_return_object()
 		{
@@ -93,12 +102,10 @@ struct FWeakCoroutine
 		}
 	};
 
-	void Init(UObject* Lifetime, TSharedPtr<TUniqueFunction<FWeakCoroutine()>> LambdaCaptures)
-	{
-		Handle.promise().Lifetime = Lifetime;
-		Handle.promise().LambdaCaptures = LambdaCaptures;
-		Handle.resume();
-	}
+	void Init(
+		UObject* Lifetime,
+		TSharedPtr<TUniqueFunction<FWeakCoroutine(FWeakCoroutineContext&)>> LambdaCaptures,
+		TUniquePtr<FWeakCoroutineContext> Context);
 
 private:
 	std::coroutine_handle<promise_type> Handle;
@@ -108,6 +115,40 @@ private:
 	{
 	}
 };
+
+
+class FWeakCoroutineContext
+{
+public:
+	template <typename T>
+	T* AddToWeakList(T* Weak)
+	{
+		Handle.promise().WeakList.Add(Weak);
+		return Weak;
+	}
+
+	// TODO 필요해지면 구현
+	template <typename T>
+	void DiableAutoAddOfAwaitableResultToWeakList() requires false
+	{
+	}
+
+private:
+	friend struct FWeakCoroutine;
+	std::coroutine_handle<FWeakCoroutine::promise_type> Handle;
+};
+
+
+inline void FWeakCoroutine::Init(
+	UObject* Lifetime,
+	TSharedPtr<TUniqueFunction<FWeakCoroutine(FWeakCoroutineContext&)>> LambdaCaptures,
+	TUniquePtr<FWeakCoroutineContext> Context)
+{
+	Context->Handle = Handle;
+	Handle.promise().WeakList.Add(Lifetime);
+	Handle.promise().LambdaCaptures = LambdaCaptures;
+	Handle.resume();
+}
 
 
 class FWeakCoroutineHandle
@@ -126,7 +167,7 @@ public:
 			return;
 		}
 
-		if (!Handle.promise().Lifetime.IsValid())
+		if (!Handle.promise().IsValid())
 		{
 			*bCoroutineDestroyed = true;
 			Handle.destroy();
@@ -241,6 +282,8 @@ private:
 template <typename ValueType>
 class TWeakAwaitable
 {
+	static constexpr bool bObjectPtr = std::is_base_of_v<UObject, std::remove_pointer_t<std::decay_t<ValueType>>>;
+
 public:
 	TWeakAwaitable() = default;
 
@@ -256,7 +299,7 @@ public:
 		bHandleCreated = true;
 		return {Value};
 	}
-	
+
 	template <typename DelegateType>
 	DelegateType CreateSetValueDelegate(UObject* Lifetime)
 	{
@@ -267,7 +310,7 @@ public:
 				return Forward<ArgType>(Pass);
 			});
 	}
-	
+
 	template <typename DelegateType, typename TransformFuncType>
 	DelegateType CreateSetValueDelegate(UObject* Lifetime, TransformFuncType&& TransformFunc)
 	{
@@ -325,9 +368,12 @@ public:
 		if (Handle)
 		{
 			Handle.promise().bCustomSuspended = false;
-		}
 
-		// TODO ValueType이 UObject이면 Weak Coroutine의 Weak List에 추가해야 함
+			if constexpr (bObjectPtr)
+			{
+				Handle.promise().WeakList.Add(Value->GetValue());
+			}
+		}
 
 		return Value->GetValue();
 	}
@@ -398,7 +444,7 @@ auto WaitForBroadcast(UObject* Lifetime, MulticastDelegateType& Delegate, Transf
 {
 	using DelegateReturnType = typename TGetFirstParam<typename MulticastDelegateType::FDelegate::TFuncType>::Type;
 	using ReturnType = std::decay_t<decltype(std::declval<TransformFuncType>()(std::declval<DelegateReturnType>()))>;
-	
+
 	TWeakAwaitable<ReturnType> Ret;
 	Ret.SetValueFromMulticastDelegate(Lifetime, Delegate, Forward<TransformFuncType>(TransformFunc));
 	return Ret;
@@ -408,8 +454,9 @@ auto WaitForBroadcast(UObject* Lifetime, MulticastDelegateType& Delegate, Transf
 template <typename FuncType>
 void RunWeakCoroutine(UObject* Lifetime, FuncType&& Func)
 {
-	auto LambdaCaptures = MakeShared<TUniqueFunction<FWeakCoroutine()>>(Forward<FuncType>(Func));
-	(*LambdaCaptures)().Init(Lifetime, LambdaCaptures);
+	auto LambdaCaptures = MakeShared<TUniqueFunction<FWeakCoroutine(FWeakCoroutineContext&)>>(Forward<FuncType>(Func));
+	auto Context = MakeUnique<FWeakCoroutineContext>();
+	(*LambdaCaptures)(*Context).Init(Lifetime, LambdaCaptures, MoveTemp(Context));
 }
 
 

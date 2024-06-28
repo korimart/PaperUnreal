@@ -43,7 +43,7 @@ private:
 			return;
 		}
 
-		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
+		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
 			// TODO 데디에서 머티리얼의 종류를 레플리케이트 받도록 수정할 수 있음
 			const TSoftObjectPtr<UMaterialInstance> SoftSolidBlue

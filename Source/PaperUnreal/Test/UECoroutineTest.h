@@ -47,6 +47,13 @@ public:
 		Handles.Add(Ret.GetHandle());
 		return Ret;
 	}
+	
+	TWeakAwaitable<UObject*> FetchObject()
+	{
+		TWeakAwaitable<UObject*> Ret;
+		ObjectHandles.Add(Ret.GetHandle());
+		return Ret;
+	}
 
 	void IssueValue(int32 Value)
 	{
@@ -57,12 +64,24 @@ public:
 			Handle.SetValue(Value);
 		}
 	}
+	
+	void IssueValue(UObject* Object)
+	{
+		if (!ObjectHandles.IsEmpty())
+		{
+			auto Handle = MoveTemp(ObjectHandles[0]);
+			ObjectHandles.RemoveAt(0);
+			Handle.SetValue(Object);
+		}
+	}
 
 	void ClearRequests()
 	{
 		Handles.Empty();
+		ObjectHandles.Empty();
 	}
 
 private:
 	TArray<FWeakAwaitableHandleInt32> Handles;
+	TArray<TWeakAwaitableHandle<UObject*>> ObjectHandles;
 };

@@ -42,7 +42,7 @@ private:
 			return;
 		}
 
-		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
+		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
 			AGameStateBase* GameState = co_await WaitForGameState(GetWorld());
 			UResourceRegistryComponent* RR = co_await WaitForComponent<UResourceRegistryComponent>(GameState);
