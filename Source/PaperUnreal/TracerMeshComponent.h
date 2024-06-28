@@ -6,7 +6,6 @@
 #include "Core/SegmentArray.h"
 #include "Components/ActorComponent.h"
 #include "Components/DynamicMeshComponent.h"
-#include "Engine/AssetManager.h"
 #include "TracerMeshComponent.generated.h"
 
 
@@ -135,10 +134,12 @@ public:
 		SetLastVertices(NewLeft, NewCenter, NewRight);
 	}
 	
+	void ConfigureMaterialSet(const TArray<UMaterialInterface*>& NewMaterialSet)
+	{
+		DynamicMeshComponent->ConfigureMaterialSet(NewMaterialSet);
+	}
+	
 private:
-	UPROPERTY(EditAnywhere)
-	TSoftObjectPtr<UMaterialInstance> TraceMaterial;
-
 	UPROPERTY()
 	UDynamicMeshComponent* DynamicMeshComponent;
 
@@ -146,25 +147,23 @@ private:
 	FSegmentArray2D CenterSegments;
 	FDynamicMeshSegment2D RightSegments;
 
-	virtual void BeginPlay() override
+	UTracerMeshComponent()
 	{
-		Super::BeginPlay();
+		bWantsInitializeComponent = true;
+	}
+
+	virtual void InitializeComponent() override
+	{
+		Super::InitializeComponent();
 
 		DynamicMeshComponent = NewObject<UDynamicMeshComponent>(GetOwner(), TEXT("DynamicMeshComponent"));
 		DynamicMeshComponent->RegisterComponent();
 		Reset();
-
-		UAssetManager::GetStreamableManager().RequestAsyncLoad(
-			TraceMaterial.ToSoftObjectPath(),
-			FStreamableDelegate::CreateWeakLambda(this, [this]()
-			{
-				DynamicMeshComponent->ConfigureMaterialSet({TraceMaterial.Get()});
-			}));
 	}
 
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override
+	virtual void UninitializeComponent() override
 	{
-		Super::EndPlay(EndPlayReason);
+		Super::UninitializeComponent();
 
 		DynamicMeshComponent->DestroyComponent();
 		DynamicMeshComponent = nullptr;

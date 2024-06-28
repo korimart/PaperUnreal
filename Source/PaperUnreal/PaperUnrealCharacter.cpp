@@ -64,15 +64,21 @@ void APaperUnrealCharacter::BeginPlay()
 	{
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
-			AGameStateBase* GameState = co_await WaitForGameState(GetWorld());
-			UAreaSpawnerComponent* AreaSpawnerComponent = co_await WaitForComponent<UAreaSpawnerComponent>(GameState);
-			UTeamComponent* TeamComponent = co_await WaitForComponent<UTeamComponent>(co_await WaitForPlayerState());
+			const auto GameState = co_await WaitForGameState(GetWorld());
+			const auto AreaSpawnerComponent = co_await WaitForComponent<UAreaSpawnerComponent>(GameState);
+			const auto TeamComponent = co_await WaitForComponent<UTeamComponent>(co_await WaitForPlayerState());
 			const int32 TeamIndex = co_await TeamComponent->GetTeamIndex().WaitForValue(this);
-			AAreaActor* Area = co_await AreaSpawnerComponent->GetAreaFor(TeamIndex).WaitForValue(this);
+			const AAreaActor* Area = co_await AreaSpawnerComponent->GetAreaFor(TeamIndex).WaitForValue(this);
 
-			UTracerAreaExpanderComponent* AreaExpanderComponent = NewObject<UTracerAreaExpanderComponent>(this);
+			const auto AreaExpanderComponent = NewObject<UTracerAreaExpanderComponent>(this);
 			AreaExpanderComponent->SetExpansionTarget(Area->AreaMeshComponent);
 			AreaExpanderComponent->RegisterComponent();
+			
+			const auto RR = co_await WaitForComponent<UResourceRegistryComponent>(GameState);
+			if (co_await RR->GetbResourcesLoaded().WaitForValue(this))
+			{
+				TracerMeshComponent->ConfigureMaterialSet({RR->GetTracerMaterialFor(TeamIndex)});
+			}
 		});
 	}
 }
