@@ -41,6 +41,21 @@ TWeakAwaitable<SoftObjectType*> RequestAsyncLoad(UObject* Lifetime, const TSoftO
 }
 
 
+template <typename SoftObjectType, typename CallbackType>
+TWeakAwaitable<bool> RequestAsyncLoad(const TSoftObjectPtr<SoftObjectType>& SoftPointer, UObject* Lifetime, CallbackType&& Callback)
+{
+	TWeakAwaitable<bool> Ret;
+	UAssetManager::GetStreamableManager().RequestAsyncLoad(
+		SoftPointer.ToSoftObjectPath(),
+		Ret.CreateSetValueDelegate<FStreamableDelegate>(Lifetime, [SoftPointer, Callback = Forward<CallbackType>(Callback)]()
+		{
+			Callback(SoftPointer.Get());
+			return true;
+		}));
+	return Ret;
+}
+
+
 #define DEFINE_REPPED_VAR_SETTER(VarName, NewValue)\
 	check(GetNetMode() != NM_Client);\
 	Repped##VarName = NewValue;\

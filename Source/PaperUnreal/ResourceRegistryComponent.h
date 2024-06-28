@@ -50,34 +50,46 @@ private:
 			{
 				FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Blue.MI_Solid_Blue'")}
 			};
-			
+
 			const TSoftObjectPtr<UMaterialInstance> SoftSolidBlueLight
 			{
 				FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Blue_Light.MI_Solid_Blue_Light'")}
 			};
-			
+
 			const TSoftObjectPtr<UMaterialInstance> SoftSolidRed
 			{
 				FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Red.MI_Solid_Red'")}
 			};
-			
+
 			const TSoftObjectPtr<UMaterialInstance> SoftSolidRedLight
 			{
 				FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Red_Light.MI_Solid_Red_Light'")}
 			};
+
+			auto SolidBlueAwaitable = RequestAsyncLoad(SoftSolidBlue, this, [this](UMaterialInstance* Material)
+			{
+				TeamToAreaMaterialMap.FindOrAdd(0) = Material;
+			});
 			
-			auto SolidBlueAwaitable = RequestAsyncLoad(this, SoftSolidBlue);
-			auto SolidBlueLightAwaitable = RequestAsyncLoad(this, SoftSolidBlueLight);
-			auto SolidRedAwaitable = RequestAsyncLoad(this, SoftSolidRed);
-			auto SolidRedLightAwaitable = RequestAsyncLoad(this, SoftSolidRedLight);
-
-			// TODO 여기서 리소스들이 살아있다는 보장이 없음 해결해야 됨
-
-			TeamToAreaMaterialMap.FindOrAdd(0) = co_await SolidBlueAwaitable;
-			TeamToAreaMaterialMap.FindOrAdd(1) = co_await SolidRedAwaitable;
-			TeamToTracerMaterialMap.FindOrAdd(0) = co_await SolidBlueLightAwaitable;
-			TeamToTracerMaterialMap.FindOrAdd(1) = co_await SolidRedLightAwaitable;
-
+			auto SolidRedAwaitable = RequestAsyncLoad(SoftSolidRed, this, [this](UMaterialInstance* Material)
+			{
+				TeamToAreaMaterialMap.FindOrAdd(1) = Material;
+			});
+			
+			auto SolidBlueLightAwaitable = RequestAsyncLoad(SoftSolidBlueLight, this, [this](UMaterialInstance* Material)
+			{
+				TeamToTracerMaterialMap.FindOrAdd(0) = Material;
+			});
+			
+			auto SolidRedLightAwaitable = RequestAsyncLoad(SoftSolidRedLight, this, [this](UMaterialInstance* Material)
+			{
+				TeamToTracerMaterialMap.FindOrAdd(1) = Material;
+			});
+			
+			co_await SolidBlueAwaitable;
+			co_await SolidRedAwaitable;
+			co_await SolidBlueLightAwaitable;
+			co_await SolidRedLightAwaitable;
 			bResourcesLoaded.SetValue(true);
 		});
 	}
