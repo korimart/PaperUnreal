@@ -153,8 +153,7 @@ public:
 		return Ret;
 	}
 
-	template <bool bLoop2 = bLoop>
-	std::enable_if_t<bLoop2, float> CalculateArea() const
+	float CalculateArea() const requires bLoop
 	{
 		// Shoelace formula
 		return 0.5f * FMath::Abs(Algo::TransformAccumulate(*this, [](const FSegment2D& Segment)
@@ -184,8 +183,7 @@ public:
 		return CalculateNetAngleDelta() > 0.f;
 	}
 
-	template <bool bLoop2 = bLoop>
-	std::enable_if_t<bLoop2, bool> IsInside(const FVector2D& Point) const
+	bool IsInside(const FVector2D& Point) const requires bLoop
 	{
 		if (!IsValid())
 		{
@@ -271,14 +269,13 @@ public:
 		}
 	}
 
-	template <bool bLoop2 = bLoop, typename... ArgTypes>
-	std::enable_if_t<!bLoop2> ReplacePoints(ArgTypes&&... Args)
+	template <typename... ArgTypes> requires !bLoop
+	void ReplacePoints(ArgTypes&&... Args)
 	{
 		ReplacePointsNoLoop(Forward<ArgTypes>(Args)...);
 	}
 
-	template <bool bLoop2 = bLoop>
-	std::enable_if_t<bLoop2> ReplacePoints(int32 FirstIndex, int32 LastIndex, TArrayView<const FVector2D> NewPoints)
+	void ReplacePoints(int32 FirstIndex, int32 LastIndex, TArrayView<const FVector2D> NewPoints) requires bLoop
 	{
 		FirstIndex = FirstIndex % FMath::Max(Points.Num(), 1);
 		LastIndex = LastIndex % FMath::Max(Points.Num(), 1);
@@ -293,8 +290,7 @@ public:
 		ReplacePointsNoLoop(0, LastIndex, {});
 	}
 
-	template <bool bLoop2 = bLoop>
-	std::enable_if_t<bLoop2> Union(FSegmentArray2D Path)
+	void Union(FSegmentArray2D Path) requires bLoop
 	{
 		const auto ReplacePoints = [this](
 			FLoopedSegmentArray2D& Target,

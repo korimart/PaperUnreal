@@ -244,8 +244,7 @@ class TWeakAwaitable
 public:
 	TWeakAwaitable() = default;
 
-	template <typename T>
-		requires std::is_convertible_v<std::decay_t<T>, std::decay_t<ValueType>>
+	template <typename T> requires std::is_convertible_v<T, ValueType>
 	TWeakAwaitable(T&& Ready)
 	{
 		Value->SetValue(Forward<T>(Ready));

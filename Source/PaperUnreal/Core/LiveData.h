@@ -12,15 +12,13 @@ class TLiveData
 public:
 	TLiveData() = default;
 
-	template <typename T>
-		requires std::is_convertible_v<T&&, ValueType>
+	template <typename T> requires std::is_convertible_v<T, ValueType>
 	TLiveData(T&& Other)
 		: Value(Forward<T>(Other))
 	{
 	}
 
-	template <typename T>
-		requires std::is_convertible_v<T&&, ValueType>
+	template <typename T> requires std::is_convertible_v<T, ValueType>
 	TLiveData& operator=(T&& Other)
 	{
 		SetValue(Forward<T>(Other));
@@ -39,8 +37,7 @@ public:
 		return WaitForBroadcast(Lifetime, OnChanged);
 	}
 
-	template <typename T>
-		requires std::is_convertible_v<T&&, ValueType>
+	template <typename T> requires std::is_convertible_v<T, ValueType>
 	void SetValue(T&& Right)
 	{
 		if (bExecutingCallbacks || Value != Right)
@@ -50,8 +47,7 @@ public:
 		}
 	}
 
-	template <typename T>
-		requires std::is_convertible_v<T&&, ValueType>
+	template <typename T> requires std::is_convertible_v<T, ValueType>
 	bool SetValueSilent(T&& Right)
 	{
 		if (Value != Right)
@@ -62,26 +58,22 @@ public:
 		return false;
 	}
 
-	template <typename T = ValueType> requires !std::is_pointer_v<T>
-	const TOptional<T>& GetValue() const
+	const TOptional<ValueType>& GetValue() const requires !std::is_pointer_v<ValueType>
 	{
 		return Value;
 	}
 
-	template <typename T = ValueType> requires !std::is_pointer_v<T>
-	operator const TOptional<T>&() const
+	operator const TOptional<ValueType>&() const requires !std::is_pointer_v<ValueType>
 	{
 		return GetValue();
 	}
 
-	template <typename T = ValueType> requires std::is_pointer_v<T>
-	T GetValue() const
+	ValueType GetValue() const requires std::is_pointer_v<ValueType>
 	{
 		return Value ? *Value : nullptr;
 	}
 
-	template <typename T = ValueType> requires std::is_pointer_v<T>
-	operator T() const
+	operator ValueType() const requires std::is_pointer_v<ValueType>
 	{
 		return GetValue();
 	}
@@ -136,7 +128,8 @@ public:
 		return LiveData.GetValue();
 	}
 
-	template <typename T> operator T()
+	template <typename T>
+	operator T()
 	{
 		return LiveData;
 	}
