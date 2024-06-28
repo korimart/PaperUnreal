@@ -10,6 +10,23 @@ template <typename ValueType>
 class TLiveData
 {
 public:
+	TLiveData() = default;
+
+	template <typename T>
+		requires std::is_convertible_v<T&&, ValueType>
+	TLiveData(T&& Other)
+		: Value(Forward<T>(Other))
+	{
+	}
+
+	template <typename T>
+		requires std::is_convertible_v<T&&, ValueType>
+	TLiveData& operator=(T&& Other)
+	{
+		SetValue(Forward<T>(Other));
+		return *this;
+	}
+
 	TWeakAwaitable<ValueType> WaitForValue(UObject* Lifetime)
 	{
 		if (Value)
@@ -21,7 +38,7 @@ public:
 		// 레퍼런스만 넘겨서 복사를 회피할 수 있음
 		return WaitForBroadcast(Lifetime, OnChanged);
 	}
-	
+
 	template <typename T>
 		requires std::is_convertible_v<T&&, ValueType>
 	void SetValue(T&& Right)
@@ -45,18 +62,34 @@ public:
 		return false;
 	}
 
-	template <typename T>
-		requires std::is_convertible_v<T&&, ValueType>
-	TLiveData& operator=(T&& Other)
+	template <typename T = ValueType> requires !std::is_pointer_v<T>
+	const TOptional<T>& GetValue() const
 	{
-		SetValue(Forward<T>(Other));
-		return *this;
+		return Value;
+	}
+
+	template <typename T = ValueType> requires !std::is_pointer_v<T>
+	operator const TOptional<T>&() const
+	{
+		return GetValue();
+	}
+
+	template <typename T = ValueType> requires std::is_pointer_v<T>
+	T GetValue() const
+	{
+		return Value ? *Value : nullptr;
+	}
+
+	template <typename T = ValueType> requires std::is_pointer_v<T>
+	operator T() const
+	{
+		return GetValue();
 	}
 
 protected:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnChanged, const ValueType&);
 	FOnChanged OnChanged;
-	
+
 	TOptional<ValueType> Value;
 	bool bExecutingCallbacks = false;
 	bool bDeferredExecutionPending = false;
@@ -92,10 +125,20 @@ public:
 		: LiveData(InLiveData)
 	{
 	}
-	
+
 	TWeakAwaitable<ValueType> WaitForValue(UObject* Lifetime)
 	{
 		return LiveData.WaitForValue(Lifetime);
+	}
+
+	decltype(auto) GetValue() const
+	{
+		return LiveData.GetValue();
+	}
+
+	template <typename T> operator T()
+	{
+		return LiveData;
 	}
 
 private:

@@ -22,15 +22,15 @@ public:
 
 	AAreaActor* SpawnAreaAtRandomEmptyLocation(int32 TeamIndex)
 	{
+		check(GetNetMode() != NM_Client);
+		
 		// 일단 팀당 하나의 영역만 스폰 가능하다고 가정
 		check(!TeamToAreaMap.Contains(TeamIndex));
 
 		AAreaActor* Ret = GetWorld()->SpawnActor<AAreaActor>();
-		Ret->SetTeamIndex(TeamIndex);
 		// TODO
 		Ret->SetActorLocation({1000.f + 500.f * TeamIndex, 1800.f, 50.f});
 		TeamToAreaMap.FindOrAdd(TeamIndex) = Ret;
-		
 		return Ret;
 	}
 

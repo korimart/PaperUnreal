@@ -4,8 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "AreaMeshComponent.h"
+#include "TeamComponent.h"
 #include "GameFramework/Actor.h"
 #include "AreaActor.generated.h"
+
 
 UCLASS()
 class AAreaActor : public AActor
@@ -15,18 +17,17 @@ class AAreaActor : public AActor
 public:
 	UPROPERTY()
 	UAreaMeshComponent* AreaMeshComponent;
-
-	int32 GetTeamIndex() const { return TeamIndex; }
-	void SetTeamIndex(int32 Index) { TeamIndex = Index; }
+	
+	UPROPERTY()
+	UTeamComponent* TeamComponent;
 
 private:
-	int32 TeamIndex = 0;
-	
 	AAreaActor()
 	{
 		bReplicates = true;
 		bAlwaysRelevant = true;
 		RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("RootComponent"));
 		AreaMeshComponent = CreateDefaultSubobject<UAreaMeshComponent>(TEXT("AreaMeshComponent"));
+		TeamComponent = CreateDefaultSubobject<UTeamComponent>(TEXT("TeamComponent"));
 	}
 };
