@@ -290,54 +290,18 @@ public:
 		ReplacePointsNoLoop(0, LastIndex, {});
 	}
 
-	void Union(FSegmentArray2D Path) requires bLoop
+	template <typename PathType>
+		requires bLoop && std::is_convertible_v<PathType, FSegmentArray2D>
+	void Union(PathType&& Path)
 	{
-		const auto ReplacePoints = [this](
-			FLoopedSegmentArray2D& Target,
-			int32 StartSegment, int32 EndSegment,
-			const TArray<FVector2D>& Points)
-		{
-			if (StartSegment == EndSegment)
-			{
-				Target.InsertPoints(SegmentIndexToEndPointIndex(StartSegment), Points);
-			}
-			else
-			{
-				Target.ReplacePoints(
-					SegmentIndexToEndPointIndex(StartSegment),
-					SegmentIndexToStartPointIndex(EndSegment),
-					Points);
-			}
-		};
-
-		const FIntersection BoundarySrcSegment = FindClosestPointTo(Path.GetPoints()[0]);
-		const FIntersection BoundaryDestSegment = FindClosestPointTo(Path.GetLastPoint());
-
-		FLoopedSegmentArray2D SrcToDestReplaced = *this;
-		ReplacePoints(
-			SrcToDestReplaced,
-			BoundarySrcSegment.SegmentIndex,
-			BoundaryDestSegment.SegmentIndex,
-			Path.GetPoints());
-
-		Path.ReverseVertexOrder();
-		FLoopedSegmentArray2D DestToSrcReplaced = *this;
-		ReplacePoints(
-			DestToSrcReplaced,
-			BoundaryDestSegment.SegmentIndex,
-			BoundarySrcSegment.SegmentIndex,
-			Path.GetPoints());
-
-		const float CurrentArea = CalculateArea();
-		const float Area0 = SrcToDestReplaced.CalculateArea();
-		const float Area1 = DestToSrcReplaced.CalculateArea();
-
-		if (CurrentArea > Area0 && CurrentArea > Area1)
-		{
-			return;
-		}
-
-		Points = Area0 < Area1 ? MoveTemp(DestToSrcReplaced.Points) : MoveTemp(SrcToDestReplaced.Points);
+		FormNewLoopWithPath<true>(Forward<PathType>(Path));
+	}
+	
+	template <typename PathType>
+		requires bLoop && std::is_convertible_v<PathType, FSegmentArray2D>
+	void Difference(PathType&& Path)
+	{
+		FormNewLoopWithPath<false>(Forward<PathType>(Path));
 	}
 
 	void ReverseVertexOrder()
@@ -422,6 +386,67 @@ private:
 		const int32 Count = FMath::Min(LastIndex - FirstIndex + 1, Points.Num());
 		Points.RemoveAt(FirstIndex, Count);
 		InsertPoints(FirstIndex, NewPoints);
+	}
+
+	template <bool bChooseLargerArea>
+	void FormNewLoopWithPath(FSegmentArray2D Path) requires bLoop
+	{
+		const auto ReplacePoints = [this](
+			FLoopedSegmentArray2D& Target,
+			int32 StartSegment, int32 EndSegment,
+			const TArray<FVector2D>& Points)
+		{
+			if (StartSegment == EndSegment)
+			{
+				Target.InsertPoints(SegmentIndexToEndPointIndex(StartSegment), Points);
+			}
+			else
+			{
+				Target.ReplacePoints(
+					SegmentIndexToEndPointIndex(StartSegment),
+					SegmentIndexToStartPointIndex(EndSegment),
+					Points);
+			}
+		};
+
+		const FIntersection BoundarySrcSegment = FindClosestPointTo(Path.GetPoints()[0]);
+		const FIntersection BoundaryDestSegment = FindClosestPointTo(Path.GetLastPoint());
+
+		FLoopedSegmentArray2D SrcToDestReplaced = *this;
+		ReplacePoints(
+			SrcToDestReplaced,
+			BoundarySrcSegment.SegmentIndex,
+			BoundaryDestSegment.SegmentIndex,
+			Path.GetPoints());
+
+		Path.ReverseVertexOrder();
+		FLoopedSegmentArray2D DestToSrcReplaced = *this;
+		ReplacePoints(
+			DestToSrcReplaced,
+			BoundaryDestSegment.SegmentIndex,
+			BoundarySrcSegment.SegmentIndex,
+			Path.GetPoints());
+
+		const float CurrentArea = CalculateArea();
+		const float Area0 = SrcToDestReplaced.CalculateArea();
+		const float Area1 = DestToSrcReplaced.CalculateArea();
+
+		if constexpr (bChooseLargerArea)
+		{
+			if (CurrentArea > FMath::Max(Area0, Area1))
+			{
+				return;
+			}
+		}
+		else
+		{
+			if (CurrentArea < FMath::Min(Area0, Area1))
+			{
+				return;
+			}
+		}
+		
+		Points = Area0 < Area1 ? MoveTemp(DestToSrcReplaced.Points) : MoveTemp(SrcToDestReplaced.Points);
 	}
 };
 

@@ -188,6 +188,49 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			TestPointsEqual(TEXT("TestCase 3: Reverse Union"), SegmentArray.GetPoints(), Joined);
 		}
 	}
+	
+	{
+		const TArray<FVector2D> VertexPositions
+		{
+			{-1.f, 1.f},
+			{-1.f, -1.f},
+			{1.f, -1.f},
+			{1.f, 1.f},
+		};
+
+		const TArray<FVector2D> Path
+		{
+			{-1.f, 0.f},
+			{0.f, 0.f},
+			{0.f, -1.f},
+		};
+
+		const TArray<FVector2D> Difference
+		{
+			{-1.f, 1.f},
+			{-1.f, 0.f},
+			{0.f, 0.f},
+			{0.f, -1.f},
+			{1.f, -1.f},
+			{1.f, 1.f},
+		};
+
+		// 왼쪽 면으로 들어와서 아래 면으로 나가는 경우 테스트
+
+		{
+			FLoopedSegmentArray2D SegmentArray{VertexPositions};
+			SegmentArray.Difference(Path);
+			TestPointsEqual(TEXT("TestCase 4: Difference"), SegmentArray.GetPoints(), Difference);
+		}
+
+		{
+			auto ReversedPath = Path;
+			std::reverse(ReversedPath.begin(), ReversedPath.end());
+			FLoopedSegmentArray2D SegmentArray{VertexPositions};
+			SegmentArray.Difference(ReversedPath);
+			TestPointsEqual(TEXT("TestCase 4: Reverse Differnce"), SegmentArray.GetPoints(), Difference);
+		}
+	}
 
 	return true;
 }
