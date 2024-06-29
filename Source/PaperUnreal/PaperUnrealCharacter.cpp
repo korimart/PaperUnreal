@@ -4,8 +4,8 @@
 
 #include "AreaActor.h"
 #include "AreaSpawnerComponent.h"
+#include "PlayerCollisionStateComponent.h"
 #include "TeamComponent.h"
-#include "TracerAreaExpanderComponent.h"
 #include "TracerMeshComponent.h"
 #include "Core/UECoroutine.h"
 #include "UObject/ConstructorHelpers.h"
@@ -52,38 +52,78 @@ APaperUnrealCharacter::APaperUnrealCharacter()
 	// Activate ticking in order to update the cursor every frame.
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
-
-	// TODO 데디에 있을 필요 없음 클라에만 있으면 됨
-	TracerMeshComponent = CreateDefaultSubobject<UTracerMeshComponent>(TEXT("TracerMeshComponent"));
 }
 
-void APaperUnrealCharacter::BeginPlay()
+void APaperUnrealCharacter::AttachPlayerMachineComponents()
 {
-	Super::BeginPlay();
-	
 	RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 	{
-		const auto GameState = co_await WaitForGameState(GetWorld());
-		const auto TeamComponent = co_await WaitForComponent<UTeamComponent>(co_await WaitForPlayerState());
-		const int32 TeamIndex = co_await TeamComponent->GetTeamIndex().WaitForValue(this);
+		AGameStateBase* GameState = co_await WaitForGameState(GetWorld());
+		UTeamComponent* MyTeamComponent = co_await WaitForComponent<UTeamComponent>(co_await WaitForPlayerState());
+		const int32 MyTeamIndex = co_await MyTeamComponent->GetTeamIndex().WaitForValue(this);
 
-		if (GetNetMode() != NM_Client)
+		UResourceRegistryComponent* RR = co_await WaitForComponent<UResourceRegistryComponent>(GameState);
+		if (!co_await RR->GetbResourcesLoaded().WaitForValue(this))
 		{
-			const auto AreaSpawnerComponent = co_await WaitForComponent<UAreaSpawnerComponent>(GameState);
-			const AAreaActor* Area = co_await AreaSpawnerComponent->GetAreaFor(TeamIndex).WaitForValue(this);
-			
-			const auto AreaExpanderComponent = NewObject<UTracerAreaExpanderComponent>(this);
-			AreaExpanderComponent->SetExpansionTarget(Area->AreaMeshComponent);
-			AreaExpanderComponent->RegisterComponent();
+			co_return;
 		}
 
-		if (GetNetMode() != NM_DedicatedServer)
+		auto TracerMesh = NewObject<UTracerMeshComponent>(this);
+		TracerMesh->RegisterComponent();
+		TracerMesh->ConfigureMaterialSet({RR->GetTracerMaterialFor(MyTeamIndex)});
+	});
+}
+
+void APaperUnrealCharacter::AttachServerMachineComponents()
+{
+	RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+	{
+		AGameStateBase* GameState = co_await WaitForGameState(GetWorld());
+		UTeamComponent* MyTeamComponent = co_await WaitForComponent<UTeamComponent>(co_await WaitForPlayerState());
+		const int32 MyTeamIndex = co_await MyTeamComponent->GetTeamIndex().WaitForValue(this);
+		UAreaSpawnerComponent* AreaSpawnerComponent = co_await WaitForComponent<UAreaSpawnerComponent>(GameState);
+		AAreaActor* MyTeamArea = co_await AreaSpawnerComponent->GetAreaFor(MyTeamIndex).WaitForValue(this);
+		UAreaMeshComponent* AreaMeshComponent = MyTeamArea->AreaMeshComponent;
+
+		const auto AttachVertexToAreaBoundary = [AreaMeshComponent](FVector2D& Vertex)
 		{
-			const auto RR = co_await WaitForComponent<UResourceRegistryComponent>(GameState);
-			if (co_await RR->GetbResourcesLoaded().WaitForValue(this))
+			Vertex = AreaMeshComponent->FindClosestPointOnBoundary2D(Vertex).GetPoint();
+		};
+
+		// TODO 머신의 종류에 따라 다른 인터페이스를 가져온다 (싱글 및 호스트는 레플리케이션을 건너뛸 수 있도록)
+		UTracerMeshComponent* TracerVertexDestination = co_await WaitForComponent<UTracerMeshComponent>(this);
+
+		auto TracerGenerator = NewObject<UTracerVertexGeneratorComponent>(this);
+		TracerGenerator->RegisterComponent();
+		TracerGenerator->SetVertexDestination(TracerVertexDestination);
+		TracerGenerator->FirstEdgeModifier.BindWeakLambda(
+			AreaMeshComponent, [AttachVertexToAreaBoundary](auto&... Vertices) { (AttachVertexToAreaBoundary(Vertices), ...); });
+		TracerGenerator->LastEdgeModifier.BindWeakLambda(
+			AreaMeshComponent, [AttachVertexToAreaBoundary](auto&... Vertices) { (AttachVertexToAreaBoundary(Vertices), ...); });
+		TracerGenerator->GetbGenerating().ObserveValid(this, [
+				TracerVertexDestination = TWeakObjectPtr<UTracerMeshComponent>{TracerVertexDestination},
+				AreaMeshComponent = TWeakObjectPtr<UAreaMeshComponent>{AreaMeshComponent}
+			](bool bGenerating)
+		{
+			if (TracerVertexDestination.IsValid() && AreaMeshComponent.IsValid() && !bGenerating)
 			{
-				TracerMeshComponent->ConfigureMaterialSet({RR->GetTracerMaterialFor(TeamIndex)});
+				AreaMeshComponent->ExpandByPath(TracerVertexDestination->GetCenterSegmentArray2D());
 			}
-		}
+		});
+
+		auto CollisionState = NewObject<UPlayerCollisionStateComponent>(this);
+		CollisionState->RegisterComponent();
+		CollisionState->FindOrAddCollisionWith(MyTeamArea->AreaMeshComponent).ObserveValid(this, [
+				TracerVertexDestination = TWeakObjectPtr<UTracerMeshComponent>{TracerVertexDestination},
+				TracerGenerator = TWeakObjectPtr<UTracerVertexGeneratorComponent>{TracerGenerator}
+			](bool bCollides)
+			{
+				if (TracerVertexDestination.IsValid() && TracerGenerator.IsValid())
+				{
+					const bool bStartNewTracer = !bCollides;
+					if (bStartNewTracer) TracerVertexDestination->Reset();
+					TracerGenerator->SetGenerationEnabled(bStartNewTracer);
+				}
+			});
 	});
 }

@@ -6,20 +6,46 @@
 #include "UECoroutine.h"
 
 
+template <typename T>
+bool operator==(const TSet<T>& Left, const TSet<T>& Right)
+{
+	if (Left.Num() != Right.Num())
+	{
+		return false;
+	}
+
+	for (const T& Each : Left)
+	{
+		if (!Right.Contains(Each))
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+template <typename T>
+bool operator!=(const TSet<T>& Left, const TSet<T>& Right)
+{
+	return !(Left == Right);
+}
+
+
 template <typename ValueType>
-class TLiveData
+class TLiveDataBase
 {
 public:
-	TLiveData() = default;
+	TLiveDataBase() = default;
 
 	template <typename T> requires std::is_convertible_v<T, ValueType>
-	TLiveData(T&& Other)
+	TLiveDataBase(T&& Other)
 		: Value(Forward<T>(Other))
 	{
 	}
 
 	template <typename T> requires std::is_convertible_v<T, ValueType>
-	TLiveData& operator=(T&& Other)
+	TLiveDataBase& operator=(T&& Other)
 	{
 		SetValue(Forward<T>(Other));
 		return *this;
@@ -54,10 +80,9 @@ public:
 	template <typename T> requires std::is_convertible_v<T, ValueType>
 	void SetValue(T&& Right)
 	{
-		if (bExecutingCallbacks || Value != Right)
+		if (SetValueSilent(Forward<T>(Right)))
 		{
-			Value.Emplace(Forward<T>(Right));
-			NotifyOnExecutionEnd();
+			Notify();
 		}
 	}
 
@@ -70,6 +95,11 @@ public:
 			return true;
 		}
 		return false;
+	}
+
+	void Notify()
+	{
+		NotifyOnExecutionEnd();
 	}
 
 	const TOptional<ValueType>& GetValue() const requires !std::is_pointer_v<ValueType>
@@ -124,6 +154,54 @@ protected:
 
 
 template <typename ValueType>
+class TLiveData : public TLiveDataBase<ValueType>
+{
+public:
+	using Super = TLiveDataBase<ValueType>;
+	using Super::Super;
+	using Super::operator=;
+};
+
+
+template <typename ElementType>
+class TLiveData<TSet<ElementType>> : public TLiveDataBase<TSet<ElementType>>
+{
+public:
+	using Super = TLiveDataBase<TSet<ElementType>>;
+	using Super::Super;
+	using Super::operator=;
+
+	template <typename T> requires std::is_convertible_v<T, ElementType>
+	void Add(T&& Element)
+	{
+		if (AddSilent(Forward<T>(Element)))
+		{
+			this->Notify();
+		}
+	}
+
+	template <typename T> requires std::is_convertible_v<T, ElementType>
+	bool AddSilent(T&& Element)
+	{
+		if (!this->Value)
+		{
+			this->Value.Emplace();
+			this->Value->Add(Forward<T>(Element));
+			return true;
+		}
+
+		if (!this->Value->Contains(Element))
+		{
+			this->Value->Add(Forward<T>(Element));
+			return true;
+		}
+
+		return false;
+	}
+};
+
+
+template <typename ValueType>
 class TLiveDataView
 {
 public:
@@ -161,6 +239,12 @@ private:
 
 #define DECLARE_LIVE_DATA_AND_GETTER(Type, Name)\
 	private: TLiveData<Type> Name;\
+	public:\
+	TLiveDataView<Type> Get##Name() { return Name; };
+
+
+#define DECLARE_LIVE_DATA_AND_GETTER_WITH_DEFAULT(Type, Name, Default)\
+	private: TLiveData<Type> Name{Default};\
 	public:\
 	TLiveDataView<Type> Get##Name() { return Name; };
 

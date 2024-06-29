@@ -15,22 +15,14 @@ class UPlayerCollisionStateComponent : public UActorComponentEx
 	GENERATED_BODY()
 
 public:
-	void AddCollisionTarget(UAreaMeshComponent* AreaMeshComponent)
-	{
-		Areas.Add(AreaMeshComponent);
-	}
-
-	TLiveDataView<bool> GetCollisionWith(UAreaMeshComponent* AreaMeshComponent) const
+	TLiveDataView<bool> FindOrAddCollisionWith(UAreaMeshComponent* AreaMeshComponent)
 	{
 		return AreaToCollisionStatusMap.FindOrAdd(AreaMeshComponent);
 	}
 
 private:
-	UPROPERTY()
-	TSet<UAreaMeshComponent*> Areas;
+	TMap<TWeakObjectPtr<UAreaMeshComponent>, TLiveData<bool>> AreaToCollisionStatusMap;
 
-	mutable TMap<TWeakObjectPtr<UAreaMeshComponent>, TLiveData<bool>> AreaToCollisionStatusMap;
-	
 	UPlayerCollisionStateComponent()
 	{
 		PrimaryComponentTick.bCanEverTick = true;
@@ -40,11 +32,14 @@ private:
 	{
 		Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-		const FVector CurrentPosition{ GetOwner()->GetActorLocation() };
+		const FVector CurrentPosition{GetOwner()->GetActorLocation()};
 
-		for (UAreaMeshComponent* Each : Areas)
+		for (auto& [EachArea, EachStatus] : AreaToCollisionStatusMap)
 		{
-			AreaToCollisionStatusMap.FindOrAdd(Each).SetValue(Each->IsInside(CurrentPosition));
+			if (EachArea.IsValid())
+			{
+				EachStatus.SetValue(EachArea->IsInside(CurrentPosition));
+			}
 		}
 	}
 };

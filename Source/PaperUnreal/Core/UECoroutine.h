@@ -39,6 +39,30 @@ struct TGetFirstParam<RetType(First, Rest...)>
 };
 
 
+// TODO 위에 거랑 합치기
+template <typename FunctorType>
+struct TGetFirstParam2
+{
+private:
+	using FuncType = typename TDecay<FunctorType>::Type;
+
+	template<typename F, typename Ret>
+	static void GetFirstParamHelper(Ret (F::*)());
+
+	template<typename F, typename Ret>
+	static void GetFirstParamHelper(Ret (F::*)() const);
+
+	template<typename F, typename Ret, typename A, typename... Rest>
+	static A GetFirstParamHelper(Ret (F::*)(A, Rest...));
+
+	template<typename F, typename Ret, typename A, typename... Rest>
+	static A GetFirstParamHelper(Ret (F::*)(A, Rest...) const);
+	
+public:
+	using Type = decltype(GetFirstParamHelper(&FuncType::operator()));
+};
+
+
 class FWeakCoroutineContext;
 	
 template <typename>

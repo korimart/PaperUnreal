@@ -27,9 +27,7 @@ private:
 	/** Camera boom positioning the camera above the character */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	class USpringArmComponent* CameraBoom;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Custom, meta = (AllowPrivateAccess = "true"))
-	class UTracerMeshComponent* TracerMeshComponent;
-	
-	virtual void BeginPlay() override;
+
+	virtual void AttachPlayerMachineComponents() override;
+	virtual void AttachServerMachineComponents() override;
 };

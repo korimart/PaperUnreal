@@ -4,8 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "Core/SegmentArray.h"
-#include "Components/ActorComponent.h"
 #include "Components/DynamicMeshComponent.h"
+#include "Core/ActorComponentEx.h"
+#include "Core/LiveData.h"
 #include "TracerMeshComponent.generated.h"
 
 
@@ -59,7 +60,7 @@ private:
 
 
 UCLASS()
-class UTracerMeshComponent : public UActorComponent
+class UTracerMeshComponent : public UActorComponentEx
 {
 	GENERATED_BODY()
 
@@ -181,13 +182,20 @@ public:
 	FEdgeModifier FirstEdgeModifier;
 	FEdgeModifier LastEdgeModifier;
 
-	void SetGenerationDestination(UTracerMeshComponent* InComponent)
+	DECLARE_LIVE_DATA_AND_GETTER_WITH_DEFAULT(bool, bGenerating, false);
+
+	void SetVertexDestination(UTracerMeshComponent* InComponent)
 	{
 		TracerMeshComponent = InComponent;
 	}
 
 	void SetGenerationEnabled(bool bEnable)
 	{
+		if (*bGenerating.GetValue() == bEnable)
+		{
+			return;
+		}
+		
 		if (bEnable)
 		{
 			if (Generate())
@@ -207,11 +215,7 @@ public:
 		}
 
 		SetComponentTickEnabled(bEnable);
-	}
-
-	bool IsGenerating() const
-	{
-		return IsComponentTickEnabled();
+		bGenerating.SetValue(bEnable);
 	}
 
 private:

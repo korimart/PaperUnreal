@@ -57,9 +57,12 @@ public:
 	
 	void ExpandByPath(FSegmentArray2D Path)
 	{
-		Path.ApplyToEachPoint([this](FVector2D& Each) { Each = WorldToLocal2D(Each); });
-		AreaBoundary.Union(Path);
-		TriangulateAreaAndSetInDynamicMesh();
+		if (Path.IsValid())
+		{
+			Path.ApplyToEachPoint([this](FVector2D& Each) { Each = WorldToLocal2D(Each); });
+			AreaBoundary.Union(Path);
+			TriangulateAreaAndSetInDynamicMesh();
+		}
 	}
 	
 	void ConfigureMaterialSet(const TArray<UMaterialInterface*>& NewMaterialSet)

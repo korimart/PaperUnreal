@@ -16,6 +16,16 @@ T* ValidOrNull(T* Object)
 }
 
 
+template <typename FuncType>
+auto RegisterNewComponent(AActor* Owner, const FuncType& Func)
+{
+	auto Component = NewObject<std::remove_pointer_t<typename TGetFirstParam2<FuncType>::Type>>(Owner);
+	Component->RegisterComponent();
+	Func(Component);
+	return Component;
+}
+
+
 inline TWeakAwaitable<AGameStateBase*> WaitForGameState(UWorld* World)
 {
 	if (AGameStateBase* Ret = ValidOrNull(World->GetGameState()))

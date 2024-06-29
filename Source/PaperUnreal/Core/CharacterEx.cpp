@@ -37,3 +37,18 @@ void ACharacterEx::OnPlayerStateChanged(APlayerState* NewPlayerState, APlayerSta
 	Super::OnPlayerStateChanged(NewPlayerState, OldPlayerState);
 	OnNewPlayerState.Broadcast(NewPlayerState);
 }
+
+void ACharacterEx::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (GetNetMode() != NM_Client)
+	{
+		AttachServerMachineComponents();
+	}
+
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		AttachPlayerMachineComponents();
+	}
+}
