@@ -100,29 +100,20 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 			AreaMeshComponent, [AttachVertexToAreaBoundary](auto&... Vertices) { (AttachVertexToAreaBoundary(Vertices), ...); });
 		TracerGenerator->LastEdgeModifier.BindWeakLambda(
 			AreaMeshComponent, [AttachVertexToAreaBoundary](auto&... Vertices) { (AttachVertexToAreaBoundary(Vertices), ...); });
-		TracerGenerator->GetbGenerating().ObserveValid(this, [
-				TracerVertexDestination = TWeakObjectPtr<UTracerMeshComponent>{TracerVertexDestination},
-				AreaMeshComponent = TWeakObjectPtr<UAreaMeshComponent>{AreaMeshComponent}
-			](bool bGenerating)
-		{
-			if (TracerVertexDestination.IsValid() && AreaMeshComponent.IsValid() && !bGenerating)
-			{
-				AreaMeshComponent->ExpandByPath(TracerVertexDestination->GetCenterSegmentArray2D());
-			}
-		});
 
 		auto CollisionState = NewObject<UPlayerCollisionStateComponent>(this);
 		CollisionState->RegisterComponent();
 		CollisionState->FindOrAddCollisionWith(MyTeamArea->AreaMeshComponent).ObserveValid(this, [
 				TracerVertexDestination = TWeakObjectPtr<UTracerMeshComponent>{TracerVertexDestination},
-				TracerGenerator = TWeakObjectPtr<UTracerVertexGeneratorComponent>{TracerGenerator}
+				TracerGenerator = TWeakObjectPtr<UTracerVertexGeneratorComponent>{TracerGenerator},
+				AreaMeshComponent = TWeakObjectPtr<UAreaMeshComponent>{AreaMeshComponent}
 			](bool bCollides)
 			{
-				if (TracerVertexDestination.IsValid() && TracerGenerator.IsValid())
+				if (AreAllValid(TracerVertexDestination, TracerGenerator, AreaMeshComponent))
 				{
-					const bool bStartNewTracer = !bCollides;
-					if (bStartNewTracer) TracerVertexDestination->Reset();
-					TracerGenerator->SetGenerationEnabled(bStartNewTracer);
+					if (bCollides) AreaMeshComponent->ExpandByPath(TracerVertexDestination->GetCenterSegmentArray2D());
+					if (!bCollides) TracerVertexDestination->Reset();
+					TracerGenerator->SetGenerationEnabled(!bCollides);
 				}
 			});
 	});

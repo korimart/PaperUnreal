@@ -36,6 +36,7 @@ private:
 
 		for (auto& [EachArea, EachStatus] : AreaToCollisionStatusMap)
 		{
+			// TODO remove if not valid
 			if (EachArea.IsValid())
 			{
 				EachStatus.SetValue(EachArea->IsInside(CurrentPosition));

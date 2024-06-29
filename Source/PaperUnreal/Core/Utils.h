@@ -16,13 +16,10 @@ T* ValidOrNull(T* Object)
 }
 
 
-template <typename FuncType>
-auto RegisterNewComponent(AActor* Owner, const FuncType& Func)
+template <typename... ElementTypes>
+bool AreAllValid(const TWeakObjectPtr<ElementTypes>&... Check)
 {
-	auto Component = NewObject<std::remove_pointer_t<typename TGetFirstParam2<FuncType>::Type>>(Owner);
-	Component->RegisterComponent();
-	Func(Component);
-	return Component;
+	return (Check.IsValid() && ...);
 }
 
 
