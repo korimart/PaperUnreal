@@ -6,6 +6,7 @@
 #include "AreaSpawnerComponent.h"
 #include "PlayerCollisionStateComponent.h"
 #include "TeamComponent.h"
+#include "OffAreaTracerGenEnablerComponent.h"
 #include "TracerMeshComponent.h"
 #include "TracerVertexAttacherComponent.h"
 #include "Core/UECoroutine.h"
@@ -102,16 +103,20 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		CollisionState->RegisterComponent();
 		CollisionState->FindOrAddCollisionWith(MyTeamArea->AreaMeshComponent).ObserveValid(this, [
 				TracerVertexDestination = TWeakObjectPtr<UTracerMeshComponent>{TracerVertexDestination},
-				TracerGenerator = TWeakObjectPtr<UTracerVertexGeneratorComponent>{TracerVertexGenerator},
 				AreaMeshComponent = TWeakObjectPtr<UAreaMeshComponent>{AreaMeshComponent}
 			](bool bCollides)
 			{
-				if (AreAllValid(TracerVertexDestination, TracerGenerator, AreaMeshComponent))
+				if (AreAllValid(TracerVertexDestination, AreaMeshComponent))
 				{
 					if (bCollides) AreaMeshComponent->ExpandByPath(TracerVertexDestination->GetCenterSegmentArray2D());
 					if (!bCollides) TracerVertexDestination->Reset();
-					TracerGenerator->SetGenerationEnabled(!bCollides);
 				}
 			});
+
+		auto TracerGenController = NewObject<UOffAreaTracerGenEnablerComponent>(this);
+		TracerGenController->SetVertexGenerator(TracerVertexGenerator);
+		TracerGenController->SetGenPreventionArea(AreaMeshComponent);
+		TracerGenController->SetCollisionState(CollisionState);
+		TracerGenController->RegisterComponent();
 	});
 }

@@ -23,6 +23,13 @@ bool AreAllValid(const TWeakObjectPtr<ElementTypes>&... Check)
 }
 
 
+template <typename... ObjectTypes> requires std::conjunction_v<std::is_base_of<UObject, ObjectTypes>...>
+bool AreAllValid(ObjectTypes*... Check)
+{
+	return (IsValid(Check) && ...);
+}
+
+
 inline TWeakAwaitable<AGameStateBase*> WaitForGameState(UWorld* World)
 {
 	if (AGameStateBase* Ret = ValidOrNull(World->GetGameState()))
