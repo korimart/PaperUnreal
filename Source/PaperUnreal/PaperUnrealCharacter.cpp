@@ -7,6 +7,7 @@
 #include "PlayerCollisionStateComponent.h"
 #include "TeamComponent.h"
 #include "TracerMeshComponent.h"
+#include "TracerVertexAttacherComponent.h"
 #include "Core/UECoroutine.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Camera/CameraComponent.h"
@@ -85,27 +86,23 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		AAreaActor* MyTeamArea = co_await AreaSpawnerComponent->GetAreaFor(MyTeamIndex).WaitForValue(this);
 		UAreaMeshComponent* AreaMeshComponent = MyTeamArea->AreaMeshComponent;
 
-		const auto AttachVertexToAreaBoundary = [AreaMeshComponent](FVector2D& Vertex)
-		{
-			Vertex = AreaMeshComponent->FindClosestPointOnBoundary2D(Vertex).GetPoint();
-		};
-
 		// TODO 머신의 종류에 따라 다른 인터페이스를 가져온다 (싱글 및 호스트는 레플리케이션을 건너뛸 수 있도록)
 		UTracerMeshComponent* TracerVertexDestination = co_await WaitForComponent<UTracerMeshComponent>(this);
 
-		auto TracerGenerator = NewObject<UTracerVertexGeneratorComponent>(this);
-		TracerGenerator->RegisterComponent();
-		TracerGenerator->SetVertexDestination(TracerVertexDestination);
-		TracerGenerator->FirstEdgeModifier.BindWeakLambda(
-			AreaMeshComponent, [AttachVertexToAreaBoundary](auto&... Vertices) { (AttachVertexToAreaBoundary(Vertices), ...); });
-		TracerGenerator->LastEdgeModifier.BindWeakLambda(
-			AreaMeshComponent, [AttachVertexToAreaBoundary](auto&... Vertices) { (AttachVertexToAreaBoundary(Vertices), ...); });
+		auto TracerVertexGenerator = NewObject<UTracerVertexGeneratorComponent>(this);
+		TracerVertexGenerator->RegisterComponent();
+		TracerVertexGenerator->SetVertexDestination(TracerVertexDestination);
+
+		auto TracerVertexModifier = NewObject<UTracerVertexAttacherComponent>(this);
+		TracerVertexModifier->RegisterComponent();
+		TracerVertexModifier->SetVertexGenerator(TracerVertexGenerator);
+		TracerVertexModifier->SetAttachDestination(AreaMeshComponent);
 
 		auto CollisionState = NewObject<UPlayerCollisionStateComponent>(this);
 		CollisionState->RegisterComponent();
 		CollisionState->FindOrAddCollisionWith(MyTeamArea->AreaMeshComponent).ObserveValid(this, [
 				TracerVertexDestination = TWeakObjectPtr<UTracerMeshComponent>{TracerVertexDestination},
-				TracerGenerator = TWeakObjectPtr<UTracerVertexGeneratorComponent>{TracerGenerator},
+				TracerGenerator = TWeakObjectPtr<UTracerVertexGeneratorComponent>{TracerVertexGenerator},
 				AreaMeshComponent = TWeakObjectPtr<UAreaMeshComponent>{AreaMeshComponent}
 			](bool bCollides)
 			{
