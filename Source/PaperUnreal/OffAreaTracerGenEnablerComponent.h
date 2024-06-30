@@ -17,6 +17,9 @@ class UOffAreaTracerGenEnablerComponent : public UActorComponentEx
 	GENERATED_BODY()
 
 public:
+	FSimpleMulticastDelegate OnGenPreEnable;
+	FSimpleMulticastDelegate OnGenPostDisable;
+	
 	void SetVertexGenerator(UTracerVertexGeneratorComponent* Generator)
 	{
 		TracerVertexGenerator = Generator;
@@ -30,6 +33,11 @@ public:
 	void SetCollisionState(UPlayerCollisionStateComponent* CollisionState)
 	{
 		PlayerCollisionState = CollisionState;
+	}
+
+	UTracerVertexGeneratorComponent* GetControlledGenerator() const
+	{
+		return TracerVertexGenerator;
 	}
 
 private:
@@ -55,7 +63,20 @@ private:
 
 		PlayerCollisionState->FindOrAddCollisionWith(GenPreventionArea).ObserveValid(this, [this](bool bCollides)
 		{
+			const bool bToEnable = !bCollides;
+			const bool bToDisable = bCollides;
+			
+			if (bToEnable)
+			{
+				OnGenPreEnable.Broadcast();
+			}
+			
 			TracerVertexGenerator->SetGenerationEnabled(!bCollides);
+
+			if (bToDisable)
+			{
+				OnGenPostDisable.Broadcast();
+			}
 		});
 	}
 };

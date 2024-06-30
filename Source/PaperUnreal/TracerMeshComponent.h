@@ -184,9 +184,14 @@ public:
 
 	DECLARE_LIVE_DATA_AND_GETTER_WITH_DEFAULT(bool, bGenerating, false);
 
-	void SetVertexDestination(UTracerMeshComponent* InComponent)
+	void SetGenDestination(UTracerMeshComponent* InComponent)
 	{
 		TracerMeshComponent = InComponent;
+	}
+
+	UTracerMeshComponent* GetGenDestination() const
+	{
+		return TracerMeshComponent;
 	}
 
 	void SetGenerationEnabled(bool bEnable)
@@ -226,6 +231,14 @@ private:
 	{
 		PrimaryComponentTick.bCanEverTick = true;
 		PrimaryComponentTick.bStartWithTickEnabled = false;
+		bWantsInitializeComponent = true;
+	}
+
+	virtual void InitializeComponent() override
+	{
+		Super::InitializeComponent();
+		
+		check(IsValid(TracerMeshComponent));
 	}
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override

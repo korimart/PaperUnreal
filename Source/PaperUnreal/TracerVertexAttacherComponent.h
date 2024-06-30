@@ -6,6 +6,7 @@
 #include "AreaMeshComponent.h"
 #include "TracerMeshComponent.h"
 #include "Core/ActorComponentEx.h"
+#include "Core/Utils.h"
 #include "TracerVertexAttacherComponent.generated.h"
 
 
@@ -17,18 +18,7 @@ class UTracerVertexAttacherComponent : public UActorComponentEx
 public:
 	void SetVertexGenerator(UTracerVertexGeneratorComponent* Generator)
 	{
-		if (IsValid(VertexGeneratorComponent))
-		{
-			VertexGeneratorComponent->FirstEdgeModifier.Unbind();
-			VertexGeneratorComponent->LastEdgeModifier.Unbind();
-		}
-
 		VertexGeneratorComponent = Generator;
-		
-		VertexGeneratorComponent->FirstEdgeModifier.BindWeakLambda(
-			this, [this](auto&... Vertices) { (AttachVertexToAreaBoundary(Vertices), ...); });
-		VertexGeneratorComponent->LastEdgeModifier.BindWeakLambda(
-			this, [this](auto&... Vertices) { (AttachVertexToAreaBoundary(Vertices), ...); });
 	}
 	
 	void SetAttachDestination(UAreaMeshComponent* Dest)
@@ -42,12 +32,26 @@ private:
 	
 	UPROPERTY()
 	UAreaMeshComponent* AttachDestination;
+
+	UTracerVertexAttacherComponent()
+	{
+		bWantsInitializeComponent = true;
+	}
+
+	virtual void InitializeComponent() override
+	{
+		Super::InitializeComponent();
+		
+		check(AreAllValid(VertexGeneratorComponent, AttachDestination));
+		
+		VertexGeneratorComponent->FirstEdgeModifier.BindWeakLambda(
+			this, [this](auto&... Vertices) { (AttachVertexToAreaBoundary(Vertices), ...); });
+		VertexGeneratorComponent->LastEdgeModifier.BindWeakLambda(
+			this, [this](auto&... Vertices) { (AttachVertexToAreaBoundary(Vertices), ...); });
+	}
 	
 	void AttachVertexToAreaBoundary(FVector2D& Vertex) const
 	{
-		if (IsValid(AttachDestination))
-		{
-			Vertex = AttachDestination->FindClosestPointOnBoundary2D(Vertex).GetPoint();
-		}
+		Vertex = AttachDestination->FindClosestPointOnBoundary2D(Vertex).GetPoint();
 	}
 };

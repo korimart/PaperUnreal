@@ -8,6 +8,7 @@
 #include "TeamComponent.h"
 #include "OffAreaTracerGenEnablerComponent.h"
 #include "TracerMeshComponent.h"
+#include "TracerToAreaConverterComponent.h"
 #include "TracerVertexAttacherComponent.h"
 #include "Core/UECoroutine.h"
 #include "UObject/ConstructorHelpers.h"
@@ -91,32 +92,26 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		UTracerMeshComponent* TracerVertexDestination = co_await WaitForComponent<UTracerMeshComponent>(this);
 
 		auto TracerVertexGenerator = NewObject<UTracerVertexGeneratorComponent>(this);
+		TracerVertexGenerator->SetGenDestination(TracerVertexDestination);
 		TracerVertexGenerator->RegisterComponent();
-		TracerVertexGenerator->SetVertexDestination(TracerVertexDestination);
 
 		auto TracerVertexModifier = NewObject<UTracerVertexAttacherComponent>(this);
-		TracerVertexModifier->RegisterComponent();
 		TracerVertexModifier->SetVertexGenerator(TracerVertexGenerator);
 		TracerVertexModifier->SetAttachDestination(AreaMeshComponent);
+		TracerVertexModifier->RegisterComponent();
 
 		auto CollisionState = NewObject<UPlayerCollisionStateComponent>(this);
 		CollisionState->RegisterComponent();
-		CollisionState->FindOrAddCollisionWith(MyTeamArea->AreaMeshComponent).ObserveValid(this, [
-				TracerVertexDestination = TWeakObjectPtr<UTracerMeshComponent>{TracerVertexDestination},
-				AreaMeshComponent = TWeakObjectPtr<UAreaMeshComponent>{AreaMeshComponent}
-			](bool bCollides)
-			{
-				if (AreAllValid(TracerVertexDestination, AreaMeshComponent))
-				{
-					if (bCollides) AreaMeshComponent->ExpandByPath(TracerVertexDestination->GetCenterSegmentArray2D());
-					if (!bCollides) TracerVertexDestination->Reset();
-				}
-			});
 
 		auto TracerGenController = NewObject<UOffAreaTracerGenEnablerComponent>(this);
 		TracerGenController->SetVertexGenerator(TracerVertexGenerator);
 		TracerGenController->SetGenPreventionArea(AreaMeshComponent);
 		TracerGenController->SetCollisionState(CollisionState);
 		TracerGenController->RegisterComponent();
+
+		auto TracerToAreaConverter = NewObject<UTracerToAreaConverterComponent>(this);
+		TracerToAreaConverter->SetTracerGenController(TracerGenController);
+		TracerToAreaConverter->SetConversionDestination(AreaMeshComponent);
+		TracerToAreaConverter->RegisterComponent();
 	});
 }
