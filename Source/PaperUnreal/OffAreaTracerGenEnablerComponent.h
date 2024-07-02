@@ -59,7 +59,7 @@ private:
 	{
 		Super::InitializeComponent();
 
-		check(AreAllValid(TracerVertexGenerator, GenPreventionArea, PlayerCollisionState));
+		check(AllValid(TracerVertexGenerator, GenPreventionArea, PlayerCollisionState));
 
 		PlayerCollisionState->FindOrAddCollisionWith(GenPreventionArea).ObserveValid(this, [this](bool bCollides)
 		{

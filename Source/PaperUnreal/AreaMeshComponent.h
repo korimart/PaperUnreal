@@ -54,13 +54,33 @@ public:
 
 		return Ret;
 	}
+
+	struct FExpansionResult
+	{
+		bool bAddedToTheLeftOfPath;
+	};
 	
-	void ExpandByPath(FSegmentArray2D Path)
+	TOptional<FExpansionResult> ExpandByPath(FSegmentArray2D Path)
 	{
 		if (Path.IsValid())
 		{
 			Path.ApplyToEachPoint([this](FVector2D& Each) { Each = WorldToLocal2D(Each); });
-			AreaBoundary.Union(Path);
+			
+			if (TOptional<FLoopedSegmentArray2D::FUnionResult> UnionResult = AreaBoundary.Union(Path))
+			{
+				TriangulateAreaAndSetInDynamicMesh();
+				return FExpansionResult{.bAddedToTheLeftOfPath = UnionResult->bUnionedToTheLeftOfPath};
+			}
+		}
+		return {};
+	}
+	
+	void ReduceByPath(FSegmentArray2D Path, bool bToTheLeftOfPath)
+	{
+		if (Path.IsValid())
+		{
+			Path.ApplyToEachPoint([this](FVector2D& Each) { Each = WorldToLocal2D(Each); });
+			AreaBoundary.Difference(Path, bToTheLeftOfPath);
 			TriangulateAreaAndSetInDynamicMesh();
 		}
 	}

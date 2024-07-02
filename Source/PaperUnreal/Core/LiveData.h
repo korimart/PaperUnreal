@@ -80,6 +80,7 @@ public:
 	template <typename T> requires std::is_convertible_v<T, ValueType>
 	void SetValue(T&& Right)
 	{
+		check(!bExecutingCallbacks);
 		if (SetValueSilent(Forward<T>(Right)))
 		{
 			Notify();
@@ -89,6 +90,7 @@ public:
 	template <typename T> requires std::is_convertible_v<T, ValueType>
 	bool SetValueSilent(T&& Right)
 	{
+		check(!bExecutingCallbacks);
 		if (Value != Right)
 		{
 			Value.Emplace(Forward<T>(Right));
@@ -99,7 +101,13 @@ public:
 
 	void Notify()
 	{
-		NotifyOnExecutionEnd();
+		if (Value)
+		{
+			check(!bExecutingCallbacks);
+			bExecutingCallbacks = true;
+			OnChanged.Broadcast(*Value);
+			bExecutingCallbacks = false;
+		}
 	}
 
 	const TOptional<ValueType>& GetValue() const requires !std::is_pointer_v<ValueType>
@@ -128,28 +136,6 @@ protected:
 
 	TOptional<ValueType> Value;
 	bool bExecutingCallbacks = false;
-	bool bDeferredExecutionPending = false;
-
-	void NotifyOnExecutionEnd()
-	{
-		if (bExecutingCallbacks)
-		{
-			bDeferredExecutionPending = true;
-			return;
-		}
-
-		const TOptional<ValueType> Copy = Value;
-		bExecutingCallbacks = true;
-		if (Value) OnChanged.Broadcast(*Value);
-		bExecutingCallbacks = false;
-		const bool bValueChangedWhileExecutingCallbacks = Copy != Value;
-
-		if (bDeferredExecutionPending && bValueChangedWhileExecutingCallbacks)
-		{
-			bDeferredExecutionPending = false;
-			NotifyOnExecutionEnd();
-		}
-	}
 };
 
 
@@ -174,29 +160,62 @@ public:
 	template <typename T> requires std::is_convertible_v<T, ElementType>
 	void Add(T&& Element)
 	{
-		if (AddSilent(Forward<T>(Element)))
+		check(!this->bExecutingCallbacks);
+		if (ElementType* Added = AddSilentImpl(Forward<T>(Element)))
 		{
 			this->Notify();
+
+			this->bExecutingCallbacks = true;
+			OnElementAdded.Broadcast(*Added);
+			this->bExecutingCallbacks = false;
 		}
 	}
 
 	template <typename T> requires std::is_convertible_v<T, ElementType>
 	bool AddSilent(T&& Element)
 	{
+		check(!this->bExecutingCallbacks);
+		return !!AddSilentImpl(Forward<T>(Element));
+	}
+
+	template <typename FuncType>
+	void ObserveEach(UObject* Lifetime, FuncType&& Func)
+	{
+		if (this->Value)
+		{
+			this->bExecutingCallbacks = true;
+			for (const ElementType& Each : *this->Value)
+			{
+				Func(Each);
+			}
+			this->bExecutingCallbacks = false;
+		}
+
+		OnElementAdded.AddWeakLambda(Lifetime, Forward<FuncType>(Func));
+	}
+
+private:
+	DECLARE_MULTICAST_DELEGATE_OneParam(FElementEvent, const ElementType&);
+	FElementEvent OnElementAdded;
+    
+	template <typename T> requires std::is_convertible_v<T, ElementType>
+	ElementType* AddSilentImpl(T&& Element)
+	{
 		if (!this->Value)
 		{
 			this->Value.Emplace();
-			this->Value->Add(Forward<T>(Element));
-			return true;
+			FSetElementId ElementId = this->Value->Add(Forward<T>(Element));
+			return &this->Value->operator[](ElementId);
 		}
 
 		if (!this->Value->Contains(Element))
 		{
 			this->Value->Add(Forward<T>(Element));
-			return true;
+			FSetElementId ElementId = this->Value->Add(Forward<T>(Element));
+			return &this->Value->operator[](ElementId);
 		}
 
-		return false;
+		return nullptr;
 	}
 };
 
@@ -214,6 +233,12 @@ public:
 	void ObserveValid(UObject* Lifetime, ObserverType&& Observer)
 	{
 		LiveData.ObserveValid(Lifetime, Forward<ObserverType>(Observer));
+	}
+	
+	template <typename ObserverType>
+	void ObserveEach(UObject* Lifetime, ObserverType&& Observer) requires TIsInstantiationOf_V<ValueType, TSet>
+	{
+		LiveData.ObserveEach(Lifetime, Forward<ObserverType>(Observer));
 	}
 
 	TWeakAwaitable<ValueType> WaitForValue(UObject* Lifetime)

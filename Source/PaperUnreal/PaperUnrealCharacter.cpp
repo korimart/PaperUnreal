@@ -3,6 +3,7 @@
 #include "PaperUnrealCharacter.h"
 
 #include "AreaActor.h"
+#include "AreaSlasherComponent.h"
 #include "AreaSpawnerComponent.h"
 #include "PlayerCollisionStateComponent.h"
 #include "TeamComponent.h"
@@ -91,6 +92,10 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		// TODO 머신의 종류에 따라 다른 인터페이스를 가져온다 (싱글 및 호스트는 레플리케이션을 건너뛸 수 있도록)
 		UTracerMeshComponent* TracerVertexDestination = co_await WaitForComponent<UTracerMeshComponent>(this);
 
+
+		// TODO 아래 컴포넌트들은 위에 먼저 부착된 컴포넌트들에 의존함
+		// 컴포넌트를 갈아끼울 때 이러한 의존성에 대한 경고를 하는 메카니즘이 존재하지 않음
+
 		auto TracerVertexGenerator = NewObject<UTracerVertexGeneratorComponent>(this);
 		TracerVertexGenerator->SetGenDestination(TracerVertexDestination);
 		TracerVertexGenerator->RegisterComponent();
@@ -113,5 +118,21 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		TracerToAreaConverter->SetTracerGenController(TracerGenController);
 		TracerToAreaConverter->SetConversionDestination(AreaMeshComponent);
 		TracerToAreaConverter->RegisterComponent();
+
+		AreaSpawnerComponent->GetSpawnedAreas().ObserveEach(this, [this,
+				CollisionState = ToWeak(CollisionState),
+				MyTeamArea = ToWeak(MyTeamArea),
+				TracerToAreaConverter = ToWeak(TracerToAreaConverter)
+			](AAreaActor* SpawnedArea)
+			{
+				if (AllValid(CollisionState, MyTeamArea, TracerToAreaConverter) && SpawnedArea != MyTeamArea)
+				{
+					auto AreaSlasherComponent = NewObject<UAreaSlasherComponent>(this);
+					AreaSlasherComponent->SetCollisionState(CollisionState.Get());
+					AreaSlasherComponent->SetSlashTarget(SpawnedArea->AreaMeshComponent);
+					AreaSlasherComponent->SetTracerToAreaConverter(TracerToAreaConverter.Get());
+					AreaSlasherComponent->RegisterComponent();
+				}
+			});
 	});
 }

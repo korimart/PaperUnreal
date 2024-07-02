@@ -16,15 +16,22 @@ T* ValidOrNull(T* Object)
 }
 
 
+template <typename T>
+TWeakObjectPtr<T> ToWeak(T* Object)
+{
+	return {Object};
+}
+
+
 template <typename... ElementTypes>
-bool AreAllValid(const TWeakObjectPtr<ElementTypes>&... Check)
+bool AllValid(const TWeakObjectPtr<ElementTypes>&... Check)
 {
 	return (Check.IsValid() && ...);
 }
 
 
 template <typename... ObjectTypes> requires std::conjunction_v<std::is_base_of<UObject, ObjectTypes>...>
-bool AreAllValid(ObjectTypes*... Check)
+bool AllValid(ObjectTypes*... Check)
 {
 	return (IsValid(Check) && ...);
 }

@@ -14,6 +14,9 @@ class UTracerToAreaConverterComponent : public UActorComponentEx
 	GENERATED_BODY()
 
 public:
+	DECLARE_MULTICAST_DELEGATE_TwoParams(FOnTracerToAreaConversion, const FSegmentArray2D&, bool);
+	FOnTracerToAreaConversion OnTracerToAreaConversion;
+
 	void SetTracerGenController(UOffAreaTracerGenEnablerComponent* Controller)
 	{
 		TracerGenController = Controller;
@@ -43,11 +46,11 @@ private:
 	{
 		Super::InitializeComponent();
 
-		check(AreAllValid(TracerGenController, ConversionDestination));
+		check(AllValid(TracerGenController, ConversionDestination));
 
 		Tracer = TracerGenController->GetControlledGenerator()->GetGenDestination();
 		check(IsValid(Tracer));
-		
+
 		TracerGenController->OnGenPreEnable.AddWeakLambda(this, [this]()
 		{
 			Tracer->Reset();
@@ -55,7 +58,11 @@ private:
 
 		TracerGenController->OnGenPostDisable.AddWeakLambda(this, [this]()
 		{
-			ConversionDestination->ExpandByPath(Tracer->GetCenterSegmentArray2D());
+			if (TOptional<UAreaMeshComponent::FExpansionResult> Result
+				= ConversionDestination->ExpandByPath(Tracer->GetCenterSegmentArray2D()))
+			{
+				OnTracerToAreaConversion.Broadcast(Tracer->GetCenterSegmentArray2D(), Result->bAddedToTheLeftOfPath);
+			}
 		});
 	}
 };

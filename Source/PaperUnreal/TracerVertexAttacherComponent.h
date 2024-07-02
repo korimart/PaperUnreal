@@ -42,7 +42,7 @@ private:
 	{
 		Super::InitializeComponent();
 		
-		check(AreAllValid(VertexGeneratorComponent, AttachDestination));
+		check(AllValid(VertexGeneratorComponent, AttachDestination));
 		
 		VertexGeneratorComponent->FirstEdgeModifier.BindWeakLambda(
 			this, [this](auto&... Vertices) { (AttachVertexToAreaBoundary(Vertices), ...); });

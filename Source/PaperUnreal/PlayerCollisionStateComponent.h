@@ -20,6 +20,11 @@ public:
 		return AreaToCollisionStatusMap.FindOrAdd(AreaMeshComponent);
 	}
 
+	FVector GetPlayerLocation() const
+	{
+		return GetOwner()->GetActorLocation();
+	}
+
 private:
 	TMap<TWeakObjectPtr<UAreaMeshComponent>, TLiveData<bool>> AreaToCollisionStatusMap;
 
