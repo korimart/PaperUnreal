@@ -79,6 +79,11 @@ private:
 			Right = VertexAttachmentTarget->FindClosestPointOnBoundary2D(Right).GetPoint();
 			VertexDestination->SetLastVertices(Left, Right);
 		});
+
+		VertexSource->OnCleared.AddWeakLambda(this, [this]()
+		{
+			VertexDestination->Reset();
+		});
 	}
 
 	static std::tuple<FVector2D, FVector2D> CreateVertexPositions(const FVector2D& Center, const FVector2D& Right)

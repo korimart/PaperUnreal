@@ -107,6 +107,19 @@ public:
 			TriangulateAreaAndSetInDynamicMesh();
 		}
 	}
+
+	UE::Geometry::FSegment2d Clip(const UE::Geometry::FSegment2d& Segment) const
+	{
+		const UE::Geometry::FSegment2d LocalSegment
+		{
+			WorldToLocal2D(Segment.StartPoint()),
+			WorldToLocal2D(Segment.EndPoint()),
+		};
+
+		const UE::Geometry::FSegment2d Clipped = AreaBoundary.Clip(LocalSegment);
+		
+		return {LocalToWorld2D(Clipped.StartPoint()), LocalToWorld2D(Clipped.EndPoint())};
+	}
 	
 	void ConfigureMaterialSet(const TArray<UMaterialInterface*>& NewMaterialSet)
 	{

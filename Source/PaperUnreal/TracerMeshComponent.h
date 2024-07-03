@@ -162,11 +162,19 @@ class UTracerPathComponent : public UActorComponent
 public:
 	FSimpleMulticastDelegate OnNewPointGenerated;
 	FSimpleMulticastDelegate OnLastPointModified;
+	FSimpleMulticastDelegate OnCleared;
+	FSimpleMulticastDelegate OnGenerationStarted;
 	FSimpleMulticastDelegate OnGenerationEnded;
 
 	void SetNoPathArea(UAreaMeshComponent* Area)
 	{
 		NoPathArea = Area;
+	}
+
+	void Clear()
+	{
+		Path.Empty();
+		OnCleared.Broadcast();
 	}
 	
 	const FSegmentArray2D& GetPath() const { return Path; }
@@ -196,9 +204,16 @@ private:
 		Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
 		const bool bGeneratedLastFrame = bGeneratedThisFrame;
+		const bool bWillGenerateThisFrame = !NoPathArea->IsInside(GetOwner()->GetActorLocation());
+		
 		bGeneratedThisFrame = false;
 
-		if (!NoPathArea->IsInside(GetOwner()->GetActorLocation()))
+		if (!bGeneratedLastFrame && bWillGenerateThisFrame)
+		{
+			OnGenerationStarted.Broadcast();
+		}
+
+		if (bWillGenerateThisFrame)
 		{
 			Generate();
 			bGeneratedThisFrame = true;
@@ -206,6 +221,8 @@ private:
 
 		if (bGeneratedLastFrame && !bGeneratedThisFrame)
 		{
+			Path.SetLastPoint(NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint());
+			OnLastPointModified.Broadcast();
 			OnGenerationEnded.Broadcast();
 		}
 	}
@@ -217,6 +234,7 @@ private:
 		if (Path.PointCount() == 0)
 		{
 			Path.AddPoint(ActorLocation2D);
+			Path.SetLastPoint(NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint());
 			OnNewPointGenerated.Broadcast();
 			return;
 		}

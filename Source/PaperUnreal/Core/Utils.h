@@ -37,6 +37,12 @@ T* ValidOrNull(T* Object)
 }
 
 
+bool AllValid(const auto&... Check)
+{
+	return (Utils_Private::IsValid(Check) && ...);
+}
+
+
 template <typename T>
 TWeakObjectPtr<T> ToWeak(T* Object)
 {
@@ -44,9 +50,10 @@ TWeakObjectPtr<T> ToWeak(T* Object)
 }
 
 
-bool AllValid(const auto&... Check)
+template <typename T>
+bool IsNearlyLE(T Left, T Right)
 {
-	return (Utils_Private::IsValid(Check) && ...);
+	return FMath::IsNearlyEqual(Left, Right) || Left < Right;
 }
 
 
@@ -87,6 +94,17 @@ TWeakAwaitable<bool> RequestAsyncLoad(const TSoftObjectPtr<SoftObjectType>& Soft
 			return true;
 		}));
 	return Ret;
+}
+
+
+template <typename T, typename U>
+void FlushAwaitablesArray(TArray<TWeakAwaitableHandle<T>>& Array, const U& Value)
+{
+	for (auto& Each : Array)
+	{
+		Each.SetValue(Value);
+	}
+	Array.Empty();
 }
 
 

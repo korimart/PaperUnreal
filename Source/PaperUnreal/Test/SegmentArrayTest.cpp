@@ -190,7 +190,7 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			TestPointsEqual(TEXT("TestCase 3: Reverse Union"), SegmentArray.GetPoints(), Joined);
 		}
 	}
-	
+
 	{
 		const TArray<FVector2D> VertexPositions
 		{
@@ -231,6 +231,22 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			FLoopedSegmentArray2D SegmentArray{VertexPositions};
 			SegmentArray.Difference(ReversedPath, true);
 			TestPointsEqual(TEXT("TestCase 4: Reverse Differnce"), SegmentArray.GetPoints(), Difference);
+		}
+	}
+
+	{
+		const TArray<FVector2D> VertexPositions
+		{
+			{-1.f, 1.f},
+			{-1.f, -1.f},
+			{1.f, -1.f},
+			{1.f, 1.f},
+		};
+
+		{
+			FLoopedSegmentArray2D SegmentArray{VertexPositions};
+			auto Result = SegmentArray.Clip({{-2.f, 0.f}, {0.f, 0.f}});
+			TestEqual(TEXT("TestCase 5: Clip"), FSegment2D{Result}, FSegment2D{{-1.f, 0.f}, {0.f, 0.f}});
 		}
 	}
 

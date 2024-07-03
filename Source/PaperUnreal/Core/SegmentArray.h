@@ -4,7 +4,39 @@
 
 #include "CoreMinimal.h"
 #include "SegmentTypes.h"
+#include "Utils.h"
 #include "Algo/Accumulate.h"
+
+
+struct FRay2D
+{
+	FVector2D Origin;
+	FVector2D Direction;
+
+	TOptional<std::tuple<double, double>> RayTrace(const UE::Geometry::FSegment2d& Segment) const
+	{
+		const FVector2D SegmentLengthedDirection = Segment.Direction * Segment.Length();
+		const double RayDirCrossSegDir = FVector2D::CrossProduct(Direction, SegmentLengthedDirection);
+
+		if (FMath::IsNearlyZero(RayDirCrossSegDir))
+		{
+			return {};
+		}
+
+		const FVector2D OriginToSegStart = Segment.StartPoint() - Origin;
+		const double T = FVector2D::CrossProduct(OriginToSegStart, SegmentLengthedDirection) / RayDirCrossSegDir;
+		const double U = FVector2D::CrossProduct(OriginToSegStart, Direction) / RayDirCrossSegDir;
+
+		if ((FMath::IsNearlyZero(T) || T > 0.)
+			&& (FMath::IsNearlyZero(U) || 0. < U)
+			&& (FMath::IsNearlyEqual(U, 1.) || U < 1.))
+		{
+			return std::make_tuple(T, U);
+		}
+
+		return {};
+	}
+};
 
 
 struct FSegment2D : UE::Geometry::FSegment2d
@@ -12,21 +44,26 @@ struct FSegment2D : UE::Geometry::FSegment2d
 	using Super = UE::Geometry::FSegment2d;
 	using Super::Super;
 
-	bool ContainsX(float X) const
+	FSegment2D(const Super& Other)
+		: Super(Other)
 	{
-		return FMath::Min(StartPoint().X, EndPoint().X) <= X
-			&& X < FMath::Max(StartPoint().X, EndPoint().X);
 	}
 
-	bool ContainsY(float Y) const
+	bool NearlyContainsX(double X) const
 	{
-		return FMath::Min(StartPoint().Y, EndPoint().Y) <= Y
-			&& Y < FMath::Max(StartPoint().Y, EndPoint().Y);
+		return IsNearlyLE(FMath::Min(StartPoint().X, EndPoint().X), X)
+			&& IsNearlyLE(X, FMath::Max(StartPoint().X, EndPoint().X));
+	}
+
+	bool NearlyContainsY(double Y) const
+	{
+		return IsNearlyLE(FMath::Min(StartPoint().Y, EndPoint().Y), Y)
+			&& IsNearlyLE(Y, FMath::Max(StartPoint().Y, EndPoint().Y));
 	}
 
 	float Slope() const
 	{
-		return (EndPoint().X - StartPoint().X) / (EndPoint().Y - StartPoint().Y);
+		return (EndPoint().Y - StartPoint().Y) / (EndPoint().X - StartPoint().X);
 	}
 
 	FSegment2D Perp(const FVector2D& Point) const
@@ -122,11 +159,18 @@ public:
 		return Index + 1;
 	}
 
+	// TODO 어떤 함수는 마이너스 인덱스를 받고 어떤 함수는 안 받고 중구난방임
+	// 그리고 GetLast 함수들이 따로 있음 전부 마이너스로 통일해야 됨
+	int32 PositiveSegmentIndex(int32 Index) const
+	{
+		return Index >= 0 ? Index : SegmentCount() + Index;
+	}
+
 	FVector2D GetLastPoint(int32 IndexFromLast = 0) const
 	{
 		return Points[Points.Num() - IndexFromLast - 1];
 	}
-	
+
 	FSegment2D GetLastSegment(int32 IndexFromLast = 0) const
 	{
 		return operator[](SegmentCount() - IndexFromLast - 1);
@@ -147,6 +191,64 @@ public:
 		}
 
 		return Points.Num() >= 2;
+	}
+
+	void AddPoint(const FVector2D& Position)
+	{
+		Points.Add(Position);
+	}
+
+	void SetPoint(int32 Index, const FVector2D& NewPosition)
+	{
+		Points[Index] = NewPosition;
+	}
+
+	void SetLastPoint(const FVector2D& NewPosition)
+	{
+		Points.Last() = NewPosition;
+	}
+
+	void InsertPoints(int32 Index, TArrayView<const FVector2D> NewPoints)
+	{
+		if (!NewPoints.IsEmpty())
+		{
+			Points.Insert(NewPoints.GetData(), NewPoints.Num(), Index);
+		}
+	}
+
+	template <typename... ArgTypes> requires !bLoop
+	void ReplacePoints(ArgTypes&&... Args)
+	{
+		ReplacePointsNoLoop(Forward<ArgTypes>(Args)...);
+	}
+
+	void ReplacePoints(int32 FirstIndex, int32 LastIndex, TArrayView<const FVector2D> NewPoints) requires bLoop
+	{
+		FirstIndex = FirstIndex % FMath::Max(Points.Num(), 1);
+		LastIndex = LastIndex % FMath::Max(Points.Num(), 1);
+
+		if (FirstIndex <= LastIndex)
+		{
+			ReplacePointsNoLoop(FirstIndex, LastIndex, NewPoints);
+			return;
+		}
+
+		ReplacePointsNoLoop(FirstIndex, Points.Num() - 1, NewPoints);
+		ReplacePointsNoLoop(0, LastIndex, {});
+	}
+
+	void RemovePoints(int32 StartIndex, int32 LastIndex)
+	{
+		Points.RemoveAt(StartIndex, LastIndex - StartIndex + 1);
+	}
+
+	void SetSegment(int32 SegmentIndex, const UE::Geometry::FSegment2d& NewSegment)
+	{
+		SegmentIndex = PositiveSegmentIndex(SegmentIndex);
+		const int32 PointIndex0 = SegmentIndexToStartPointIndex(SegmentIndex);
+		const int32 PointIndex1 = SegmentIndexToEndPointIndex(SegmentIndex);
+		SetPoint(PointIndex0, NewSegment.StartPoint());
+		SetPoint(PointIndex1, NewSegment.EndPoint());
 	}
 
 	float CalculateNetAngleDelta() const
@@ -200,21 +302,27 @@ public:
 			return false;
 		}
 
-		int32 IntersectionCount = 0;
+		TArray<double> IntersectingXes;
 		for (const FSegment2D& Each : *this)
 		{
-			if (Each.ContainsY(Point.Y))
+			if (Each.NearlyContainsY(Point.Y))
 			{
-				const int32 IntersectionX = Each.StartPoint().X + (Point.Y - Each.StartPoint().Y) * Each.Slope();
+				const double IntersectionX = Each.StartPoint().X + (Point.Y - Each.StartPoint().Y) / Each.Slope();
 
-				if (Point.X < IntersectionX)
+				if (IsNearlyLE(Point.X, IntersectionX))
 				{
-					IntersectionCount++;
+					if (!IntersectingXes.FindByPredicate([&](double X)
+					{
+						return FMath::IsNearlyEqual(X, IntersectionX, UE_KINDA_SMALL_NUMBER);
+					}))
+					{
+						IntersectingXes.Add(IntersectionX);
+					}
 				}
 			}
 		}
 
-		return IntersectionCount % 2 == 1;
+		return IntersectingXes.Num() % 2 == 1;
 	}
 
 	FIntersection FindClosestPointTo(const FVector2D& Point) const
@@ -238,7 +346,7 @@ public:
 
 		return Ret;
 	}
-	
+
 	TOptional<FIntersection> FindIntersection(const UE::Geometry::FSegment2d& Segment) const
 	{
 		if (!IsValid())
@@ -261,53 +369,52 @@ public:
 		return {};
 	}
 
-	void AddPoint(const FVector2D& Position)
+	TOptional<FVector2D> Attach(const FVector2D& Point, const FVector2D& Direction) const
 	{
-		Points.Add(Position);
-	}
+		const FRay2D Ray{Point, Direction};
 
-	void SetPoint(int32 Index, const FVector2D& NewPosition)
-	{
-		Points[Index] = NewPosition;
-	}
-
-	void SetLastPoint(const FVector2D& NewPosition)
-	{
-		Points.Last() = NewPosition;
-	}
-
-	void InsertPoints(int32 Index, TArrayView<const FVector2D> NewPoints)
-	{
-		if (!NewPoints.IsEmpty())
+		double Distance = TNumericLimits<double>::Max();
+		TOptional<FVector2D> Ret;
+		for (FSegment2D Each : *this)
 		{
-			Points.Insert(NewPoints.GetData(), NewPoints.Num(), Index);
+			if (TOptional<std::tuple<double, double>> Hit = Ray.RayTrace(Each))
+			{
+				if (std::get<0>(*Hit) < Distance)
+				{
+					Distance = std::get<0>(*Hit);
+					Ret = Each.PointBetween(std::get<1>(*Hit));
+				}
+			}
 		}
+		return Ret;
 	}
 
-	template <typename... ArgTypes> requires !bLoop
-	void ReplacePoints(ArgTypes&&... Args)
+	UE::Geometry::FSegment2d Clip(const UE::Geometry::FSegment2d& Segment) const requires bLoop
 	{
-		ReplacePointsNoLoop(Forward<ArgTypes>(Args)...);
-	}
-
-	void ReplacePoints(int32 FirstIndex, int32 LastIndex, TArrayView<const FVector2D> NewPoints) requires bLoop
-	{
-		FirstIndex = FirstIndex % FMath::Max(Points.Num(), 1);
-		LastIndex = LastIndex % FMath::Max(Points.Num(), 1);
-
-		if (FirstIndex <= LastIndex)
+		if (!IsValid())
 		{
-			ReplacePointsNoLoop(FirstIndex, LastIndex, NewPoints);
-			return;
+			return Segment;
 		}
 
-		ReplacePointsNoLoop(FirstIndex, Points.Num() - 1, NewPoints);
-		ReplacePointsNoLoop(0, LastIndex, {});
-	}
+		UE::Geometry::FSegment2d Ret = Segment;
 
-	void RemovePoints(int32 StartIndex, int32 LastIndex)
-	{
-		Points.RemoveAt(StartIndex, LastIndex - StartIndex + 1);
+		if (!IsInside(Segment.StartPoint()))
+		{
+			if (TOptional<FVector2D> AttachedPoint = Attach(Segment.StartPoint(), Segment.Direction))
+			{
+				Ret.SetStartPoint(*AttachedPoint);
+			}
+		}
+
+		if (!IsInside(Segment.EndPoint()))
+		{
+			if (TOptional<FVector2D> AttachedPoint = Attach(Segment.EndPoint(), -Segment.Direction))
+			{
+				Ret.SetEndPoint(*AttachedPoint);
+			}
+		}
+
+		return Ret;
 	}
 
 	struct FUnionResult
@@ -353,7 +460,7 @@ public:
 		{
 			Path.ReverseVertexOrder();
 		}
-		
+
 		const FIntersection BoundarySrcSegment = FindClosestPointTo(Path.GetPoints()[0]);
 		const FIntersection BoundaryDestSegment = FindClosestPointTo(Path.GetLastPoint());
 
@@ -391,6 +498,7 @@ public:
 
 	FSegment2D operator[](int32 Index) const
 	{
+		Index = PositiveSegmentIndex(Index);
 		return
 		{
 			Points[SegmentIndexToStartPointIndex(Index)],

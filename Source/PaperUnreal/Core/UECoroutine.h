@@ -294,6 +294,15 @@ public:
 			SetValue(Forward<ArgType>(Arg));
 		}
 	}
+	
+	void Cancel()
+	{
+		if (!bSetValue)
+		{
+			bSetValue = true;
+			Impl->Destroy();
+		}
+	}
 
 	const ValueType& GetValue() const { return Impl->GetValue(); }
 

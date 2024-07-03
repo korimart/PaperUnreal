@@ -18,22 +18,24 @@ public:
 	DECLARE_MULTICAST_DELEGATE_TwoParams(FOnTracerToAreaConversion, const FSegmentArray2D&, bool);
 	FOnTracerToAreaConversion OnTracerToAreaConversion;
 
-	// void SetTracerGenController(UTracerPathControllerComponent* Controller)
-	// {
-	// 	TracerGenController = Controller;
-	// }
-	//
+	void SetTracer(UTracerPathComponent* InTracer)
+	{
+		Tracer = InTracer;
+	}
+	
 	void SetConversionDestination(UAreaMeshComponent* Destination)
 	{
 		ConversionDestination = Destination;
 	}
 
-private:
-	// UPROPERTY()
-	// UTracerPathControllerComponent* TracerGenController;
+	UTracerPathComponent* GetTracer() const
+	{
+		return Tracer;
+	}
 
+private:
 	UPROPERTY()
-	UTracerMeshComponent* Tracer;
+	UTracerPathComponent* Tracer;
 
 	UPROPERTY()
 	UAreaMeshComponent* ConversionDestination;
@@ -47,23 +49,20 @@ private:
 	{
 		Super::InitializeComponent();
 
-		// check(AllValid(TracerGenController, ConversionDestination));
+		check(AllValid(Tracer, ConversionDestination));
 
-		// Tracer = TracerGenController->GetControlledGenerator()->GetGenDestination();
-		check(IsValid(Tracer));
-
-		// TracerGenController->OnGenPreEnable.AddWeakLambda(this, [this]()
-		// {
-		// 	Tracer->Reset();
-		// });
-		//
-		// TracerGenController->OnGenPostDisable.AddWeakLambda(this, [this]()
-		// {
-		// 	// if (TOptional<UAreaMeshComponent::FExpansionResult> Result
-		// 	// 	= ConversionDestination->ExpandByPath(Tracer->GetCenterSegmentArray2D()))
-		// 	// {
-		// 	// 	OnTracerToAreaConversion.Broadcast(Tracer->GetCenterSegmentArray2D(), Result->bAddedToTheLeftOfPath);
-		// 	// }
-		// });
+		Tracer->OnGenerationStarted.AddWeakLambda(this, [this]()
+		{
+			Tracer->Clear();
+		});
+		
+		Tracer->OnGenerationEnded.AddWeakLambda(this, [this]()
+		{
+			if (TOptional<UAreaMeshComponent::FExpansionResult> Result
+				= ConversionDestination->ExpandByPath(Tracer->GetPath()))
+			{
+				OnTracerToAreaConversion.Broadcast(Tracer->GetPath(), Result->bAddedToTheLeftOfPath);
+			}
+		});
 	}
 };
