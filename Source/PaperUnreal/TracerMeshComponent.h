@@ -3,11 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "TracerPathGenerator.h"
+#include "AreaMeshComponent.h"
 #include "Core/SegmentArray.h"
 #include "Components/DynamicMeshComponent.h"
 #include "Core/ActorComponentEx.h"
-#include "Core/LiveData.h"
+#include "Core/Utils.h"
 #include "TracerMeshComponent.generated.h"
 
 
@@ -155,34 +155,30 @@ private:
 
 
 UCLASS()
-class UDefaultTracerPathGeneratorComponent : public UActorComponent, public ITracerPathGenerator
+class UTracerPathComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
 public:
-	virtual FSimpleMulticastDelegate& GetOnNewPointGenerated() override { return OnNewPointGenerated; }
-	virtual FSimpleMulticastDelegate& GetOnLastPointModified() override { return OnLastPointModified; }
-
-	virtual FSimpleMulticastDelegate& GetOnGenerationEnded() override
-	{
-		// Default Generator는 절대 끝나지 않음
-		static FSimpleMulticastDelegate Ret;
-		return Ret;
-	}
-
-	virtual const FSegmentArray2D& GetPath() const override { return Path; }
-
-	void RemovePoints(int32 StartIndex, int32 LastIndex)
-	{
-		Path.RemovePoints(StartIndex, LastIndex);
-	}
-
-private:
 	FSimpleMulticastDelegate OnNewPointGenerated;
 	FSimpleMulticastDelegate OnLastPointModified;
+	FSimpleMulticastDelegate OnGenerationEnded;
+
+	void SetNoPathArea(UAreaMeshComponent* Area)
+	{
+		NoPathArea = Area;
+	}
+	
+	const FSegmentArray2D& GetPath() const { return Path; }
+
+private:
+	UPROPERTY()
+	UAreaMeshComponent* NoPathArea;
+
+	bool bGeneratedThisFrame = false;
 	FSegmentArray2D Path;
 
-	UDefaultTracerPathGeneratorComponent()
+	UTracerPathComponent()
 	{
 		PrimaryComponentTick.bCanEverTick = true;
 		bWantsInitializeComponent = true;
@@ -191,12 +187,27 @@ private:
 	virtual void InitializeComponent() override
 	{
 		Super::InitializeComponent();
+		
+		check(AllValid(NoPathArea));
 	}
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override
 	{
 		Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-		Generate();
+
+		const bool bGeneratedLastFrame = bGeneratedThisFrame;
+		bGeneratedThisFrame = false;
+
+		if (!NoPathArea->IsInside(GetOwner()->GetActorLocation()))
+		{
+			Generate();
+			bGeneratedThisFrame = true;
+		}
+
+		if (bGeneratedLastFrame && !bGeneratedThisFrame)
+		{
+			OnGenerationEnded.Broadcast();
+		}
 	}
 
 	void Generate()

@@ -41,6 +41,29 @@ public:
 	{
 		return AreaBoundary.IsInside(WorldToLocal2D(FVector2D{Point}));
 	}
+	
+	TOptional<FPointOnBoundary> FindIntersection(const UE::Geometry::FSegment2d& Segment) const
+	{
+		using FIntersection = FLoopedSegmentArray2D::FIntersection;
+
+		const UE::Geometry::FSegment2d LocalSegment
+		{
+			WorldToLocal2D(Segment.StartPoint()),
+			WorldToLocal2D(Segment.EndPoint()),
+		};
+		
+		if (TOptional<FIntersection> Found = AreaBoundary.FindIntersection(LocalSegment))
+		{
+			const FSegment2D& HitSegment = AreaBoundary[Found->SegmentIndex];
+
+			FPointOnBoundary Ret;
+			Ret.Segment = FSegment2D{LocalToWorld2D(HitSegment.StartPoint()), LocalToWorld2D(HitSegment.EndPoint()),};
+			Ret.Alpha = Found->Alpha;
+			return Ret;
+		}
+
+		return {};
+	}
 
 	FPointOnBoundary FindClosestPointOnBoundary2D(const FVector2D& Point) const
 	{

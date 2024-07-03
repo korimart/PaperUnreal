@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "PlayerCollisionStateComponent.h"
+#include "TracerCollisionStateComponent.h"
 #include "TracerMeshComponent.h"
 #include "TracerToAreaConverterComponent.h"
 #include "Core/ActorComponentEx.h"
@@ -17,7 +17,7 @@ class UAreaSlasherComponent : public UActorComponentEx
 	GENERATED_BODY()
 
 public:
-	void SetCollisionState(UPlayerCollisionStateComponent* State)
+	void SetCollisionState(UTracerCollisionStateComponent* State)
 	{
 		CollisionState = State;
 	}
@@ -34,7 +34,7 @@ public:
 
 private:
 	UPROPERTY()
-	UPlayerCollisionStateComponent* CollisionState;
+	UTracerCollisionStateComponent* CollisionState;
 
 	UPROPERTY()
 	UAreaMeshComponent* SlashTarget;
@@ -100,11 +100,11 @@ private:
 		{
 			if (bColliding)
 			{
-				EntryExitPoints.OnEntry(CollisionState->GetPlayerLocation());
+				// EntryExitPoints.OnEntry(CollisionState->GetPlayerLocation());
 			}
 			else
 			{
-				EntryExitPoints.OnExit(CollisionState->GetPlayerLocation());
+				// EntryExitPoints.OnExit(CollisionState->GetPlayerLocation());
 			}
 		});
 
@@ -113,7 +113,7 @@ private:
 			// 영역이 맞닿아 있는 경우 SlashTarget에서 나가기 전에 Tracer-to-Area conversion이 발생할 수 있음
 			// 이 때 그냥 SlashTarget 에서 나갔다고 가정한다. 어차피 가장 가까운 SlashTarget의 경계 상의 지점을 기준으로
 			// 잘라내기 때문에 나가기 전에 하나 후에 하나 똑같음
-			EntryExitPoints.OnExit(CollisionState->GetPlayerLocation());
+			// EntryExitPoints.OnExit(CollisionState->GetPlayerLocation());
 
 			for (const auto& [EntryPoint, ExitPoint] : EntryExitPoints.Get())
 			{

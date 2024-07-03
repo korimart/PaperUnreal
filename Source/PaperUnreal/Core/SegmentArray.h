@@ -126,6 +126,11 @@ public:
 	{
 		return Points[Points.Num() - IndexFromLast - 1];
 	}
+	
+	FSegment2D GetLastSegment(int32 IndexFromLast = 0) const
+	{
+		return operator[](SegmentCount() - IndexFromLast - 1);
+	}
 
 	FVector2D GetLastSegmentDirection(int32 IndexFromLast = 0) const
 	{
@@ -248,7 +253,7 @@ public:
 			{
 				FIntersection Ret;
 				Ret.SegmentIndex = i;
-				Ret.Alpha = Intersection;
+				Ret.Alpha = *Intersection;
 				return Ret;
 			}
 		}

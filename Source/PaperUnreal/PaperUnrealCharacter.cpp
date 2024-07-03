@@ -5,9 +5,8 @@
 #include "AreaActor.h"
 #include "AreaSlasherComponent.h"
 #include "AreaSpawnerComponent.h"
-#include "PlayerCollisionStateComponent.h"
+#include "TracerCollisionStateComponent.h"
 #include "TeamComponent.h"
-#include "OffAreaTracerGenEnablerComponent.h"
 #include "TracerMeshComponent.h"
 #include "TracerToAreaConverterComponent.h"
 #include "TracerVertexAttacherComponent.h"
@@ -96,17 +95,20 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		// TODO 아래 컴포넌트들은 위에 먼저 부착된 컴포넌트들에 의존함
 		// 컴포넌트를 갈아끼울 때 이러한 의존성에 대한 경고를 하는 메카니즘이 존재하지 않음
 
-		auto TracerPathGenerator = NewObject<UDefaultTracerPathGeneratorComponent>(this);
-		TracerPathGenerator->RegisterComponent();
+		auto TracerPath = NewObject<UTracerPathComponent>(this);
+		TracerPath->SetNoPathArea(AreaMeshComponent);
+		TracerPath->RegisterComponent();
+		
+		auto TracerCollisionState = NewObject<UTracerCollisionStateComponent>(this);
+		TracerCollisionState->SetTracer(TracerPath);
+		TracerCollisionState->RegisterComponent();
 		
 		auto TracerVertexGenerator = NewObject<UTracerVertexGeneratorComponent>(this);
-		TracerVertexGenerator->SetVertexSource(TracerPathGenerator);
+		TracerVertexGenerator->SetVertexSource(TracerPath);
 		TracerVertexGenerator->SetVertexDestination(TracerVertexDestination);
 		TracerVertexGenerator->SetVertexAttachmentTarget(AreaMeshComponent);
 		TracerVertexGenerator->RegisterComponent();
 
-	// 	auto CollisionState = NewObject<UPlayerCollisionStateComponent>(this);
-	// 	CollisionState->RegisterComponent();
 	//
 	// 	auto TracerGenController = NewObject<UOffAreaTracerGenEnablerComponent>(this);
 	// 	// TracerGenController->SetVertexGenerator(TracerVertexGenerator);

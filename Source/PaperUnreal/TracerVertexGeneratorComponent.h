@@ -16,9 +16,9 @@ class UTracerVertexGeneratorComponent : public UActorComponentEx
 	GENERATED_BODY()
 
 public:
-	void SetVertexSource(ITracerPathGenerator* Source)
+	void SetVertexSource(UTracerPathComponent* Source)
 	{
-		VertexSource = Cast<UObject>(Source);
+		VertexSource = Source;
 	}
 
 	void SetVertexDestination(UTracerMeshComponent* Destination)
@@ -33,7 +33,7 @@ public:
 
 private:
 	UPROPERTY()
-	TScriptInterface<ITracerPathGenerator> VertexSource;
+	UTracerPathComponent* VertexSource;
 
 	UPROPERTY()
 	UTracerMeshComponent* VertexDestination;
@@ -52,7 +52,7 @@ private:
 
 		check(AllValid(VertexSource, VertexDestination, VertexAttachmentTarget));
 
-		VertexSource->GetOnNewPointGenerated().AddWeakLambda(this, [this]()
+		VertexSource->OnNewPointGenerated.AddWeakLambda(this, [this]()
 		{
 			auto [Left, Right] = CreateVertexPositions(
 				VertexSource->GetPath().GetLastPoint(), FVector2D{GetOwner()->GetActorRightVector()}.GetSafeNormal());
@@ -64,14 +64,14 @@ private:
 			VertexDestination->AppendVertices(Left, Right);
 		});
 
-		VertexSource->GetOnLastPointModified().AddWeakLambda(this, [this]()
+		VertexSource->OnLastPointModified.AddWeakLambda(this, [this]()
 		{
 			const auto [Left, Right] = CreateVertexPositions(
 				VertexSource->GetPath().GetLastPoint(), FVector2D{GetOwner()->GetActorRightVector()}.GetSafeNormal());
 			VertexDestination->SetLastVertices(Left, Right);
 		});
 
-		VertexSource->GetOnGenerationEnded().AddWeakLambda(this, [this]()
+		VertexSource->OnGenerationEnded.AddWeakLambda(this, [this]()
 		{
 			auto [Left, Right] = CreateVertexPositions(
 				VertexSource->GetPath().GetLastPoint(), FVector2D{GetOwner()->GetActorRightVector()}.GetSafeNormal());

@@ -3,7 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "OffAreaTracerGenEnablerComponent.h"
+#include "AreaMeshComponent.h"
+#include "TracerMeshComponent.h"
 #include "Core/ActorComponentEx.h"
 #include "TracerToAreaConverterComponent.generated.h"
 
@@ -17,19 +18,19 @@ public:
 	DECLARE_MULTICAST_DELEGATE_TwoParams(FOnTracerToAreaConversion, const FSegmentArray2D&, bool);
 	FOnTracerToAreaConversion OnTracerToAreaConversion;
 
-	void SetTracerGenController(UOffAreaTracerGenEnablerComponent* Controller)
-	{
-		TracerGenController = Controller;
-	}
-
+	// void SetTracerGenController(UTracerPathControllerComponent* Controller)
+	// {
+	// 	TracerGenController = Controller;
+	// }
+	//
 	void SetConversionDestination(UAreaMeshComponent* Destination)
 	{
 		ConversionDestination = Destination;
 	}
 
 private:
-	UPROPERTY()
-	UOffAreaTracerGenEnablerComponent* TracerGenController;
+	// UPROPERTY()
+	// UTracerPathControllerComponent* TracerGenController;
 
 	UPROPERTY()
 	UTracerMeshComponent* Tracer;
@@ -46,23 +47,23 @@ private:
 	{
 		Super::InitializeComponent();
 
-		check(AllValid(TracerGenController, ConversionDestination));
+		// check(AllValid(TracerGenController, ConversionDestination));
 
 		// Tracer = TracerGenController->GetControlledGenerator()->GetGenDestination();
 		check(IsValid(Tracer));
 
-		TracerGenController->OnGenPreEnable.AddWeakLambda(this, [this]()
-		{
-			Tracer->Reset();
-		});
-
-		TracerGenController->OnGenPostDisable.AddWeakLambda(this, [this]()
-		{
-			// if (TOptional<UAreaMeshComponent::FExpansionResult> Result
-			// 	= ConversionDestination->ExpandByPath(Tracer->GetCenterSegmentArray2D()))
-			// {
-			// 	OnTracerToAreaConversion.Broadcast(Tracer->GetCenterSegmentArray2D(), Result->bAddedToTheLeftOfPath);
-			// }
-		});
+		// TracerGenController->OnGenPreEnable.AddWeakLambda(this, [this]()
+		// {
+		// 	Tracer->Reset();
+		// });
+		//
+		// TracerGenController->OnGenPostDisable.AddWeakLambda(this, [this]()
+		// {
+		// 	// if (TOptional<UAreaMeshComponent::FExpansionResult> Result
+		// 	// 	= ConversionDestination->ExpandByPath(Tracer->GetCenterSegmentArray2D()))
+		// 	// {
+		// 	// 	OnTracerToAreaConversion.Broadcast(Tracer->GetCenterSegmentArray2D(), Result->bAddedToTheLeftOfPath);
+		// 	// }
+		// });
 	}
 };
