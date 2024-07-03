@@ -96,43 +96,43 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		// TODO 아래 컴포넌트들은 위에 먼저 부착된 컴포넌트들에 의존함
 		// 컴포넌트를 갈아끼울 때 이러한 의존성에 대한 경고를 하는 메카니즘이 존재하지 않음
 
+		auto TracerPathGenerator = NewObject<UDefaultTracerPathGeneratorComponent>(this);
+		TracerPathGenerator->RegisterComponent();
+		
 		auto TracerVertexGenerator = NewObject<UTracerVertexGeneratorComponent>(this);
-		TracerVertexGenerator->SetGenDestination(TracerVertexDestination);
+		TracerVertexGenerator->SetVertexSource(TracerPathGenerator);
+		TracerVertexGenerator->SetVertexDestination(TracerVertexDestination);
+		TracerVertexGenerator->SetVertexAttachmentTarget(AreaMeshComponent);
 		TracerVertexGenerator->RegisterComponent();
 
-		auto TracerVertexModifier = NewObject<UTracerVertexAttacherComponent>(this);
-		TracerVertexModifier->SetVertexGenerator(TracerVertexGenerator);
-		TracerVertexModifier->SetAttachDestination(AreaMeshComponent);
-		TracerVertexModifier->RegisterComponent();
-
-		auto CollisionState = NewObject<UPlayerCollisionStateComponent>(this);
-		CollisionState->RegisterComponent();
-
-		auto TracerGenController = NewObject<UOffAreaTracerGenEnablerComponent>(this);
-		TracerGenController->SetVertexGenerator(TracerVertexGenerator);
-		TracerGenController->SetGenPreventionArea(AreaMeshComponent);
-		TracerGenController->SetCollisionState(CollisionState);
-		TracerGenController->RegisterComponent();
-
-		auto TracerToAreaConverter = NewObject<UTracerToAreaConverterComponent>(this);
-		TracerToAreaConverter->SetTracerGenController(TracerGenController);
-		TracerToAreaConverter->SetConversionDestination(AreaMeshComponent);
-		TracerToAreaConverter->RegisterComponent();
-
-		AreaSpawnerComponent->GetSpawnedAreas().ObserveEach(this, [this,
-				CollisionState = ToWeak(CollisionState),
-				MyTeamArea = ToWeak(MyTeamArea),
-				TracerToAreaConverter = ToWeak(TracerToAreaConverter)
-			](AAreaActor* SpawnedArea)
-			{
-				if (AllValid(CollisionState, MyTeamArea, TracerToAreaConverter) && SpawnedArea != MyTeamArea)
-				{
-					auto AreaSlasherComponent = NewObject<UAreaSlasherComponent>(this);
-					AreaSlasherComponent->SetCollisionState(CollisionState.Get());
-					AreaSlasherComponent->SetSlashTarget(SpawnedArea->AreaMeshComponent);
-					AreaSlasherComponent->SetTracerToAreaConverter(TracerToAreaConverter.Get());
-					AreaSlasherComponent->RegisterComponent();
-				}
-			});
+	// 	auto CollisionState = NewObject<UPlayerCollisionStateComponent>(this);
+	// 	CollisionState->RegisterComponent();
+	//
+	// 	auto TracerGenController = NewObject<UOffAreaTracerGenEnablerComponent>(this);
+	// 	// TracerGenController->SetVertexGenerator(TracerVertexGenerator);
+	// 	TracerGenController->SetGenPreventionArea(AreaMeshComponent);
+	// 	TracerGenController->SetCollisionState(CollisionState);
+	// 	TracerGenController->RegisterComponent();
+	//
+	// 	auto TracerToAreaConverter = NewObject<UTracerToAreaConverterComponent>(this);
+	// 	TracerToAreaConverter->SetTracerGenController(TracerGenController);
+	// 	TracerToAreaConverter->SetConversionDestination(AreaMeshComponent);
+	// 	TracerToAreaConverter->RegisterComponent();
+	//
+	// 	AreaSpawnerComponent->GetSpawnedAreas().ObserveEach(this, [this,
+	// 			CollisionState = ToWeak(CollisionState),
+	// 			MyTeamArea = ToWeak(MyTeamArea),
+	// 			TracerToAreaConverter = ToWeak(TracerToAreaConverter)
+	// 		](AAreaActor* SpawnedArea)
+	// 		{
+	// 			if (AllValid(CollisionState, MyTeamArea, TracerToAreaConverter) && SpawnedArea != MyTeamArea)
+	// 			{
+	// 				auto AreaSlasherComponent = NewObject<UAreaSlasherComponent>(this);
+	// 				AreaSlasherComponent->SetCollisionState(CollisionState.Get());
+	// 				AreaSlasherComponent->SetSlashTarget(SpawnedArea->AreaMeshComponent);
+	// 				AreaSlasherComponent->SetTracerToAreaConverter(TracerToAreaConverter.Get());
+	// 				AreaSlasherComponent->RegisterComponent();
+	// 			}
+	// 		});
 	});
 }

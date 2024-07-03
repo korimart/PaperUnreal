@@ -44,6 +44,7 @@ private:
 			// TODO remove if not valid
 			if (EachArea.IsValid())
 			{
+				// TODO remove if not bound
 				EachStatus.SetValue(EachArea->IsInside(CurrentPosition));
 			}
 		}

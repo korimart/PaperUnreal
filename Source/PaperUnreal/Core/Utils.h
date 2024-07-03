@@ -9,6 +9,27 @@
 #include "Engine/StreamableManager.h"
 
 
+namespace Utils_Private
+{
+	bool IsValid(auto Pointer)
+	{
+		return ::IsValid(Pointer);
+	}
+	
+	template <typename T>
+	bool IsValid(const TWeakObjectPtr<T>& Pointer)
+	{
+		return Pointer.IsValid();
+	}
+	
+	template <typename T>
+	bool IsValid(const TScriptInterface<T>& Pointer)
+	{
+		return Pointer != nullptr;
+	}
+}
+
+
 template <typename T>
 T* ValidOrNull(T* Object)
 {
@@ -23,17 +44,9 @@ TWeakObjectPtr<T> ToWeak(T* Object)
 }
 
 
-template <typename... ElementTypes>
-bool AllValid(const TWeakObjectPtr<ElementTypes>&... Check)
+bool AllValid(const auto&... Check)
 {
-	return (Check.IsValid() && ...);
-}
-
-
-template <typename... ObjectTypes> requires std::conjunction_v<std::is_base_of<UObject, ObjectTypes>...>
-bool AllValid(ObjectTypes*... Check)
-{
-	return (IsValid(Check) && ...);
+	return (Utils_Private::IsValid(Check) && ...);
 }
 
 

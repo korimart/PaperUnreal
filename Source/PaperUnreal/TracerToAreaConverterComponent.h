@@ -48,7 +48,7 @@ private:
 
 		check(AllValid(TracerGenController, ConversionDestination));
 
-		Tracer = TracerGenController->GetControlledGenerator()->GetGenDestination();
+		// Tracer = TracerGenController->GetControlledGenerator()->GetGenDestination();
 		check(IsValid(Tracer));
 
 		TracerGenController->OnGenPreEnable.AddWeakLambda(this, [this]()
@@ -58,11 +58,11 @@ private:
 
 		TracerGenController->OnGenPostDisable.AddWeakLambda(this, [this]()
 		{
-			if (TOptional<UAreaMeshComponent::FExpansionResult> Result
-				= ConversionDestination->ExpandByPath(Tracer->GetCenterSegmentArray2D()))
-			{
-				OnTracerToAreaConversion.Broadcast(Tracer->GetCenterSegmentArray2D(), Result->bAddedToTheLeftOfPath);
-			}
+			// if (TOptional<UAreaMeshComponent::FExpansionResult> Result
+			// 	= ConversionDestination->ExpandByPath(Tracer->GetCenterSegmentArray2D()))
+			// {
+			// 	OnTracerToAreaConversion.Broadcast(Tracer->GetCenterSegmentArray2D(), Result->bAddedToTheLeftOfPath);
+			// }
 		});
 	}
 };

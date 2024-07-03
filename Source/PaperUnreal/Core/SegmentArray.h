@@ -300,6 +300,11 @@ public:
 		ReplacePointsNoLoop(0, LastIndex, {});
 	}
 
+	void RemovePoints(int32 StartIndex, int32 LastIndex)
+	{
+		Points.RemoveAt(StartIndex, LastIndex - StartIndex + 1);
+	}
+
 	struct FUnionResult
 	{
 		bool bUnionedToTheLeftOfPath;

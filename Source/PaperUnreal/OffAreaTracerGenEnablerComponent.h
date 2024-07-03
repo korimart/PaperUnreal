@@ -6,6 +6,7 @@
 #include "AreaMeshComponent.h"
 #include "PlayerCollisionStateComponent.h"
 #include "TracerMeshComponent.h"
+#include "TracerVertexGeneratorComponent.h"
 #include "Core/ActorComponentEx.h"
 #include "Core/Utils.h"
 #include "OffAreaTracerGenEnablerComponent.generated.h"
@@ -71,7 +72,7 @@ private:
 				OnGenPreEnable.Broadcast();
 			}
 			
-			TracerVertexGenerator->SetGenerationEnabled(!bCollides);
+			// TracerVertexGenerator->SetGenerationEnabled(!bCollides);
 
 			if (bToDisable)
 			{

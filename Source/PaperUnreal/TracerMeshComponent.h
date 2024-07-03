@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "TracerPathGenerator.h"
 #include "Core/SegmentArray.h"
 #include "Components/DynamicMeshComponent.h"
 #include "Core/ActorComponentEx.h"
@@ -65,11 +66,6 @@ class UTracerMeshComponent : public UActorComponentEx
 	GENERATED_BODY()
 
 public:
-	const FSegmentArray2D& GetCenterSegmentArray2D() const
-	{
-		return CenterSegments;
-	}
-
 	void Reset()
 	{
 		DynamicMeshComponent->GetDynamicMesh()->Reset();
@@ -85,18 +81,16 @@ public:
 		UVOverlay->AppendElement({0.f, 1.f});
 		UVOverlay->AppendElement({1.f, 1.f});
 
-		CenterSegments.Empty();
 		LeftSegments.SetDynamicMesh(DynamicMeshComponent->GetDynamicMesh());
 		RightSegments.SetDynamicMesh(DynamicMeshComponent->GetDynamicMesh());
 	}
 
-	void AppendVertices(const FVector2D& Left, const FVector2D& Center, const FVector2D& Right)
+	void AppendVertices(const FVector2D& Left, const FVector2D& Right)
 	{
 		LeftSegments.AddVertex(Left);
-		CenterSegments.AddPoint(Center);
 		RightSegments.AddVertex(Right);
 
-		if (CenterSegments.PointCount() >= 2)
+		if (LeftSegments.GetSegmentArray().PointCount() >= 2)
 		{
 			const int V0 = LeftSegments.GetLastVertexDynamicIndex(1);
 			const int V1 = RightSegments.GetLastVertexDynamicIndex(1);
@@ -117,35 +111,23 @@ public:
 		DynamicMeshComponent->NotifyMeshModified();
 	}
 
-	void SetLastVertices(const FVector2D& Left, const FVector2D& Center, const FVector2D& Right)
+	void SetLastVertices(const FVector2D& Left, const FVector2D& Right)
 	{
 		LeftSegments.SetLastVertexPosition(Left);
-		CenterSegments.SetLastPoint(Center);
 		RightSegments.SetLastVertexPosition(Right);
 		DynamicMeshComponent->FastNotifyPositionsUpdated();
 	}
-	
-	template <typename FuncType>
-	void ModifyLastVertices(FuncType&& Func)
-	{
-		FVector2D NewLeft = LeftSegments.GetLastVertexPosition();
-		FVector2D NewCenter = CenterSegments.GetLastPoint();
-		FVector2D NewRight = RightSegments.GetLastVertexPosition();
-		Func(NewLeft, NewCenter, NewRight);
-		SetLastVertices(NewLeft, NewCenter, NewRight);
-	}
-	
+
 	void ConfigureMaterialSet(const TArray<UMaterialInterface*>& NewMaterialSet)
 	{
 		DynamicMeshComponent->ConfigureMaterialSet(NewMaterialSet);
 	}
-	
+
 private:
 	UPROPERTY()
 	UDynamicMeshComponent* DynamicMeshComponent;
 
 	FDynamicMeshSegment2D LeftSegments;
-	FSegmentArray2D CenterSegments;
 	FDynamicMeshSegment2D RightSegments;
 
 	UTracerMeshComponent()
@@ -173,72 +155,42 @@ private:
 
 
 UCLASS()
-class UTracerVertexGeneratorComponent : public UActorComponent
+class UDefaultTracerPathGeneratorComponent : public UActorComponent, public ITracerPathGenerator
 {
 	GENERATED_BODY()
 
 public:
-	DECLARE_DELEGATE_ThreeParams(FEdgeModifier, FVector2D&, FVector2D&, FVector2D&);
-	FEdgeModifier FirstEdgeModifier;
-	FEdgeModifier LastEdgeModifier;
+	virtual FSimpleMulticastDelegate& GetOnNewPointGenerated() override { return OnNewPointGenerated; }
+	virtual FSimpleMulticastDelegate& GetOnLastPointModified() override { return OnLastPointModified; }
 
-	DECLARE_LIVE_DATA_AND_GETTER_WITH_DEFAULT(bool, bGenerating, false);
-
-	void SetGenDestination(UTracerMeshComponent* InComponent)
+	virtual FSimpleMulticastDelegate& GetOnGenerationEnded() override
 	{
-		TracerMeshComponent = InComponent;
+		// Default Generator는 절대 끝나지 않음
+		static FSimpleMulticastDelegate Ret;
+		return Ret;
 	}
 
-	UTracerMeshComponent* GetGenDestination() const
-	{
-		return TracerMeshComponent;
-	}
+	virtual const FSegmentArray2D& GetPath() const override { return Path; }
 
-	void SetGenerationEnabled(bool bEnable)
+	void RemovePoints(int32 StartIndex, int32 LastIndex)
 	{
-		if (*bGenerating.GetValue() == bEnable)
-		{
-			return;
-		}
-		
-		if (bEnable)
-		{
-			if (Generate())
-			{
-				TracerMeshComponent->ModifyLastVertices([this](auto&... Vertices)
-				{
-					FirstEdgeModifier.ExecuteIfBound(Vertices...);
-				});
-			}
-		}
-		else
-		{
-			TracerMeshComponent->ModifyLastVertices([this](auto&... Vertices)
-			{
-				LastEdgeModifier.ExecuteIfBound(Vertices...);
-			});
-		}
-
-		SetComponentTickEnabled(bEnable);
-		bGenerating.SetValue(bEnable);
+		Path.RemovePoints(StartIndex, LastIndex);
 	}
 
 private:
-	UPROPERTY()
-	UTracerMeshComponent* TracerMeshComponent;
-	
-	UTracerVertexGeneratorComponent()
+	FSimpleMulticastDelegate OnNewPointGenerated;
+	FSimpleMulticastDelegate OnLastPointModified;
+	FSegmentArray2D Path;
+
+	UDefaultTracerPathGeneratorComponent()
 	{
 		PrimaryComponentTick.bCanEverTick = true;
-		PrimaryComponentTick.bStartWithTickEnabled = false;
 		bWantsInitializeComponent = true;
 	}
 
 	virtual void InitializeComponent() override
 	{
 		Super::InitializeComponent();
-		
-		check(IsValid(TracerMeshComponent));
 	}
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override
@@ -246,39 +198,34 @@ private:
 		Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 		Generate();
 	}
-	
-	bool Generate()
+
+	void Generate()
 	{
-		if (!IsValid(TracerMeshComponent))
-		{
-			return false;
-		}
-
-		const FSegmentArray2D& CenterSegments = TracerMeshComponent->GetCenterSegmentArray2D();
-
-		if (CenterSegments.PointCount() == 0)
-		{
-			AppendVerticesToTracer();
-			return true;
-		}
-
 		const FVector2D ActorLocation2D{GetOwner()->GetActorLocation()};
 
-		if (CenterSegments.GetLastPoint().Equals(ActorLocation2D))
+		if (Path.PointCount() == 0)
 		{
-			return false;
+			Path.AddPoint(ActorLocation2D);
+			OnNewPointGenerated.Broadcast();
+			return;
 		}
 
-		if (CenterSegments.PointCount() < 3)
+		if (Path.GetLastPoint().Equals(ActorLocation2D))
 		{
-			AppendVerticesToTracer();
-			return true;
+			return;
+		}
+
+		if (Path.PointCount() < 3)
+		{
+			Path.AddPoint(ActorLocation2D);
+			OnNewPointGenerated.Broadcast();
+			return;
 		}
 
 		const float Curvature = [&]()
 		{
-			const FVector2D& Position0 = CenterSegments.GetLastPoint(1);
-			const FVector2D& Position1 = CenterSegments.GetLastPoint();
+			const FVector2D& Position0 = Path.GetLastPoint(1);
+			const FVector2D& Position1 = Path.GetLastPoint();
 			const FVector2D& Position2 = ActorLocation2D;
 
 			const float ASideLength = (Position1 - Position2).Length();
@@ -295,40 +242,21 @@ private:
 
 		const float CurrentDeviation = [&]()
 		{
-			const FVector2D DeviatingVector = ActorLocation2D - CenterSegments.GetLastPoint(1);
-			const FVector2D StraightVector = CenterSegments.GetLastSegmentDirection(1);
+			const FVector2D DeviatingVector = ActorLocation2D - Path.GetLastPoint(1);
+			const FVector2D StraightVector = Path.GetLastSegmentDirection(1);
 			const FVector2D Proj = StraightVector * DeviatingVector.Dot(StraightVector);
 			return (DeviatingVector - Proj).Length();
 		}();
 
 		if (Curvature > 0.005f || CurrentDeviation > 10.f)
 		{
-			AppendVerticesToTracer();
+			Path.AddPoint(ActorLocation2D);
+			OnNewPointGenerated.Broadcast();
 		}
 		else
 		{
-			AdjustLastTracerVertices();
+			Path.SetLastPoint(ActorLocation2D);
+			OnLastPointModified.Broadcast();
 		}
-
-		return true;
-	}
-
-	static std::tuple<FVector2D, FVector2D, FVector2D> CreateVertexPositions(const AActor* ActorToTrace)
-	{
-		const FVector2D ActorLocation2D{ActorToTrace->GetActorLocation()};
-		const FVector2D ActorRight2D = FVector2D{ActorToTrace->GetActorRightVector()}.GetSafeNormal();
-		return {ActorLocation2D - 5.f * ActorRight2D, ActorLocation2D, ActorLocation2D + 5.f * ActorRight2D};
-	}
-
-	void AppendVerticesToTracer() const
-	{
-		const auto [Left, Center, Right] = CreateVertexPositions(GetOwner());
-		TracerMeshComponent->AppendVertices(Left, Center, Right);
-	}
-	
-	void AdjustLastTracerVertices() const
-	{
-		const auto [Left, Center, Right] = CreateVertexPositions(GetOwner());
-		TracerMeshComponent->SetLastVertices(Left, Center, Right);
 	}
 };

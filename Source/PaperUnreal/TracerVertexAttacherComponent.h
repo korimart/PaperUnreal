@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "AreaMeshComponent.h"
-#include "TracerMeshComponent.h"
+#include "TracerVertexGeneratorComponent.h"
 #include "Core/ActorComponentEx.h"
 #include "Core/Utils.h"
 #include "TracerVertexAttacherComponent.generated.h"
@@ -44,10 +44,10 @@ private:
 		
 		check(AllValid(VertexGeneratorComponent, AttachDestination));
 		
-		VertexGeneratorComponent->FirstEdgeModifier.BindWeakLambda(
-			this, [this](auto&... Vertices) { (AttachVertexToAreaBoundary(Vertices), ...); });
-		VertexGeneratorComponent->LastEdgeModifier.BindWeakLambda(
-			this, [this](auto&... Vertices) { (AttachVertexToAreaBoundary(Vertices), ...); });
+		// VertexGeneratorComponent->FirstEdgeModifier.BindWeakLambda(
+		// 	this, [this](auto&... Vertices) { (AttachVertexToAreaBoundary(Vertices), ...); });
+		// VertexGeneratorComponent->LastEdgeModifier.BindWeakLambda(
+		// 	this, [this](auto&... Vertices) { (AttachVertexToAreaBoundary(Vertices), ...); });
 	}
 	
 	void AttachVertexToAreaBoundary(FVector2D& Vertex) const
