@@ -41,6 +41,9 @@ MeshSelectionFunctions.h의 함수들로 메시의 일부를 선택하여 MeshTr
 
 1. (임시 기능) 실행 했을 때 내 영역과 다른 영역이 존재 해야 함
 2. 영역에 컬러 입히기 / 다른 영토 깎아내는 거 구현
+2-1. Tracer Mesh Generator와 Path Generator를 분리한다
+2-2. Path Generator에서 새 Path 생성 시마다 충돌 검사를 한다 (CollisionState?)
+2-3. 충돌 검사를 이미 다 해놨으므로 영역에 걸치는 segment들이 시작과 끝이 되는 Path를 가지고 Difference를 한다.
 3. 멀티플레이 게임 모드 구현 - 신규/난입 시 랜덤한 팀에 배정, 영역 및 trace 레플리케이션이 완료되면 내 캐릭터를 스폰
 4. 멀티플레이 게임 규칙 구현
     a. 내 trace가 팀원의 의한 영역 확장에 의해 가려지는 경우 처리
