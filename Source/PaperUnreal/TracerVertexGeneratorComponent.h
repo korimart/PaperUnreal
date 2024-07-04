@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "AreaMeshComponent.h"
 #include "TracerMeshComponent.h"
+#include "TracerPathGenerator.h"
 #include "Core/ActorComponentEx.h"
 #include "Core/Utils.h"
 #include "TracerVertexGeneratorComponent.generated.h"
@@ -16,9 +17,9 @@ class UTracerVertexGeneratorComponent : public UActorComponentEx
 	GENERATED_BODY()
 
 public:
-	void SetVertexSource(UTracerPathComponent* Source)
+	void SetVertexSource(ITracerPathGenerator* Source)
 	{
-		VertexSource = Source;
+		VertexSource = Cast<UObject>(Source);
 	}
 
 	void SetVertexDestination(UTracerMeshComponent* Destination)
@@ -33,7 +34,7 @@ public:
 
 private:
 	UPROPERTY()
-	UTracerPathComponent* VertexSource;
+	TScriptInterface<ITracerPathGenerator> VertexSource;
 
 	UPROPERTY()
 	UTracerMeshComponent* VertexDestination;
@@ -52,7 +53,7 @@ private:
 
 		check(AllValid(VertexSource, VertexDestination, VertexAttachmentTarget));
 
-		VertexSource->OnNewPointGenerated.AddWeakLambda(this, [this]()
+		VertexSource->GetOnNewPointGenerated().AddWeakLambda(this, [this]()
 		{
 			auto [Left, Right] = CreateVertexPositions(
 				VertexSource->GetPath().GetLastPoint(), FVector2D{GetOwner()->GetActorRightVector()}.GetSafeNormal());
@@ -64,14 +65,14 @@ private:
 			VertexDestination->AppendVertices(Left, Right);
 		});
 
-		VertexSource->OnLastPointModified.AddWeakLambda(this, [this]()
+		VertexSource->GetOnLastPointModified().AddWeakLambda(this, [this]()
 		{
 			const auto [Left, Right] = CreateVertexPositions(
 				VertexSource->GetPath().GetLastPoint(), FVector2D{GetOwner()->GetActorRightVector()}.GetSafeNormal());
 			VertexDestination->SetLastVertices(Left, Right);
 		});
 
-		VertexSource->OnGenerationEnded.AddWeakLambda(this, [this]()
+		VertexSource->GetOnGenerationEnded().AddWeakLambda(this, [this]()
 		{
 			auto [Left, Right] = CreateVertexPositions(
 				VertexSource->GetPath().GetLastPoint(), FVector2D{GetOwner()->GetActorRightVector()}.GetSafeNormal());
@@ -80,7 +81,7 @@ private:
 			VertexDestination->SetLastVertices(Left, Right);
 		});
 
-		VertexSource->OnCleared.AddWeakLambda(this, [this]()
+		VertexSource->GetOnCleared().AddWeakLambda(this, [this]()
 		{
 			VertexDestination->Reset();
 		});

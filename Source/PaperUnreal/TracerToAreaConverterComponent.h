@@ -51,12 +51,12 @@ private:
 
 		check(AllValid(Tracer, ConversionDestination));
 
-		Tracer->OnGenerationStarted.AddWeakLambda(this, [this]()
+		Tracer->GetOnGenerationStarted().AddWeakLambda(this, [this]()
 		{
 			Tracer->Clear();
 		});
 		
-		Tracer->OnGenerationEnded.AddWeakLambda(this, [this]()
+		Tracer->GetOnGenerationEnded().AddWeakLambda(this, [this]()
 		{
 			if (TOptional<UAreaMeshComponent::FExpansionResult> Result
 				= ConversionDestination->ExpandByPath(Tracer->GetPath()))

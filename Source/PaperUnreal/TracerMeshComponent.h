@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "AreaMeshComponent.h"
+#include "TracerPathGenerator.h"
 #include "Core/SegmentArray.h"
 #include "Components/DynamicMeshComponent.h"
 #include "Core/ActorComponentEx.h"
@@ -155,16 +156,17 @@ private:
 
 
 UCLASS()
-class UTracerPathComponent : public UActorComponent
+class UTracerPathComponent : public UActorComponentEx, public ITracerPathGenerator
 {
 	GENERATED_BODY()
 
 public:
-	FSimpleMulticastDelegate OnNewPointGenerated;
-	FSimpleMulticastDelegate OnLastPointModified;
-	FSimpleMulticastDelegate OnCleared;
-	FSimpleMulticastDelegate OnGenerationStarted;
-	FSimpleMulticastDelegate OnGenerationEnded;
+	virtual FSimpleMulticastDelegate& GetOnNewPointGenerated() override { return OnNewPointGenerated; }
+	virtual FSimpleMulticastDelegate& GetOnLastPointModified() override { return OnLastPointModified; }
+	virtual FSimpleMulticastDelegate& GetOnCleared() override { return OnCleared; }
+	virtual FSimpleMulticastDelegate& GetOnGenerationStarted() override { return OnGenerationStarted; }
+	virtual FSimpleMulticastDelegate& GetOnGenerationEnded() override { return OnGenerationEnded; }
+	virtual const FSegmentArray2D& GetPath() const override { return Path; }
 
 	void SetNoPathArea(UAreaMeshComponent* Area)
 	{
@@ -176,8 +178,6 @@ public:
 		Path.Empty();
 		OnCleared.Broadcast();
 	}
-	
-	const FSegmentArray2D& GetPath() const { return Path; }
 
 private:
 	UPROPERTY()
@@ -185,6 +185,12 @@ private:
 
 	bool bGeneratedThisFrame = false;
 	FSegmentArray2D Path;
+
+	FSimpleMulticastDelegate OnNewPointGenerated;
+	FSimpleMulticastDelegate OnLastPointModified;
+	FSimpleMulticastDelegate OnCleared;
+	FSimpleMulticastDelegate OnGenerationStarted;
+	FSimpleMulticastDelegate OnGenerationEnded;
 
 	UTracerPathComponent()
 	{
@@ -195,7 +201,7 @@ private:
 	virtual void InitializeComponent() override
 	{
 		Super::InitializeComponent();
-		
+
 		check(AllValid(NoPathArea));
 	}
 
@@ -205,7 +211,7 @@ private:
 
 		const bool bGeneratedLastFrame = bGeneratedThisFrame;
 		const bool bWillGenerateThisFrame = !NoPathArea->IsInside(GetOwner()->GetActorLocation());
-		
+
 		bGeneratedThisFrame = false;
 
 		if (!bGeneratedLastFrame && bWillGenerateThisFrame)

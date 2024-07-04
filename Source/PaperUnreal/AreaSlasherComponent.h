@@ -55,8 +55,8 @@ private:
 
 		// TODO destroy self on slash target end play
 
-		Slasher->OnNewPointGenerated.AddUObject(this, &ThisClass::DoCollisionTest);
-		Slasher->OnLastPointModified.AddUObject(this, &ThisClass::DoCollisionTest);
+		Slasher->GetOnNewPointGenerated().AddUObject(this, &ThisClass::DoCollisionTest);
+		Slasher->GetOnLastPointModified().AddUObject(this, &ThisClass::DoCollisionTest);
 
 		TracerToAreaConverter->OnTracerToAreaConversion.AddWeakLambda(
 			this, [this](const FSegmentArray2D& Tracer, bool bToTheLeft)

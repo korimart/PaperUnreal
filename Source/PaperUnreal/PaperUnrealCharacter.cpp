@@ -5,9 +5,10 @@
 #include "AreaActor.h"
 #include "AreaSlasherComponent.h"
 #include "AreaSpawnerComponent.h"
-#include "TracerCollisionStateComponent.h"
+#include "ReplicatedTracerPathComponent.h"
 #include "TeamComponent.h"
 #include "TracerMeshComponent.h"
+#include "TracerPathGenerator.h"
 #include "TracerToAreaConverterComponent.h"
 #include "TracerVertexGeneratorComponent.h"
 #include "Core/UECoroutine.h"
@@ -64,6 +65,9 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 		AGameStateBase* GameState = co_await WaitForGameState(GetWorld());
 		UTeamComponent* MyTeamComponent = co_await WaitForComponent<UTeamComponent>(co_await WaitForPlayerState());
 		const int32 MyTeamIndex = co_await MyTeamComponent->GetTeamIndex().WaitForValue(this);
+		UAreaSpawnerComponent* AreaSpawnerComponent = co_await WaitForComponent<UAreaSpawnerComponent>(GameState);
+		AAreaActor* MyTeamArea = co_await AreaSpawnerComponent->GetAreaFor(MyTeamIndex).WaitForValue(this);
+		UAreaMeshComponent* AreaMeshComponent = MyTeamArea->AreaMeshComponent;
 
 		UResourceRegistryComponent* RR = co_await WaitForComponent<UResourceRegistryComponent>(GameState);
 		if (!co_await RR->GetbResourcesLoaded().WaitForValue(this))
@@ -71,9 +75,25 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 			co_return;
 		}
 
+		ITracerPathGenerator* TracerVertexSource = nullptr;
+		if (GetNetMode() == NM_Standalone || GetNetMode() == NM_ListenServer)
+		{
+			TracerVertexSource = co_await WaitForComponent<UTracerPathComponent>(this);
+		}
+		else
+		{
+			TracerVertexSource = co_await WaitForComponent<UReplicatedTracerPathComponent>(this);
+		}
+
 		auto TracerMesh = NewObject<UTracerMeshComponent>(this);
 		TracerMesh->RegisterComponent();
 		TracerMesh->ConfigureMaterialSet({RR->GetTracerMaterialFor(MyTeamIndex)});
+		
+		auto TracerVertexGenerator = NewObject<UTracerVertexGeneratorComponent>(this);
+		TracerVertexGenerator->SetVertexSource(TracerVertexSource);
+		TracerVertexGenerator->SetVertexDestination(TracerMesh);
+		TracerVertexGenerator->SetVertexAttachmentTarget(AreaMeshComponent);
+		TracerVertexGenerator->RegisterComponent();
 	});
 }
 
@@ -88,10 +108,6 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		AAreaActor* MyTeamArea = co_await AreaSpawnerComponent->GetAreaFor(MyTeamIndex).WaitForValue(this);
 		UAreaMeshComponent* AreaMeshComponent = MyTeamArea->AreaMeshComponent;
 
-		// TODO 머신의 종류에 따라 다른 인터페이스를 가져온다 (싱글 및 호스트는 레플리케이션을 건너뛸 수 있도록)
-		UTracerMeshComponent* TracerVertexDestination = co_await WaitForComponent<UTracerMeshComponent>(this);
-
-
 		// TODO 아래 컴포넌트들은 위에 먼저 부착된 컴포넌트들에 의존함
 		// 컴포넌트를 갈아끼울 때 이러한 의존성에 대한 경고를 하는 메카니즘이 존재하지 않음
 
@@ -99,11 +115,12 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		TracerPath->SetNoPathArea(AreaMeshComponent);
 		TracerPath->RegisterComponent();
 
-		auto TracerVertexGenerator = NewObject<UTracerVertexGeneratorComponent>(this);
-		TracerVertexGenerator->SetVertexSource(TracerPath);
-		TracerVertexGenerator->SetVertexDestination(TracerVertexDestination);
-		TracerVertexGenerator->SetVertexAttachmentTarget(AreaMeshComponent);
-		TracerVertexGenerator->RegisterComponent();
+		if (GetNetMode() == NM_ListenServer || GetNetMode() == NM_DedicatedServer)
+		{
+			auto TracerPathReplicator = NewObject<UReplicatedTracerPathComponent>(this);
+			TracerPathReplicator->SetTracerPathSource(TracerPath);
+			TracerPathReplicator->RegisterComponent();
+		}
 
 		auto TracerToAreaConverter = NewObject<UTracerToAreaConverterComponent>(this);
 		TracerToAreaConverter->SetTracer(TracerPath);
