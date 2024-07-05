@@ -15,13 +15,11 @@ class UReplicatedTracerPathComponent : public UActorComponentEx, public ITracerP
 	GENERATED_BODY()
 
 public:
-	virtual FSimpleMulticastDelegate& GetOnNewPointGenerated() override { return OnNewPointGenerated; };
-	virtual FSimpleMulticastDelegate& GetOnLastPointModified() override { return OnLastPointModified; }
-	virtual FSimpleMulticastDelegate& GetOnCleared() override { return OnCleared; }
-	virtual FSimpleMulticastDelegate& GetOnGenerationStarted() override { return OnGenerationStarted; }
-	virtual FSimpleMulticastDelegate& GetOnGenerationEnded() override { return OnGenerationEnded; }
-	virtual const FSegmentArray2D& GetPath() const override { return Path; }
-
+	virtual TValueGenerator<FTracerPathEvent> CreatePathEventGenerator() override
+	{
+		return CreateMulticastValueGenerator(this, TArray<FTracerPathEvent>{}, OnPathEvent);
+	}
+	
 	void SetTracerPathSource(UTracerPathComponent* Source)
 	{
 		check(GetNetMode() != NM_Client);
@@ -34,14 +32,13 @@ private:
 
 	FSegmentArray2D Path;
 
-	FSimpleMulticastDelegate OnNewPointGenerated;
-	FSimpleMulticastDelegate OnLastPointModified;
-	FSimpleMulticastDelegate OnCleared;
-	FSimpleMulticastDelegate OnGenerationStarted;
-	FSimpleMulticastDelegate OnGenerationEnded;
-
 	UReplicatedTracerPathComponent()
 	{
 		SetIsReplicatedByDefault(true);
+	}
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
+	{
+		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	}
 };

@@ -51,17 +51,19 @@ private:
 
 		check(AllValid(Tracer, ConversionDestination));
 
-		Tracer->GetOnGenerationStarted().AddWeakLambda(this, [this]()
+		Tracer->OnPathEvent.AddWeakLambda(this, [this](const FTracerPathEvent& Event)
 		{
-			Tracer->Clear();
-		});
-		
-		Tracer->GetOnGenerationEnded().AddWeakLambda(this, [this]()
-		{
-			if (TOptional<UAreaMeshComponent::FExpansionResult> Result
-				= ConversionDestination->ExpandByPath(Tracer->GetPath()))
+			if (Event.GenerationStarted())
 			{
-				OnTracerToAreaConversion.Broadcast(Tracer->GetPath(), Result->bAddedToTheLeftOfPath);
+				Tracer->Clear();
+			}
+			else if (Event.GenerationEnded())
+			{
+				if (TOptional<UAreaMeshComponent::FExpansionResult> Result
+					= ConversionDestination->ExpandByPath(Tracer->GetPath()))
+				{
+					OnTracerToAreaConversion.Broadcast(Tracer->GetPath(), Result->bAddedToTheLeftOfPath);
+				}
 			}
 		});
 	}

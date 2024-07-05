@@ -55,8 +55,13 @@ private:
 
 		// TODO destroy self on slash target end play
 
-		Slasher->GetOnNewPointGenerated().AddUObject(this, &ThisClass::DoCollisionTest);
-		Slasher->GetOnLastPointModified().AddUObject(this, &ThisClass::DoCollisionTest);
+		Slasher->OnPathEvent.AddWeakLambda(this, [this](const FTracerPathEvent& Event)
+		{
+			if (Event.NewPointGenerated() || Event.LastPointModified())
+			{
+				DoCollisionTest();
+			}
+		});
 
 		TracerToAreaConverter->OnTracerToAreaConversion.AddWeakLambda(
 			this, [this](const FSegmentArray2D& Tracer, bool bToTheLeft)
@@ -134,10 +139,10 @@ private:
 
 			const int32 FirstSegmentIndex = FirstInsidePointIndex == 0 ? 0 : FirstInsidePointIndex - 1;
 			const int32 LastSegmentIndex = FMath::Max(FirstSegmentIndex,
-			Slasher->GetPath().GetPoints().IsValidIndex(LastInsidePointIndex + 1)
+				Slasher->GetPath().GetPoints().IsValidIndex(LastInsidePointIndex + 1)
 				? LastInsidePointIndex
 				: LastInsidePointIndex - 1);
-			
+
 			FSegmentArray2D MinimalSlicingPath = Slasher->GetPath().SubArray(FirstSegmentIndex, LastSegmentIndex);
 			MinimalSlicingPath.SetSegment(0, SlashTarget->Clip(MinimalSlicingPath[0]));
 			MinimalSlicingPath.SetSegment(-1, SlashTarget->Clip(MinimalSlicingPath[-1]));

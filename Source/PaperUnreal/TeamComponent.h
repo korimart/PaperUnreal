@@ -16,6 +16,7 @@ class UTeamComponent : public UActorComponentEx
 	GENERATED_BODY()
 
 public:
+	// TODO maybe remove
 	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(int32, TeamIndex);
 
 private:

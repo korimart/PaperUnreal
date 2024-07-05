@@ -53,42 +53,47 @@ private:
 
 		check(AllValid(VertexSource, VertexDestination, VertexAttachmentTarget));
 
-		VertexSource->GetOnNewPointGenerated().AddWeakLambda(this, [this]()
+		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			auto [Left, Right] = CreateVertexPositions(
-				VertexSource->GetPath().GetLastPoint(), FVector2D{GetOwner()->GetActorRightVector()}.GetSafeNormal());
-			if (VertexSource->GetPath().PointCount() == 1)
+			auto PathEventGenerator = VertexSource->CreatePathEventGenerator();
+
+			while (true)
 			{
-				Left = VertexAttachmentTarget->FindClosestPointOnBoundary2D(Left).GetPoint();
-				Right = VertexAttachmentTarget->FindClosestPointOnBoundary2D(Right).GetPoint();
+				const FTracerPathEvent Event = co_await PathEventGenerator.Next();
+
+				if (Event.NewPointGenerated())
+				{
+					auto [Left, Right] = CreateVertexPositions(*Event.Point, *Event.PathDirection);
+					if (VertexDestination->GetVertexCount() == 0)
+					{
+						Left = VertexAttachmentTarget->FindClosestPointOnBoundary2D(Left).GetPoint();
+						Right = VertexAttachmentTarget->FindClosestPointOnBoundary2D(Right).GetPoint();
+					}
+					VertexDestination->AppendVertices(Left, Right);
+				}
+				else if (Event.LastPointModified())
+				{
+					auto [Left, Right] = CreateVertexPositions(*Event.Point, *Event.PathDirection);
+					VertexDestination->SetLastVertices(Left, Right);
+				}
+				else if (Event.GenerationEnded())
+				{
+					auto [Left, Right] = VertexDestination->GetLastVertices();
+					Left = VertexAttachmentTarget->FindClosestPointOnBoundary2D(Left).GetPoint();
+					Right = VertexAttachmentTarget->FindClosestPointOnBoundary2D(Right).GetPoint();
+					VertexDestination->SetLastVertices(Left, Right);
+				}
+				else if (Event.PointsCleared())
+				{
+					VertexDestination->Reset();
+				}
 			}
-			VertexDestination->AppendVertices(Left, Right);
-		});
-
-		VertexSource->GetOnLastPointModified().AddWeakLambda(this, [this]()
-		{
-			const auto [Left, Right] = CreateVertexPositions(
-				VertexSource->GetPath().GetLastPoint(), FVector2D{GetOwner()->GetActorRightVector()}.GetSafeNormal());
-			VertexDestination->SetLastVertices(Left, Right);
-		});
-
-		VertexSource->GetOnGenerationEnded().AddWeakLambda(this, [this]()
-		{
-			auto [Left, Right] = CreateVertexPositions(
-				VertexSource->GetPath().GetLastPoint(), FVector2D{GetOwner()->GetActorRightVector()}.GetSafeNormal());
-			Left = VertexAttachmentTarget->FindClosestPointOnBoundary2D(Left).GetPoint();
-			Right = VertexAttachmentTarget->FindClosestPointOnBoundary2D(Right).GetPoint();
-			VertexDestination->SetLastVertices(Left, Right);
-		});
-
-		VertexSource->GetOnCleared().AddWeakLambda(this, [this]()
-		{
-			VertexDestination->Reset();
 		});
 	}
 
-	static std::tuple<FVector2D, FVector2D> CreateVertexPositions(const FVector2D& Center, const FVector2D& Right)
+	static std::tuple<FVector2D, FVector2D> CreateVertexPositions(const FVector2D& Center, const FVector2D& Forward)
 	{
+		const FVector2D Right{-Forward.Y, Forward.X};
 		return {Center - 5.f * Right, Center + 5.f * Right};
 	}
 };

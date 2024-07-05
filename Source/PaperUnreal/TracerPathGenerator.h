@@ -14,6 +14,31 @@ class UTracerPathGenerator : public UInterface
 	GENERATED_BODY()
 };
 
+
+enum class ETracerPathEvent
+{
+	GenerationStarted,
+	NewPointGenerated,
+	LastPointModified,
+	PointsCleared,
+	GenerationEnded,
+};
+
+
+struct FTracerPathEvent
+{
+	ETracerPathEvent Event;
+	TOptional<FVector2D> Point;
+	TOptional<FVector2D> PathDirection;
+
+	bool GenerationStarted() const { return Event == ETracerPathEvent::GenerationStarted; }
+	bool NewPointGenerated() const { return Event == ETracerPathEvent::NewPointGenerated; }
+	bool LastPointModified() const { return Event == ETracerPathEvent::LastPointModified; }
+	bool PointsCleared() const { return Event == ETracerPathEvent::PointsCleared; }
+	bool GenerationEnded() const { return Event == ETracerPathEvent::GenerationEnded; }
+};
+
+
 /**
  * 
  */
@@ -22,10 +47,8 @@ class ITracerPathGenerator
 	GENERATED_BODY()
 
 public:
-	virtual FSimpleMulticastDelegate& GetOnNewPointGenerated() = 0;
-	virtual FSimpleMulticastDelegate& GetOnLastPointModified() = 0;
-	virtual FSimpleMulticastDelegate& GetOnCleared() = 0;
-	virtual FSimpleMulticastDelegate& GetOnGenerationStarted() = 0;
-	virtual FSimpleMulticastDelegate& GetOnGenerationEnded() = 0;
-	virtual const FSegmentArray2D& GetPath() const = 0;
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnPathEvent, FTracerPathEvent);
+	FOnPathEvent OnPathEvent;
+
+	virtual TValueGenerator<FTracerPathEvent> CreatePathEventGenerator() = 0;
 };
