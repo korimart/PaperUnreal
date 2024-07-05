@@ -46,25 +46,25 @@ struct TGetFirstParam2
 private:
 	using FuncType = typename TDecay<FunctorType>::Type;
 
-	template<typename F, typename Ret>
+	template <typename F, typename Ret>
 	static void GetFirstParamHelper(Ret (F::*)());
 
-	template<typename F, typename Ret>
+	template <typename F, typename Ret>
 	static void GetFirstParamHelper(Ret (F::*)() const);
 
-	template<typename F, typename Ret, typename A, typename... Rest>
+	template <typename F, typename Ret, typename A, typename... Rest>
 	static A GetFirstParamHelper(Ret (F::*)(A, Rest...));
 
-	template<typename F, typename Ret, typename A, typename... Rest>
+	template <typename F, typename Ret, typename A, typename... Rest>
 	static A GetFirstParamHelper(Ret (F::*)(A, Rest...) const);
-	
+
 public:
 	using Type = decltype(GetFirstParamHelper(&FuncType::operator()));
 };
 
 
 class FWeakCoroutineContext;
-	
+
 template <typename>
 class TWeakAwaitable;
 
@@ -294,7 +294,7 @@ public:
 			SetValue(Forward<ArgType>(Arg));
 		}
 	}
-	
+
 	void Cancel()
 	{
 		if (!bSetValue)
@@ -384,9 +384,19 @@ public:
 		MulticastDelegate.Add(CreateSetValueDelegate<MulticastDelegateType::FDelegate>(Lifetime, Forward<TransformFuncType>(TransformFunc)));
 	}
 
+	void SetNeverReady()
+	{
+		bNeverReady = true;
+
+		if (Handle)
+		{
+			Value->Destroy();
+		}
+	}
+
 	bool await_ready() const
 	{
-		return !!*Value;
+		return !bNeverReady && !!*Value;
 	}
 
 	void await_suspend(std::coroutine_handle<FWeakCoroutine::promise_type> InHandle)
@@ -394,6 +404,11 @@ public:
 		Handle = InHandle;
 		Handle.promise().bCustomSuspended = true;
 		Value->SetHandle(Handle);
+
+		if (bNeverReady)
+		{
+			Value->Destroy();
+		}
 	}
 
 	ValueType await_resume()
@@ -415,6 +430,7 @@ private:
 	mutable bool bHandleCreated = false;
 	std::coroutine_handle<FWeakCoroutine::promise_type> Handle;
 	TSharedPtr<TWeakAwaitableHandleImpl<ValueType>> Value = MakeShared<TWeakAwaitableHandleImpl<ValueType>>();
+	bool bNeverReady = false;
 };
 
 
@@ -449,6 +465,43 @@ public:
 
 private:
 	ValueType Value;
+};
+
+
+template <typename T>
+class TValueGenerator
+{
+public:
+	DECLARE_DELEGATE_RetVal(TWeakAwaitable<T>, FOnReadyValuesDeprived);
+	
+	TValueGenerator(TArray<T> InReadyValues, FOnReadyValuesDeprived OnDeprived)
+		: ReadyValues(MoveTemp(InReadyValues)), OnReadyValuesDeprived(MoveTemp(OnDeprived))
+	{
+	}
+	
+	TWeakAwaitable<T> Next()
+	{
+		if (ReadyValues.IsValidIndex(NextReadyIndex))
+		{
+			TWeakAwaitable<T> Ret{ReadyValues[NextReadyIndex]};
+			NextReadyIndex++;
+			return Ret;
+		}
+
+		if (OnReadyValuesDeprived.IsBound())
+		{
+			return OnReadyValuesDeprived.Execute();
+		}
+
+		TWeakAwaitable<T> Ret;
+		Ret.SetNeverReady();
+		return Ret;
+	}
+
+private:
+	TArray<T> ReadyValues;
+	int32 NextReadyIndex = 0;
+	FOnReadyValuesDeprived OnReadyValuesDeprived;
 };
 
 
@@ -490,6 +543,35 @@ void RunWeakCoroutine(UObject* Lifetime, FuncType&& Func)
 	auto LambdaCaptures = MakeShared<TUniqueFunction<FWeakCoroutine(FWeakCoroutineContext&)>>(Forward<FuncType>(Func));
 	auto Context = MakeUnique<FWeakCoroutineContext>();
 	(*LambdaCaptures)(*Context).Init(Lifetime, LambdaCaptures, MoveTemp(Context));
+}
+
+
+template <typename T, typename U>
+void FlushAwaitablesArray(TArray<TWeakAwaitableHandle<T>>& Array, const U& Value)
+{
+	for (auto& Each : Array)
+	{
+		Each.SetValue(Value);
+	}
+	Array.Empty();
+}
+
+
+template <typename T>
+TValueGenerator<T> CreateMulticastValueGenerator(UObject* MulticastOwner, const TArray<T>& ReadyValues, auto& MulticastDelegate)
+{
+	using FOnReadyValuesDeprived = typename TValueGenerator<T>::FOnReadyValuesDeprived;
+	TValueGenerator Ret
+	{
+		ReadyValues,
+		FOnReadyValuesDeprived::CreateWeakLambda(MulticastOwner, [MulticastOwner, &MulticastDelegate]()
+		{
+			TWeakAwaitable<T> Ret;
+			Ret.SetValueFromMulticastDelegate(MulticastOwner, MulticastDelegate);
+			return Ret;
+		}),
+	};
+	return Ret;
 }
 
 

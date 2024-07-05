@@ -66,7 +66,7 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 		UTeamComponent* MyTeamComponent = co_await WaitForComponent<UTeamComponent>(co_await WaitForPlayerState());
 		const int32 MyTeamIndex = co_await MyTeamComponent->GetTeamIndex().WaitForValue(this);
 		UAreaSpawnerComponent* AreaSpawnerComponent = co_await WaitForComponent<UAreaSpawnerComponent>(GameState);
-		AAreaActor* MyTeamArea = co_await AreaSpawnerComponent->GetAreaFor(MyTeamIndex).WaitForValue(this);
+		AAreaActor* MyTeamArea = co_await AreaSpawnerComponent->WaitForAreaOfTeam(MyTeamIndex);
 		UAreaMeshComponent* AreaMeshComponent = MyTeamArea->AreaMeshComponent;
 
 		UResourceRegistryComponent* RR = co_await WaitForComponent<UResourceRegistryComponent>(GameState);
@@ -88,7 +88,7 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 		auto TracerMesh = NewObject<UTracerMeshComponent>(this);
 		TracerMesh->RegisterComponent();
 		TracerMesh->ConfigureMaterialSet({RR->GetTracerMaterialFor(MyTeamIndex)});
-		
+
 		auto TracerVertexGenerator = NewObject<UTracerVertexGeneratorComponent>(this);
 		TracerVertexGenerator->SetVertexSource(TracerVertexSource);
 		TracerVertexGenerator->SetVertexDestination(TracerMesh);
@@ -105,7 +105,7 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		UTeamComponent* MyTeamComponent = co_await WaitForComponent<UTeamComponent>(co_await WaitForPlayerState());
 		const int32 MyTeamIndex = co_await MyTeamComponent->GetTeamIndex().WaitForValue(this);
 		UAreaSpawnerComponent* AreaSpawnerComponent = co_await WaitForComponent<UAreaSpawnerComponent>(GameState);
-		AAreaActor* MyTeamArea = co_await AreaSpawnerComponent->GetAreaFor(MyTeamIndex).WaitForValue(this);
+		AAreaActor* MyTeamArea = co_await AreaSpawnerComponent->WaitForAreaOfTeam(MyTeamIndex);
 		UAreaMeshComponent* AreaMeshComponent = MyTeamArea->AreaMeshComponent;
 
 		// TODO 아래 컴포넌트들은 위에 먼저 부착된 컴포넌트들에 의존함
@@ -127,17 +127,27 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		TracerToAreaConverter->SetConversionDestination(AreaMeshComponent);
 		TracerToAreaConverter->RegisterComponent();
 
-		AreaSpawnerComponent->GetSpawnedAreas().ObserveEach(this, [this,
-				MyTeamArea = ToWeak(MyTeamArea),
-				TracerToAreaConverter = ToWeak(TracerToAreaConverter)
-			](AAreaActor* SpawnedArea)
+		RunWeakCoroutine(this, [
+				this,
+				AreaSpawnerComponent,
+				MyTeamArea,
+				TracerToAreaConverter](FWeakCoroutineContext& Context) -> FWeakCoroutine
 			{
-				if (AllValid(MyTeamArea, TracerToAreaConverter) && SpawnedArea != MyTeamArea)
+				Context.AddToWeakList(AreaSpawnerComponent);
+				Context.AddToWeakList(MyTeamArea);
+				Context.AddToWeakList(TracerToAreaConverter);
+
+				auto SpawnedAreaGenerator = AreaSpawnerComponent->CreateSpawnedAreaGenerator();
+			
+				while (true)
 				{
-					auto AreaSlasherComponent = NewObject<UAreaSlasherComponent>(this);
-					AreaSlasherComponent->SetSlashTarget(SpawnedArea->AreaMeshComponent);
-					AreaSlasherComponent->SetTracerToAreaConverter(TracerToAreaConverter.Get());
-					AreaSlasherComponent->RegisterComponent();
+					if (AAreaActor* Area = co_await SpawnedAreaGenerator.Next(); MyTeamArea != Area)
+					{
+						auto AreaSlasherComponent = NewObject<UAreaSlasherComponent>(this);
+						AreaSlasherComponent->SetSlashTarget(Area->AreaMeshComponent);
+						AreaSlasherComponent->SetTracerToAreaConverter(TracerToAreaConverter);
+						AreaSlasherComponent->RegisterComponent();
+					}
 				}
 			});
 	});

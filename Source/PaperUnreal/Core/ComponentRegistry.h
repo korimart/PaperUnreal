@@ -60,6 +60,12 @@ template <typename ComponentType>
 	requires std::is_base_of_v<UActorComponentEx, ComponentType>
 TWeakAwaitable<ComponentType*> WaitForComponent(AActor* Owner)
 {
+	if (!IsValid(Owner))
+	{
+		check(false);
+		return nullptr;
+	}
+	
 	if (ComponentType* Found = ValidOrNull(Owner->FindComponentByClass<ComponentType>()))
 	{
 		return Found;

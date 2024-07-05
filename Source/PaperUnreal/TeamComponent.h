@@ -30,6 +30,7 @@ private:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{
+		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 		DOREPLIFETIME(ThisClass, ReppedTeamIndex);
 	}
 };

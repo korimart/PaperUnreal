@@ -97,17 +97,6 @@ TWeakAwaitable<bool> RequestAsyncLoad(const TSoftObjectPtr<SoftObjectType>& Soft
 }
 
 
-template <typename T, typename U>
-void FlushAwaitablesArray(TArray<TWeakAwaitableHandle<T>>& Array, const U& Value)
-{
-	for (auto& Each : Array)
-	{
-		Each.SetValue(Value);
-	}
-	Array.Empty();
-}
-
-
 #define DEFINE_REPPED_VAR_SETTER(VarName, NewValue)\
 	check(GetNetMode() != NM_Client);\
 	Repped##VarName = NewValue;\
