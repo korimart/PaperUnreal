@@ -53,11 +53,7 @@ private:
 
 		Tracer->OnPathEvent.AddWeakLambda(this, [this](const FTracerPathEvent& Event)
 		{
-			if (Event.GenerationStarted())
-			{
-				Tracer->Clear();
-			}
-			else if (Event.GenerationEnded())
+			if (Event.GenerationEnded())
 			{
 				if (TOptional<UAreaMeshComponent::FExpansionResult> Result
 					= ConversionDestination->ExpandByPath(Tracer->GetPath()))

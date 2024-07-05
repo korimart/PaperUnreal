@@ -15,12 +15,12 @@ class UTracerPathGenerator : public UInterface
 };
 
 
+UENUM()
 enum class ETracerPathEvent
 {
 	GenerationStarted,
 	NewPointGenerated,
 	LastPointModified,
-	PointsCleared,
 	GenerationEnded,
 };
 
@@ -34,7 +34,6 @@ struct FTracerPathEvent
 	bool GenerationStarted() const { return Event == ETracerPathEvent::GenerationStarted; }
 	bool NewPointGenerated() const { return Event == ETracerPathEvent::NewPointGenerated; }
 	bool LastPointModified() const { return Event == ETracerPathEvent::LastPointModified; }
-	bool PointsCleared() const { return Event == ETracerPathEvent::PointsCleared; }
 	bool GenerationEnded() const { return Event == ETracerPathEvent::GenerationEnded; }
 };
 

@@ -61,7 +61,11 @@ private:
 			{
 				const FTracerPathEvent Event = co_await PathEventGenerator.Next();
 
-				if (Event.NewPointGenerated())
+				if (Event.GenerationStarted())
+				{
+					VertexDestination->Reset();
+				}
+				else if (Event.NewPointGenerated())
 				{
 					auto [Left, Right] = CreateVertexPositions(*Event.Point, *Event.PathDirection);
 					if (VertexDestination->GetVertexCount() == 0)
@@ -82,10 +86,6 @@ private:
 					Left = VertexAttachmentTarget->FindClosestPointOnBoundary2D(Left).GetPoint();
 					Right = VertexAttachmentTarget->FindClosestPointOnBoundary2D(Right).GetPoint();
 					VertexDestination->SetLastVertices(Left, Right);
-				}
-				else if (Event.PointsCleared())
-				{
-					VertexDestination->Reset();
 				}
 			}
 		});

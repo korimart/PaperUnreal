@@ -184,12 +184,6 @@ public:
 		NoPathArea = Area;
 	}
 
-	void Clear()
-	{
-		Path.Empty();
-		OnPathEvent.Broadcast({.Event = ETracerPathEvent::PointsCleared});
-	}
-
 private:
 	UPROPERTY()
 	UAreaMeshComponent* NoPathArea;
@@ -221,6 +215,7 @@ private:
 
 		if (!bGeneratedLastFrame && bWillGenerateThisFrame)
 		{
+			Path.Empty();
 			OnPathEvent.Broadcast({.Event = ETracerPathEvent::GenerationStarted});
 		}
 
