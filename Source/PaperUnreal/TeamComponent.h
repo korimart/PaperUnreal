@@ -23,6 +23,11 @@ private:
 	UPROPERTY(ReplicatedUsing=OnRep_TeamIndex)
 	int32 ReppedTeamIndex = -1;
 
+	UTeamComponent()
+	{
+		SetIsReplicatedByDefault(true);
+	}
+
 	UFUNCTION()
 	void OnRep_TeamIndex()
 	{

@@ -100,4 +100,4 @@ TWeakAwaitable<bool> RequestAsyncLoad(const TSoftObjectPtr<SoftObjectType>& Soft
 #define DEFINE_REPPED_VAR_SETTER(VarName, NewValue)\
 	check(GetNetMode() != NM_Client);\
 	Repped##VarName = NewValue;\
-	if (GetNetMode() != NM_DedicatedServer) OnRep_##VarName();
+	OnRep_##VarName();
