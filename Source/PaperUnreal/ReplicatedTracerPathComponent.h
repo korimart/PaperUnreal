@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "TracerMeshComponent.h"
+#include "TracerPathComponent.h"
 #include "TracerPathGenerator.h"
 #include "Core/ActorComponent2.h"
 #include "Net/UnrealNetwork.h"

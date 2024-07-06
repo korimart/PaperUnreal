@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "AreaMeshComponent.h"
-#include "TracerMeshComponent.h"
+#include "TracerPathComponent.h"
 #include "Core/ActorComponent2.h"
 #include "TracerToAreaConverterComponent.generated.h"
 
