@@ -16,7 +16,7 @@ class UAreaSlasherComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	void SetSlashTarget(UAreaMeshComponent* Target)
+	void SetSlashTarget(UAreaBoundaryComponent* Target)
 	{
 		SlashTarget = Target;
 	}
@@ -31,7 +31,7 @@ private:
 	UTracerPathComponent* Slasher;
 
 	UPROPERTY()
-	UAreaMeshComponent* SlashTarget;
+	UAreaBoundaryComponent* SlashTarget;
 
 	UPROPERTY()
 	UTracerToAreaConverterComponent* TracerToAreaConverter;

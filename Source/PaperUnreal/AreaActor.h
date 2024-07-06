@@ -6,20 +6,17 @@
 #include "AreaMeshComponent.h"
 #include "ResourceRegistryComponent.h"
 #include "TeamComponent.h"
+#include "Core/Actor2.h"
 #include "Core/ComponentRegistry.h"
-#include "GameFramework/Actor.h"
 #include "AreaActor.generated.h"
 
 
 UCLASS()
-class AAreaActor : public AActor
+class AAreaActor : public AActor2
 {
 	GENERATED_BODY()
 
 public:
-	UPROPERTY()
-	UAreaMeshComponent* AreaMeshComponent;
-
 	UPROPERTY()
 	UTeamComponent* TeamComponent;
 
@@ -29,31 +26,45 @@ private:
 		bReplicates = true;
 		bAlwaysRelevant = true;
 		RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("RootComponent"));
-		AreaMeshComponent = CreateDefaultSubobject<UAreaMeshComponent>(TEXT("AreaMeshComponent"));
 		TeamComponent = CreateDefaultSubobject<UTeamComponent>(TEXT("TeamComponent"));
 	}
 
-	virtual void BeginPlay() override
+	virtual void AttachPlayerMachineComponents() override
 	{
-		Super::BeginPlay();
-
-		if (GetNetMode() == NM_DedicatedServer)
-		{
-			return;
-		}
-
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
 			AGameStateBase* GameState = co_await WaitForGameState(GetWorld());
 			UResourceRegistryComponent* RR = co_await WaitForComponent<UResourceRegistryComponent>(GameState);
 
-			if (!co_await RR->GetbResourcesLoaded().WaitForValue(this))
-			{
-				co_return;
-			}
+			// TODO graceful exit
+			check(co_await RR->GetbResourcesLoaded().WaitForValue(this));
 
 			const int32 TeamIndex = co_await TeamComponent->GetTeamIndex().WaitForValue(this);
+
+			auto AreaMeshComponent = NewObject<UAreaMeshComponent>(this);
+			AreaMeshComponent->RegisterComponent();
 			AreaMeshComponent->ConfigureMaterialSet({RR->GetAreaMaterialFor(TeamIndex)});
+
+			if (GetNetMode() == NM_Client)
+			{
+			}
+			else
+			{
+				auto AreaBoundaryComponent = co_await WaitForComponent<UAreaBoundaryComponent>(this);
+				AreaMeshComponent->SetMeshByWorldBoundary(AreaBoundaryComponent->GetBoundary());
+				AreaBoundaryComponent->OnBoundaryChanged.AddWeakLambda(AreaMeshComponent,
+					[AreaMeshComponent]<typename T>(T&& Boundary)
+					{
+						AreaMeshComponent->SetMeshByWorldBoundary(Forward<T>(Boundary));
+					});
+			}
 		});
+	}
+
+	virtual void AttachServerMachineComponents() override
+	{
+		auto AreaBoundaryComponent = NewObject<UAreaBoundaryComponent>(this);
+		AreaBoundaryComponent->ResetToStartingBoundary(GetActorLocation());
+		AreaBoundaryComponent->RegisterComponent();
 	}
 };

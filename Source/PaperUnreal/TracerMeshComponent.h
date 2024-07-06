@@ -179,14 +179,14 @@ public:
 
 	const FSegmentArray2D& GetPath() const { return Path; }
 
-	void SetNoPathArea(UAreaMeshComponent* Area)
+	void SetNoPathArea(UAreaBoundaryComponent* Area)
 	{
 		NoPathArea = Area;
 	}
 
 private:
 	UPROPERTY()
-	UAreaMeshComponent* NoPathArea;
+	UAreaBoundaryComponent* NoPathArea;
 
 	bool bGeneratedThisFrame = false;
 	FSegmentArray2D Path;

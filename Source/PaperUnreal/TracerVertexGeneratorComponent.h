@@ -70,8 +70,7 @@ private:
 					auto [Left, Right] = CreateVertexPositions(*Event.Point, *Event.PathDirection);
 					if (VertexDestination->GetVertexCount() == 0)
 					{
-						Left = VertexAttachmentTarget->FindClosestPointOnBoundary2D(Left).GetPoint();
-						Right = VertexAttachmentTarget->FindClosestPointOnBoundary2D(Right).GetPoint();
+						AttachVerticesToAttachmentTarget(Left, Right);
 					}
 					VertexDestination->AppendVertices(Left, Right);
 				}
@@ -83,8 +82,7 @@ private:
 				else if (Event.GenerationEnded())
 				{
 					auto [Left, Right] = VertexDestination->GetLastVertices();
-					Left = VertexAttachmentTarget->FindClosestPointOnBoundary2D(Left).GetPoint();
-					Right = VertexAttachmentTarget->FindClosestPointOnBoundary2D(Right).GetPoint();
+					AttachVerticesToAttachmentTarget(Left, Right);
 					VertexDestination->SetLastVertices(Left, Right);
 				}
 			}
@@ -95,5 +93,14 @@ private:
 	{
 		const FVector2D Right{-Forward.Y, Forward.X};
 		return {Center - 5.f * Right, Center + 5.f * Right};
+	}
+
+	void AttachVerticesToAttachmentTarget(FVector2D& Left, FVector2D& Right) const
+	{
+		if (VertexAttachmentTarget->IsValid())
+		{
+			Left = VertexAttachmentTarget->FindClosestPointOnBoundary2D(Left).GetPoint();
+			Right = VertexAttachmentTarget->FindClosestPointOnBoundary2D(Right).GetPoint();
+		}
 	}
 };

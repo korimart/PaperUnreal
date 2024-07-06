@@ -42,10 +42,8 @@ public:
 	{
 		check(GetNetMode() != NM_Client);
 
-		AAreaActor* Ret = GetWorld()->SpawnActor<AAreaActor>();
-
 		// TODO 제대로 된 좌표 입력
-		Ret->SetActorLocation({1000.f + 500.f * TeamIndex, 1800.f, 50.f});
+		AAreaActor* Ret = GetWorld()->SpawnActor<AAreaActor>({1000.f + 500.f * TeamIndex, 1800.f, 50.f}, {});
 		Ret->TeamComponent->SetTeamIndex(TeamIndex);
 		RepSpawnedAreas.Add(Ret);
 		OnAreaTeamReady(Ret, TeamIndex);

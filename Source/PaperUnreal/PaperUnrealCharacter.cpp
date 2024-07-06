@@ -67,13 +67,11 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 		const int32 MyTeamIndex = co_await MyTeamComponent->GetTeamIndex().WaitForValue(this);
 		UAreaSpawnerComponent* AreaSpawnerComponent = co_await WaitForComponent<UAreaSpawnerComponent>(GameState);
 		AAreaActor* MyTeamArea = co_await AreaSpawnerComponent->WaitForAreaOfTeam(MyTeamIndex);
-		UAreaMeshComponent* AreaMeshComponent = MyTeamArea->AreaMeshComponent;
+		UAreaMeshComponent* AreaMeshComponent = co_await WaitForComponent<UAreaMeshComponent>(MyTeamArea);
 
 		UResourceRegistryComponent* RR = co_await WaitForComponent<UResourceRegistryComponent>(GameState);
-		if (!co_await RR->GetbResourcesLoaded().WaitForValue(this))
-		{
-			co_return;
-		}
+		// TODO graceful exit
+		check(co_await RR->GetbResourcesLoaded().WaitForValue(this));
 
 		ITracerPathGenerator* TracerVertexSource = nullptr;
 		if (GetNetMode() == NM_Standalone || GetNetMode() == NM_ListenServer)
@@ -106,13 +104,13 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		const int32 MyTeamIndex = co_await MyTeamComponent->GetTeamIndex().WaitForValue(this);
 		UAreaSpawnerComponent* AreaSpawnerComponent = co_await WaitForComponent<UAreaSpawnerComponent>(GameState);
 		AAreaActor* MyTeamArea = co_await AreaSpawnerComponent->WaitForAreaOfTeam(MyTeamIndex);
-		UAreaMeshComponent* AreaMeshComponent = MyTeamArea->AreaMeshComponent;
+		UAreaBoundaryComponent* AreaBoundaryComponent = co_await WaitForComponent<UAreaBoundaryComponent>(MyTeamArea);
 
 		// TODO 아래 컴포넌트들은 위에 먼저 부착된 컴포넌트들에 의존함
 		// 컴포넌트를 갈아끼울 때 이러한 의존성에 대한 경고를 하는 메카니즘이 존재하지 않음
 
 		auto TracerPath = NewObject<UTracerPathComponent>(this);
-		TracerPath->SetNoPathArea(AreaMeshComponent);
+		TracerPath->SetNoPathArea(AreaBoundaryComponent);
 		TracerPath->RegisterComponent();
 
 		if (GetNetMode() == NM_ListenServer || GetNetMode() == NM_DedicatedServer)
@@ -124,7 +122,7 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 
 		auto TracerToAreaConverter = NewObject<UTracerToAreaConverterComponent>(this);
 		TracerToAreaConverter->SetTracer(TracerPath);
-		TracerToAreaConverter->SetConversionDestination(AreaMeshComponent);
+		TracerToAreaConverter->SetConversionDestination(AreaBoundaryComponent);
 		TracerToAreaConverter->RegisterComponent();
 
 		RunWeakCoroutine(this, [
@@ -138,13 +136,15 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 				Context.AddToWeakList(TracerToAreaConverter);
 
 				auto SpawnedAreaGenerator = AreaSpawnerComponent->CreateSpawnedAreaGenerator();
-			
+
 				while (true)
 				{
 					if (AAreaActor* Area = co_await SpawnedAreaGenerator.Next(); MyTeamArea != Area)
 					{
+						auto AreaBoundaryComponent = co_await WaitForComponent<UAreaBoundaryComponent>(Area);
+						
 						auto AreaSlasherComponent = NewObject<UAreaSlasherComponent>(this);
-						AreaSlasherComponent->SetSlashTarget(Area->AreaMeshComponent);
+						AreaSlasherComponent->SetSlashTarget(AreaBoundaryComponent);
 						AreaSlasherComponent->SetTracerToAreaConverter(TracerToAreaConverter);
 						AreaSlasherComponent->RegisterComponent();
 					}

@@ -23,7 +23,7 @@ public:
 		Tracer = InTracer;
 	}
 	
-	void SetConversionDestination(UAreaMeshComponent* Destination)
+	void SetConversionDestination(UAreaBoundaryComponent* Destination)
 	{
 		ConversionDestination = Destination;
 	}
@@ -38,7 +38,7 @@ private:
 	UTracerPathComponent* Tracer;
 
 	UPROPERTY()
-	UAreaMeshComponent* ConversionDestination;
+	UAreaBoundaryComponent* ConversionDestination;
 
 	UTracerToAreaConverterComponent()
 	{
@@ -55,7 +55,7 @@ private:
 		{
 			if (Event.GenerationEnded())
 			{
-				if (TOptional<UAreaMeshComponent::FExpansionResult> Result
+				if (TOptional<UAreaBoundaryComponent::FExpansionResult> Result
 					= ConversionDestination->ExpandByPath(Tracer->GetPath()))
 				{
 					OnTracerToAreaConversion.Broadcast(Tracer->GetPath(), Result->bAddedToTheLeftOfPath);
