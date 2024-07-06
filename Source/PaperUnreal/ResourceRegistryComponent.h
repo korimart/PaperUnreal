@@ -66,6 +66,7 @@ private:
 				FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Red_Light.MI_Solid_Red_Light'")}
 			};
 
+			// TODO 이 코루틴이 살아있는 동안 UObject의 생명을 연장시키는 기능 추가
 			auto SolidBlueAwaitable = RequestAsyncLoad(SoftSolidBlue, this, [this](UMaterialInstance* Material)
 			{
 				TeamToAreaMaterialMap.FindOrAdd(0) = Material;
