@@ -4,13 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "AreaActor.h"
-#include "Core/ActorComponentEx.h"
+#include "Core/ActorComponent2.h"
 #include "Core/LiveData.h"
 #include "AreaSpawnerComponent.generated.h"
 
 
 UCLASS()
-class UAreaSpawnerComponent : public UActorComponentEx
+class UAreaSpawnerComponent : public UActorComponent2
 {
 	GENERATED_BODY()
 

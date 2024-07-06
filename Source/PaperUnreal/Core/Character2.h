@@ -5,11 +5,11 @@
 #include "CoreMinimal.h"
 #include "UECoroutine.h"
 #include "GameFramework/Character.h"
-#include "CharacterEx.generated.h"
+#include "Character2.generated.h"
 
 
 UCLASS()
-class ACharacterEx : public ACharacter
+class ACharacter2 : public ACharacter
 {
 	GENERATED_BODY()
 

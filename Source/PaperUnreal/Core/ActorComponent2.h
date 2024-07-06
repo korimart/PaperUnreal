@@ -4,11 +4,11 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "ActorComponentEx.generated.h"
+#include "ActorComponent2.generated.h"
 
 
 UCLASS()
-class UActorComponentEx : public UActorComponent
+class UActorComponent2 : public UActorComponent
 {
 	GENERATED_BODY()
 

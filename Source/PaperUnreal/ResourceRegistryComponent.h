@@ -3,14 +3,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Core/ActorComponentEx.h"
+#include "Core/ActorComponent2.h"
 #include "Core/LiveData.h"
 #include "Core/Utils.h"
 #include "ResourceRegistryComponent.generated.h"
 
 
 UCLASS(Within=GameStateBase)
-class UResourceRegistryComponent : public UActorComponentEx
+class UResourceRegistryComponent : public UActorComponent2
 {
 	GENERATED_BODY()
 

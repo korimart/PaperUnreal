@@ -6,13 +6,13 @@
 #include "AreaMeshComponent.h"
 #include "TracerMeshComponent.h"
 #include "TracerPathGenerator.h"
-#include "Core/ActorComponentEx.h"
+#include "Core/ActorComponent2.h"
 #include "Core/Utils.h"
 #include "TracerVertexGeneratorComponent.generated.h"
 
 
 UCLASS()
-class UTracerVertexGeneratorComponent : public UActorComponentEx
+class UTracerVertexGeneratorComponent : public UActorComponent2
 {
 	GENERATED_BODY()
 

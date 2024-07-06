@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "TracerMeshComponent.h"
 #include "TracerPathGenerator.h"
-#include "Core/ActorComponentEx.h"
+#include "Core/ActorComponent2.h"
 #include "Net/UnrealNetwork.h"
 #include "ReplicatedTracerPathComponent.generated.h"
 
@@ -61,7 +61,7 @@ struct FReplicatedTracerEvent
 
 
 UCLASS()
-class UReplicatedTracerPathComponent : public UActorComponentEx, public ITracerPathGenerator
+class UReplicatedTracerPathComponent : public UActorComponent2, public ITracerPathGenerator
 {
 	GENERATED_BODY()
 

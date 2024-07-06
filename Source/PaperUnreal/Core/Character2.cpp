@@ -1,12 +1,12 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "CharacterEx.h"
+#include "Character2.h"
 
 #include "Utils.h"
 #include "GameFramework/PlayerState.h"
 
-TWeakAwaitable<AController*> ACharacterEx::WaitForController()
+TWeakAwaitable<AController*> ACharacter2::WaitForController()
 {
 	if (AController* ValidController = ValidOrNull(GetController()))
 	{
@@ -16,7 +16,7 @@ TWeakAwaitable<AController*> ACharacterEx::WaitForController()
 	return WaitForBroadcast(this, OnControllerChanged);
 }
 
-TWeakAwaitable<APlayerState*> ACharacterEx::WaitForPlayerState()
+TWeakAwaitable<APlayerState*> ACharacter2::WaitForPlayerState()
 {
 	if (APlayerState* ValidPlayerState = ValidOrNull(GetPlayerState()))
 	{
@@ -26,19 +26,19 @@ TWeakAwaitable<APlayerState*> ACharacterEx::WaitForPlayerState()
 	return WaitForBroadcast(this, OnNewPlayerState);
 }
 
-void ACharacterEx::NotifyControllerChanged()
+void ACharacter2::NotifyControllerChanged()
 {
 	Super::NotifyControllerChanged();
 	OnControllerChanged.Broadcast(GetController());
 }
 
-void ACharacterEx::OnPlayerStateChanged(APlayerState* NewPlayerState, APlayerState* OldPlayerState)
+void ACharacter2::OnPlayerStateChanged(APlayerState* NewPlayerState, APlayerState* OldPlayerState)
 {
 	Super::OnPlayerStateChanged(NewPlayerState, OldPlayerState);
 	OnNewPlayerState.Broadcast(NewPlayerState);
 }
 
-void ACharacterEx::BeginPlay()
+void ACharacter2::BeginPlay()
 {
 	Super::BeginPlay();
 

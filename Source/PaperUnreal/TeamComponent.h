@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Core/ActorComponentEx.h"
+#include "Core/ActorComponent2.h"
 #include "Core/LiveData.h"
 #include "Core/Utils.h"
 #include "Net/UnrealNetwork.h"
@@ -11,7 +11,7 @@
 
 
 UCLASS()
-class UTeamComponent : public UActorComponentEx
+class UTeamComponent : public UActorComponent2
 {
 	GENERATED_BODY()
 

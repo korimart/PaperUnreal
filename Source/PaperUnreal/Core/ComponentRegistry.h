@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "ActorComponentEx.h"
+#include "ActorComponent2.h"
 #include "UECoroutine.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "ComponentRegistry.generated.h"
@@ -57,7 +57,7 @@ private:
 
 template <typename ComponentType>
 	// 현재 UActorComponentEx만 Registry를 사용하므로 실수 다른 컴포넌트를 넣지 않도록 체크
-	requires std::is_base_of_v<UActorComponentEx, ComponentType>
+	requires std::is_base_of_v<UActorComponent2, ComponentType>
 TWeakAwaitable<ComponentType*> WaitForComponent(AActor* Owner)
 {
 	if (!IsValid(Owner))

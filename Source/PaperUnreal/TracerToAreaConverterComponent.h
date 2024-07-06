@@ -5,12 +5,12 @@
 #include "CoreMinimal.h"
 #include "AreaMeshComponent.h"
 #include "TracerMeshComponent.h"
-#include "Core/ActorComponentEx.h"
+#include "Core/ActorComponent2.h"
 #include "TracerToAreaConverterComponent.generated.h"
 
 
 UCLASS()
-class UTracerToAreaConverterComponent : public UActorComponentEx
+class UTracerToAreaConverterComponent : public UActorComponent2
 {
 	GENERATED_BODY()
 

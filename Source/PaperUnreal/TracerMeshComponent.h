@@ -7,7 +7,7 @@
 #include "TracerPathGenerator.h"
 #include "Core/SegmentArray.h"
 #include "Components/DynamicMeshComponent.h"
-#include "Core/ActorComponentEx.h"
+#include "Core/ActorComponent2.h"
 #include "Core/Utils.h"
 #include "TracerMeshComponent.generated.h"
 
@@ -62,7 +62,7 @@ private:
 
 
 UCLASS()
-class UTracerMeshComponent : public UActorComponentEx
+class UTracerMeshComponent : public UActorComponent2
 {
 	GENERATED_BODY()
 
@@ -166,7 +166,7 @@ private:
 
 
 UCLASS()
-class UTracerPathComponent : public UActorComponentEx, public ITracerPathGenerator
+class UTracerPathComponent : public UActorComponent2, public ITracerPathGenerator
 {
 	GENERATED_BODY()
 

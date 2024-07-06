@@ -3,11 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Core/CharacterEx.h"
+#include "Core/Character2.h"
 #include "PaperUnrealCharacter.generated.h"
 
 UCLASS(Blueprintable)
-class APaperUnrealCharacter : public ACharacterEx
+class APaperUnrealCharacter : public ACharacter2
 {
 	GENERATED_BODY()
 
