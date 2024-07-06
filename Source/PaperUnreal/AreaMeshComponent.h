@@ -132,6 +132,12 @@ public:
 	{
 		LastSetWorldBoundary = Forward<LoopedSegmentArray2DType>(WorldBoundary);
 
+		if (!LastSetWorldBoundary.IsValid())
+		{
+			DynamicMeshComponent->GetDynamicMesh()->Reset();
+			return;
+		}
+
 		FLoopedSegmentArray2D LocalBoundary = LastSetWorldBoundary;
 		LocalBoundary.ApplyToEachPoint([&](FVector2D& Each) { Each = WorldToLocal2D(Each); });
 

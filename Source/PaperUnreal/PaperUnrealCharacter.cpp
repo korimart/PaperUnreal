@@ -74,13 +74,13 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 		check(co_await RR->GetbResourcesLoaded().WaitForValue(this));
 
 		ITracerPathGenerator* TracerVertexSource = nullptr;
-		if (GetNetMode() == NM_Standalone || GetNetMode() == NM_ListenServer)
+		if (GetNetMode() == NM_Client)
 		{
-			TracerVertexSource = co_await WaitForComponent<UTracerPathComponent>(this);
+			TracerVertexSource = co_await WaitForComponent<UReplicatedTracerPathComponent>(this);
 		}
 		else
 		{
-			TracerVertexSource = co_await WaitForComponent<UReplicatedTracerPathComponent>(this);
+			TracerVertexSource = co_await WaitForComponent<UTracerPathComponent>(this);
 		}
 
 		auto TracerMesh = NewObject<UTracerMeshComponent>(this);
@@ -113,7 +113,7 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		TracerPath->SetNoPathArea(AreaBoundaryComponent);
 		TracerPath->RegisterComponent();
 
-		if (GetNetMode() == NM_ListenServer || GetNetMode() == NM_DedicatedServer)
+		if (GetNetMode() != NM_Standalone)
 		{
 			auto TracerPathReplicator = NewObject<UReplicatedTracerPathComponent>(this);
 			TracerPathReplicator->SetTracerPathSource(TracerPath);

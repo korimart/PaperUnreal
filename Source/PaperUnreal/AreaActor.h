@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "AreaMeshComponent.h"
+#include "ReplicatedAreaBoundaryComponent.h"
 #include "ResourceRegistryComponent.h"
 #include "TeamComponent.h"
 #include "Core/Actor2.h"
@@ -45,18 +46,23 @@ private:
 			AreaMeshComponent->RegisterComponent();
 			AreaMeshComponent->ConfigureMaterialSet({RR->GetAreaMaterialFor(TeamIndex)});
 
-			if (GetNetMode() == NM_Client)
+			const auto SetUpAreaBoundaryWithAreaMesh = [AreaMeshComponent](auto AreaBoundary)
 			{
-			}
-			else
-			{
-				auto AreaBoundaryComponent = co_await WaitForComponent<UAreaBoundaryComponent>(this);
-				AreaMeshComponent->SetMeshByWorldBoundary(AreaBoundaryComponent->GetBoundary());
-				AreaBoundaryComponent->OnBoundaryChanged.AddWeakLambda(AreaMeshComponent,
+				AreaMeshComponent->SetMeshByWorldBoundary(AreaBoundary->GetBoundary());
+				AreaBoundary->OnBoundaryChanged.AddWeakLambda(AreaMeshComponent,
 					[AreaMeshComponent]<typename T>(T&& Boundary)
 					{
 						AreaMeshComponent->SetMeshByWorldBoundary(Forward<T>(Boundary));
 					});
+			};
+
+			if (GetNetMode() == NM_Client)
+			{
+				SetUpAreaBoundaryWithAreaMesh(co_await WaitForComponent<UReplicatedAreaBoundaryComponent>(this));
+			}
+			else
+			{
+				SetUpAreaBoundaryWithAreaMesh(co_await WaitForComponent<UAreaBoundaryComponent>(this));
 			}
 		});
 	}
@@ -66,5 +72,12 @@ private:
 		auto AreaBoundaryComponent = NewObject<UAreaBoundaryComponent>(this);
 		AreaBoundaryComponent->ResetToStartingBoundary(GetActorLocation());
 		AreaBoundaryComponent->RegisterComponent();
+
+		if (GetNetMode() != NM_Standalone)
+		{
+			auto ReplicatedAreaBoundary = NewObject<UReplicatedAreaBoundaryComponent>(this);
+			ReplicatedAreaBoundary->SetAreaBoundarySource(AreaBoundaryComponent);
+			ReplicatedAreaBoundary->RegisterComponent();
+		}
 	}
 };
