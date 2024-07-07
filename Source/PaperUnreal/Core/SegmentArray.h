@@ -119,9 +119,14 @@ public:
 	{
 	}
 
-	const TArray<FVector2D>& GetPoints() const
+	const TArray<FVector2D>& GetPoints() const &
 	{
 		return Points;
+	}
+	
+	TArray<FVector2D> GetPoints() &&
+	{
+		return MoveTemp(Points);
 	}
 
 	int32 PointCount() const
@@ -581,3 +586,10 @@ private:
 
 using FSegmentArray2D = TSegmentArray2D<false>;
 using FLoopedSegmentArray2D = TSegmentArray2D<true>;
+
+
+template <typename T>
+concept CSegmentArray2D = std::is_convertible_v<T, FSegmentArray2D>;
+
+template <typename T>
+concept CLoopedSegmentArray2D = std::is_convertible_v<T, FLoopedSegmentArray2D>;

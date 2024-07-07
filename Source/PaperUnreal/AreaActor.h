@@ -42,27 +42,17 @@ private:
 
 			const int32 TeamIndex = co_await TeamComponent->GetTeamIndex().WaitForValue(this);
 
-			auto AreaMeshComponent = NewObject<UAreaMeshComponent>(this);
-			AreaMeshComponent->RegisterComponent();
-			AreaMeshComponent->ConfigureMaterialSet({RR->GetAreaMaterialFor(TeamIndex)});
-
-			const auto SetUpAreaBoundaryWithAreaMesh = [AreaMeshComponent](auto AreaBoundary)
-			{
-				AreaMeshComponent->SetMeshByWorldBoundary(AreaBoundary->GetBoundary());
-				AreaBoundary->OnBoundaryChanged.AddWeakLambda(AreaMeshComponent,
-					[AreaMeshComponent]<typename T>(T&& Boundary)
-					{
-						AreaMeshComponent->SetMeshByWorldBoundary(Forward<T>(Boundary));
-					});
-			};
+			auto AreaMesh = NewObject<UAreaMeshComponent>(this);
+			AreaMesh->RegisterComponent();
+			AreaMesh->ConfigureMaterialSet({RR->GetAreaMaterialFor(TeamIndex)});
 
 			if (GetNetMode() == NM_Client)
 			{
-				SetUpAreaBoundaryWithAreaMesh(co_await WaitForComponent<UReplicatedAreaBoundaryComponent>(this));
+				SetUpAreaBoundaryWithAreaMesh(AreaMesh, co_await WaitForComponent<UReplicatedAreaBoundaryComponent>(this));
 			}
 			else
 			{
-				SetUpAreaBoundaryWithAreaMesh(co_await WaitForComponent<UAreaBoundaryComponent>(this));
+				SetUpAreaBoundaryWithAreaMesh(AreaMesh, co_await WaitForComponent<UAreaBoundaryComponent>(this));
 			}
 		});
 	}
@@ -80,4 +70,13 @@ private:
 			ReplicatedAreaBoundary->RegisterComponent();
 		}
 	}
+
+	static void SetUpAreaBoundaryWithAreaMesh(UAreaMeshComponent* AreaMesh, auto AreaBoundary)
+	{
+		AreaMesh->SetMeshByWorldBoundary(AreaBoundary->GetBoundary());
+		AreaBoundary->OnBoundaryChanged.AddWeakLambda(AreaMesh, [AreaMesh]<typename T>(T&& Boundary)
+		{
+			AreaMesh->SetMeshByWorldBoundary(Forward<T>(Boundary));
+		});
+	};
 };

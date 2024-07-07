@@ -10,7 +10,9 @@
 #include "EnhancedInputComponent.h"
 #include "InputActionValue.h"
 #include "EnhancedInputSubsystems.h"
+#include "Development/InGameCheats.h"
 #include "Engine/LocalPlayer.h"
+#include "GameFramework/CheatManager.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -32,6 +34,9 @@ void APaperUnrealPlayerController::BeginPlay()
 	{
 		Subsystem->AddMappingContext(DefaultMappingContext, 0);
 	}
+
+	EnableCheats();
+	CheatManager->AddCheatManagerExtension(NewObject<UInGameCheats>(CheatManager));
 }
 
 void APaperUnrealPlayerController::SetupInputComponent()

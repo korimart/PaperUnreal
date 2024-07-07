@@ -53,9 +53,9 @@ private:
 		check(AllValid(BoundarySource));
 
 		RepPoints = BoundarySource->GetBoundary().GetPoints();
-		BoundarySource->OnBoundaryChanged.AddWeakLambda(this, [this](auto&& Boundary)
+		BoundarySource->OnBoundaryChanged.AddWeakLambda(this, [this]<typename T>(T&& Boundary)
 		{
-			RepPoints = Boundary.GetPoints();
+			RepPoints = Forward<T>(Boundary).GetPoints();
 		});
 	}
 

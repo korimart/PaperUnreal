@@ -126,11 +126,10 @@ class UAreaMeshComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	template <typename LoopedSegmentArray2DType>
-		requires std::is_convertible_v<LoopedSegmentArray2DType, FLoopedSegmentArray2D>
-	void SetMeshByWorldBoundary(LoopedSegmentArray2DType&& WorldBoundary)
+	template <CLoopedSegmentArray2D T>
+	void SetMeshByWorldBoundary(T&& WorldBoundary)
 	{
-		LastSetWorldBoundary = Forward<LoopedSegmentArray2DType>(WorldBoundary);
+		LastSetWorldBoundary = Forward<T>(WorldBoundary);
 
 		if (!LastSetWorldBoundary.IsValid())
 		{
