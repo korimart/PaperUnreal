@@ -6,6 +6,7 @@
 #include "AreaMeshComponent.h"
 #include "Vector2DArrayReplicatorComponent.h"
 #include "Core/ActorComponent2.h"
+#include "Core/ComponentRegistry.h"
 #include "ReplicatedAreaBoundaryComponent.generated.h"
 
 
@@ -17,21 +18,30 @@ class UReplicatedAreaBoundaryComponent : public UActorComponent2, public IVector
 public:
 	virtual TValueGenerator<FVector2DArrayEvent> CreateEventGenerator() override
 	{
+		check(IsValid(Replicator)); // did you wait for init complete?
 		return Replicator->CreateEventGenerator();
 	}
-	
+
 	void SetAreaBoundarySource(UAreaBoundaryComponent* Source)
 	{
 		BoundarySource = Source;
 	}
-	
+
+	TWeakAwaitable<bool> WaitForClientInitComplete()
+	{
+		check(GetNetMode() == NM_Client);
+		return CreateAwaitableToArray(IsValid(Replicator), true, InitAwaitableHandles);
+	}
+
 private:
 	UPROPERTY()
 	UAreaBoundaryComponent* BoundarySource;
-	
-	UPROPERTY(Replicated)
+
+	UPROPERTY(ReplicatedUsing=OnRep_Replicator)
 	UVector2DArrayReplicatorComponent* Replicator;
-	
+
+	TArray<TWeakAwaitableHandle<bool>> InitAwaitableHandles;
+
 	UReplicatedAreaBoundaryComponent()
 	{
 		bWantsInitializeComponent = true;
@@ -59,6 +69,15 @@ private:
 				Replicator->SetFromEvent(co_await Events.Next());
 			}
 		});
+	}
+
+	UFUNCTION()
+	void OnRep_Replicator()
+	{
+		if (IsValid(Replicator))
+		{
+			FlushAwaitablesArray(InitAwaitableHandles, true);
+		}
 	}
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override

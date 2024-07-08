@@ -50,7 +50,9 @@ private:
 			IVectorArray2DEventGenerator* AreaBoundaryGenerator = nullptr;
 			if (GetNetMode() == NM_Client)
 			{
-				AreaBoundaryGenerator = co_await WaitForComponent<UReplicatedAreaBoundaryComponent>(this);
+				auto ReplicatedAreaBoundary = co_await WaitForComponent<UReplicatedAreaBoundaryComponent>(this);
+				co_await ReplicatedAreaBoundary->WaitForClientInitComplete();
+				AreaBoundaryGenerator = ReplicatedAreaBoundary;
 			}
 			else
 			{

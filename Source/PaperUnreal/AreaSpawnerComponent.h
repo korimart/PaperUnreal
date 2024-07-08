@@ -35,7 +35,7 @@ public:
 
 	TValueGenerator<AAreaActor*> CreateSpawnedAreaGenerator()
 	{
-		return CreateMulticastValueGenerator(this, RepSpawnedAreas, OnAreaSpawned);
+		return CreateMulticastValueGenerator(RepSpawnedAreas, OnAreaSpawned);
 	}
 
 	AAreaActor* SpawnAreaAtRandomEmptyLocation(int32 TeamIndex)

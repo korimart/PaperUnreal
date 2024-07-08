@@ -70,7 +70,7 @@ public:
 	{
 		TArray<FTracerPathEvent> Initial;
 		Algo::Copy(RepEvents, Initial);
-		return CreateMulticastValueGenerator(this, Initial, OnPathEvent);
+		return CreateMulticastValueGenerator(Initial, OnPathEvent);
 	}
 
 	void SetTracerPathSource(UTracerPathComponent* Source)

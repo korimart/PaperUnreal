@@ -97,8 +97,7 @@ class UVector2DArrayReplicatorComponent : public UActorComponent2, public IVecto
 public:
 	virtual TValueGenerator<FVector2DArrayEvent> CreateEventGenerator() override
 	{
-		return CreateMulticastValueGenerator(
-			this, RepArray.CompareAndCreateEvents({}), OnEvent);
+		return CreateMulticastValueGenerator(RepArray.CompareAndCreateEvents({}), OnEvent);
 	}
 
 	const TArray<FVector2D>& GetArray() const

@@ -19,7 +19,7 @@ class UAreaBoundaryComponent : public UActorComponent2, public IVectorArray2DEve
 public:
 	virtual TValueGenerator<FVector2DArrayEvent> CreateEventGenerator() override
 	{
-		return CreateMulticastValueGenerator(this, TArray{CreateResetEvent()}, OnEvent);
+		return CreateMulticastValueGenerator(TArray{CreateResetEvent()}, OnEvent);
 	}
 
 	void ResetToStartingBoundary(const FVector& Location)

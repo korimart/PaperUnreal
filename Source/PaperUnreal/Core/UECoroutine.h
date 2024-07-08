@@ -278,12 +278,18 @@ public:
 		}
 	}
 
+	bool IsWaitingForValue() const
+	{
+		return Impl && !bSetValue;
+	}
+
 	template <typename ArgType>
 	void SetValue(ArgType&& Arg)
 	{
 		check(!bSetValue);
 		bSetValue = true;
 		Impl->SetValue(Forward<ArgType>(Arg));
+		Impl = nullptr;
 	}
 
 	template <typename ArgType>
@@ -469,38 +475,60 @@ private:
 
 
 template <typename T>
-class TValueGenerator
+class TValueGeneratorValueReceiver
 {
 public:
-	DECLARE_DELEGATE_RetVal(TWeakAwaitable<T>, FOnReadyValuesDeprived);
-	
-	TValueGenerator(TArray<T> InReadyValues, FOnReadyValuesDeprived OnDeprived)
-		: ReadyValues(MoveTemp(InReadyValues)), OnReadyValuesDeprived(MoveTemp(OnDeprived))
+	template <typename U>
+	void AddValue(U&& Value)
 	{
-	}
-	
-	TWeakAwaitable<T> Next()
-	{
-		if (ReadyValues.IsValidIndex(0))
+		if (ValueAwaitableHandles.Num() > 0)
 		{
-			TWeakAwaitable<T> Ret{ReadyValues[0]};
-			ReadyValues.RemoveAt(0);
+			auto Handle = MoveTemp(ValueAwaitableHandles[0]);
+			ValueAwaitableHandles.RemoveAt(0);
+			Handle.SetValue(Forward<U>(Value));
+		}
+		else
+		{
+			Values.Add(Forward<U>(Value));
+		}
+	}
+
+	TWeakAwaitable<T> GetValue()
+	{
+		if (Values.Num() > 0)
+		{
+			TWeakAwaitable<T> Ret{MoveTemp(Values[0])};
+			Values.RemoveAt(0);
 			return Ret;
 		}
 
-		if (OnReadyValuesDeprived.IsBound())
-		{
-			return OnReadyValuesDeprived.Execute();
-		}
-
 		TWeakAwaitable<T> Ret;
-		Ret.SetNeverReady();
+		ValueAwaitableHandles.Add(Ret.GetHandle());
 		return Ret;
 	}
 
 private:
-	TArray<T> ReadyValues;
-	FOnReadyValuesDeprived OnReadyValuesDeprived;
+	TArray<T> Values;
+	TArray<TWeakAwaitableHandle<T>> ValueAwaitableHandles;
+};
+
+
+template <typename T>
+class TValueGenerator
+{
+public:
+	TWeakPtr<TValueGeneratorValueReceiver<T>> GetReceiver() const
+	{
+		return Receiver;
+	}
+	
+	TWeakAwaitable<T> Next()
+	{
+		return Receiver->GetValue();
+	}
+
+private:
+	TSharedPtr<TValueGeneratorValueReceiver<T>> Receiver = MakeShared<TValueGeneratorValueReceiver<T>>();
 };
 
 
@@ -545,6 +573,20 @@ void RunWeakCoroutine(UObject* Lifetime, FuncType&& Func)
 }
 
 
+template <typename T>
+TWeakAwaitable<T> CreateAwaitableToArray(bool bCondition, const T& ReadyValue, TArray<TWeakAwaitableHandle<T>>& Array)
+{
+	if (bCondition)
+	{
+		return ReadyValue;
+	}
+
+	TWeakAwaitable<T> Ret;
+	Array.Add(Ret.GetHandle());
+	return Ret;
+}
+
+
 template <typename T, typename U>
 void FlushAwaitablesArray(TArray<TWeakAwaitableHandle<T>>& Array, const U& Value)
 {
@@ -556,20 +598,22 @@ void FlushAwaitablesArray(TArray<TWeakAwaitableHandle<T>>& Array, const U& Value
 }
 
 
-template <typename T>
-TValueGenerator<T> CreateMulticastValueGenerator(UObject* MulticastOwner, const TArray<T>& ReadyValues, auto& MulticastDelegate)
+template <typename T, typename DelegateType>
+TValueGenerator<T> CreateMulticastValueGenerator(const TArray<T>& ReadyValues, DelegateType& MulticastDelegate)
 {
-	using FOnReadyValuesDeprived = typename TValueGenerator<T>::FOnReadyValuesDeprived;
-	TValueGenerator Ret
+	TValueGenerator<T> Ret;
+	
+	auto Receiver = Ret.GetReceiver();
+	for (const T& Each : ReadyValues)
 	{
-		ReadyValues,
-		FOnReadyValuesDeprived::CreateWeakLambda(MulticastOwner, [MulticastOwner, &MulticastDelegate]()
-		{
-			TWeakAwaitable<T> Ret;
-			Ret.SetValueFromMulticastDelegate(MulticastOwner, MulticastDelegate);
-			return Ret;
-		}),
-	};
+		Receiver.Pin()->AddValue(Each);
+	}
+
+	MulticastDelegate.Add(DelegateType::FDelegate::CreateSPLambda(Receiver.Pin().ToSharedRef(), [Receiver]<typename U>(U&& NewValue)
+	{
+		Receiver.Pin()->AddValue(Forward<U>(NewValue));
+	}));
+	
 	return Ret;
 }
 

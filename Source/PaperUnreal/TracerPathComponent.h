@@ -18,7 +18,7 @@ public:
 	// UTracerPathComponent의 구현은 옛날 Event를 기록하지 않음 (새 Event만 받을 수 있음)
 	virtual TValueGenerator<FTracerPathEvent> CreatePathEventGenerator() override
 	{
-		return CreateMulticastValueGenerator(this, TArray<FTracerPathEvent>{}, OnPathEvent);
+		return CreateMulticastValueGenerator(TArray<FTracerPathEvent>{}, OnPathEvent);
 	}
 
 	const FSegmentArray2D& GetPath() const { return Path; }
