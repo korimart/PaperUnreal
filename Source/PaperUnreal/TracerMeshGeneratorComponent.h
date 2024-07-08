@@ -57,7 +57,8 @@ private:
 		{
 			for (auto PathEventGenerator = MeshSource->CreatePathEventGenerator();;)
 			{
-				// const FTracerPathEvent Event = co_await PathEventGenerator.Next();
+				const FTracerPathEvent Event = co_await PathEventGenerator.Next();
+				UE_LOG(LogTemp, Warning, TEXT("Event %d"), Event.Affected.Num());
 				//
 				// if (Event.IsReset())
 				// {

@@ -63,7 +63,7 @@ struct FRepByteArray
 	void SetLast(ArrayType&& NewArray)
 	{
 		check(Array.Num() >= NewArray.Num());
-		
+
 		if (NewArray.Num() > 0)
 		{
 			Array.SetNum(Array.Num() - NewArray.Num(), false);
@@ -94,9 +94,9 @@ struct FRepByteArray
 		}();
 
 		const int32 AppendedByteCount = Array.Num() - OldArray.Array.Num();
-		
+
 		TArray<FByteArrayEvent> Ret;
-		
+
 		if (ModifiedByteCount > 0)
 		{
 			Ret.Add({
@@ -133,7 +133,7 @@ class UByteArrayReplicatorComponent : public UActorComponent2
 public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnByteArrayEvent, const FByteArrayEvent&);
 	FOnByteArrayEvent OnByteArrayEvent;
-	
+
 	TValueGenerator<FByteArrayEvent> CreateEventGenerator()
 	{
 		return CreateMulticastValueGenerator(RepArray.CompareAndCreateEvents({}), OnByteArrayEvent);
@@ -252,35 +252,54 @@ concept CTypedByteArray = std::is_convertible_v<T, TArray<U>>;
 
 
 template <typename T>
-class TTypedByteArrayReplicatorView
+class TTypedByteArrayReplicatorView : public TSharedFromThis<TTypedByteArrayReplicatorView<T>>
 {
 public:
 	TTypedByteArrayReplicatorView(UByteArrayReplicatorComponent& Replicator)
 		: ByteArrayReplicator(Replicator)
 	{
 	}
+
+	TValueGenerator<TArrayEvent<T>> CreateTypedEventGenerator()
+	{
+		TValueGenerator<TArrayEvent<T>> Ret;
+		RunWeakCoroutine(this->AsShared(), [this, Receiver = Ret.GetReceiver()](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		{
+			Context.AddToWeakList(Receiver);
+			for (auto ByteEvents = ByteArrayReplicator.CreateEventGenerator();;)
+			{
+				Receiver.Pin()->AddValue(ToTypedEvent(co_await ByteEvents.Next()));
+			}
+		});
+		return Ret;
+	}
 	
 	void ResetArray(const TArray<T>& NewArray)
 	{
-		ByteArrayReplicator->ResetArray(Serialize(NewArray));
+		ByteArrayReplicator.ResetArray(Serialize(NewArray));
 	}
 
 	void AppendArray(const TArray<T>& NewArray)
 	{
-		ByteArrayReplicator->AppendArray(Serialize(NewArray));
+		ByteArrayReplicator.AppendArray(Serialize(NewArray));
 	}
 
 	void SetLast(const TArray<T>& NewArray)
 	{
-		ByteArrayReplicator->SetLast(Serialize(NewArray));
+		ByteArrayReplicator.SetLast(Serialize(NewArray));
 	}
 
 	void SetFromEvent(const TArrayEvent<T>& Event)
 	{
-		ByteArrayReplicator->SetFromEvent({
+		ByteArrayReplicator.SetFromEvent(FByteArrayEvent{
 			.Event = Event.Event,
 			.Affected = Serialize(Event.Affected),
 		});
+	}
+
+	TArrayEvent<T> ToTypedEvent(const FByteArrayEvent& Event)
+	{
+		return { .Event = Event.Event, .Affected = Deserialize(Event.Affected), };
 	}
 
 private:
@@ -292,8 +311,21 @@ private:
 		FMemoryWriter Writer{Serialized};
 		for (const T& Each : Source)
 		{
-			Writer << Each;
+			Writer << const_cast<T&>(Each);
 		}
 		return Serialized;
+	}
+	
+	TArray<T> Deserialize(const TArray<uint8>& Source)
+	{
+		FMemoryReader Reader{Source};
+		TArray<T> Ret;
+		while (!Reader.AtEnd())
+		{
+			T NewElement;
+			Reader << NewElement;
+			Ret.Add(NewElement);
+		}
+		return Ret;
 	}
 };

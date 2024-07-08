@@ -77,6 +77,7 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 		if (GetNetMode() == NM_Client)
 		{
 			TracerMeshSource = co_await WaitForComponent<UReplicatedTracerPathComponent>(this);
+			co_await Cast<UReplicatedTracerPathComponent>(TracerMeshSource)->WaitForClientInitComplete();
 		}
 		else
 		{

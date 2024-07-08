@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "ByteArrayReplicatorComponent.h"
-#include "Core/SegmentArray.h"
 #include "UObject/Interface.h"
 #include "TracerPathGenerator.generated.h"
 
@@ -20,12 +19,17 @@ struct FTracerPathPoint
 {
 	FVector2D Point;
 	FVector2D PathDirection;
+
+	friend FArchive& operator<<(FArchive& Ar, FTracerPathPoint& PathPoint)
+	{
+		Ar << PathPoint.Point;
+		Ar << PathPoint.PathDirection;
+		return Ar;
+	}
 };
 
 
-struct FTracerPathEvent : TArrayEvent<FTracerPathPoint>
-{
-};
+using FTracerPathEvent = TArrayEvent<FTracerPathPoint>;
 
 
 /**

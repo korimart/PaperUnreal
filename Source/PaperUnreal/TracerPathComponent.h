@@ -26,6 +26,7 @@ public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnCompletePathGenerated, const FSegmentArray2D&);
 	FOnCompletePathGenerated OnCompletePathGenerated;
 
+	// TODO maybe remove?
 	const FSegmentArray2D& GetPath() const { return Path; }
 
 	void SetNoPathArea(UAreaBoundaryComponent* Area)

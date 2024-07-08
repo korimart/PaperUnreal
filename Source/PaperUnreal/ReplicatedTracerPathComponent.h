@@ -21,8 +21,8 @@ public:
 
 	virtual TValueGenerator<FTracerPathEvent> CreatePathEventGenerator() override
 	{
-		TArray<FTracerPathEvent> Initial;
-		return CreateMulticastValueGenerator(Initial, OnPathEvent);
+		check(TypedReplicator); // did you wait for init?
+		return TypedReplicator->CreateTypedEventGenerator();
 	}
 
 	void SetTracerPathSource(UTracerPathComponent* Source)
@@ -31,12 +31,21 @@ public:
 		ServerTracerPath = Source;
 	}
 
+	TWeakAwaitable<bool> WaitForClientInitComplete()
+	{
+		check(GetNetMode() == NM_Client);
+		return CreateAwaitableToArray(IsValid(Replicator), true, InitCompleteHandles);
+	}
+
 private:
 	UPROPERTY()
 	UTracerPathComponent* ServerTracerPath;
 	
 	UPROPERTY(ReplicatedUsing=OnRep_Replicator)
 	UByteArrayReplicatorComponent* Replicator;
+	
+	TSharedPtr<TTypedByteArrayReplicatorView<FTracerPathPoint>> TypedReplicator;
+	TArray<TWeakAwaitableHandle<bool>> InitCompleteHandles;
 
 	UReplicatedTracerPathComponent()
 	{
@@ -54,11 +63,28 @@ private:
 		}
 
 		check(AllValid(ServerTracerPath));
+
+		Replicator = NewObject<UByteArrayReplicatorComponent>(this);
+		Replicator->RegisterComponent();
+		TypedReplicator = MakeShared<TTypedByteArrayReplicatorView<FTracerPathPoint>>(*Replicator);
+
+		RunWeakCoroutine(this, [this](auto&) -> FWeakCoroutine
+		{
+			for (auto PathEvents = ServerTracerPath->CreatePathEventGenerator();;)
+			{
+				TypedReplicator->SetFromEvent(co_await PathEvents.Next());
+			}
+		});
 	}
 
 	UFUNCTION()
 	void OnRep_Replicator()
 	{
+		if (IsValid(Replicator))
+		{
+			TypedReplicator = MakeShared<TTypedByteArrayReplicatorView<FTracerPathPoint>>(*Replicator);
+			FlushAwaitablesArray(InitCompleteHandles, true);
+		}
 	}
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override

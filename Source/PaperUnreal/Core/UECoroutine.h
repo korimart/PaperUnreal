@@ -76,14 +76,36 @@ struct FWeakCoroutine
 {
 	struct promise_type
 	{
-		TArray<TWeakObjectPtr<>> WeakList;
 		TSharedPtr<TUniqueFunction<FWeakCoroutine(FWeakCoroutineContext&)>> LambdaCaptures;
 		bool bCustomSuspended = false;
 		TSharedPtr<bool> bDestroyed = MakeShared<bool>(false);
 
 		bool IsValid() const
 		{
-			return Algo::AllOf(WeakList, [](const TWeakObjectPtr<>& Each) { return Each.IsValid(); });
+			return Algo::AllOf(WeakList, [](const auto& Each) { return Each(); });
+		}
+
+		void AddToWeakList(UObject* Object)
+		{
+			WeakList.Add([Weak = TWeakObjectPtr{Object}]() { return Weak.IsValid(); });
+		}
+
+		template <typename T>
+		void AddToWeakList(const TSharedPtr<T>& Object)
+		{
+			WeakList.Add([Weak = TWeakPtr<T>{Object}]() { return Weak.IsValid(); });
+		}
+		
+		template <typename T>
+		void AddToWeakList(const TSharedRef<T>& Object)
+		{
+			WeakList.Add([Weak = TWeakPtr<T>{Object}]() { return Weak.IsValid(); });
+		}
+
+		template <typename T>
+		void AddToWeakList(const TWeakPtr<T>& Object)
+		{
+			WeakList.Add([Weak = Object]() { return Weak.IsValid(); });
 		}
 
 		FWeakCoroutine get_return_object()
@@ -124,10 +146,13 @@ struct FWeakCoroutine
 				static_assert(TFalse<AwaitableType>::Value);
 			}
 		}
+
+	private:
+		TArray<TFunction<bool()>> WeakList;
 	};
 
 	void Init(
-		UObject* Lifetime,
+		auto& Lifetime,
 		TSharedPtr<TUniqueFunction<FWeakCoroutine(FWeakCoroutineContext&)>> LambdaCaptures,
 		TUniquePtr<FWeakCoroutineContext> Context);
 
@@ -140,15 +165,13 @@ private:
 	}
 };
 
-
 class FWeakCoroutineContext
 {
 public:
 	template <typename T>
-	T* AddToWeakList(T* Weak)
+	void AddToWeakList(T&& Weak)
 	{
-		Handle.promise().WeakList.Add(Weak);
-		return Weak;
+		Handle.promise().AddToWeakList(Forward<T>(Weak));
 	}
 
 	// TODO 필요해지면 구현
@@ -163,13 +186,13 @@ private:
 };
 
 
-inline void FWeakCoroutine::Init(
-	UObject* Lifetime,
+void FWeakCoroutine::Init(
+	auto& Lifetime,
 	TSharedPtr<TUniqueFunction<FWeakCoroutine(FWeakCoroutineContext&)>> LambdaCaptures,
 	TUniquePtr<FWeakCoroutineContext> Context)
 {
 	Context->Handle = Handle;
-	Handle.promise().WeakList.Add(Lifetime);
+	Handle.promise().AddToWeakList(Lifetime);
 	Handle.promise().LambdaCaptures = LambdaCaptures;
 	Handle.resume();
 }
@@ -425,7 +448,7 @@ public:
 
 			if constexpr (bObjectPtr)
 			{
-				Handle.promise().WeakList.Add(Value->GetValue());
+				Handle.promise().AddToWeakList(Value->GetValue());
 			}
 		}
 
@@ -521,7 +544,7 @@ public:
 	{
 		return Receiver;
 	}
-	
+
 	TWeakAwaitable<T> Next()
 	{
 		return Receiver->GetValue();
@@ -565,7 +588,7 @@ auto WaitForBroadcast(UObject* Lifetime, MulticastDelegateType& Delegate, Transf
 
 
 template <typename FuncType>
-void RunWeakCoroutine(UObject* Lifetime, FuncType&& Func)
+void RunWeakCoroutine(const auto& Lifetime, FuncType&& Func)
 {
 	auto LambdaCaptures = MakeShared<TUniqueFunction<FWeakCoroutine(FWeakCoroutineContext&)>>(Forward<FuncType>(Func));
 	auto Context = MakeUnique<FWeakCoroutineContext>();
@@ -602,7 +625,7 @@ template <typename T, typename DelegateType>
 TValueGenerator<T> CreateMulticastValueGenerator(const TArray<T>& ReadyValues, DelegateType& MulticastDelegate)
 {
 	TValueGenerator<T> Ret;
-	
+
 	auto Receiver = Ret.GetReceiver();
 	for (const T& Each : ReadyValues)
 	{
@@ -613,7 +636,7 @@ TValueGenerator<T> CreateMulticastValueGenerator(const TArray<T>& ReadyValues, D
 	{
 		Receiver.Pin()->AddValue(Forward<U>(NewValue));
 	}));
-	
+
 	return Ret;
 }
 
