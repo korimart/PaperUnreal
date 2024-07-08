@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "AreaMeshComponent.h"
+#include "AreaMeshGeneratorComponent.h"
 #include "ReplicatedAreaBoundaryComponent.h"
 #include "ResourceRegistryComponent.h"
 #include "TeamComponent.h"
@@ -46,14 +47,20 @@ private:
 			AreaMesh->RegisterComponent();
 			AreaMesh->ConfigureMaterialSet({RR->GetAreaMaterialFor(TeamIndex)});
 
+			IVectorArray2DEventGenerator* AreaBoundaryGenerator = nullptr;
 			if (GetNetMode() == NM_Client)
 			{
-				SetUpAreaBoundaryWithAreaMesh(AreaMesh, co_await WaitForComponent<UReplicatedAreaBoundaryComponent>(this));
+				AreaBoundaryGenerator = co_await WaitForComponent<UReplicatedAreaBoundaryComponent>(this);
 			}
 			else
 			{
-				SetUpAreaBoundaryWithAreaMesh(AreaMesh, co_await WaitForComponent<UAreaBoundaryComponent>(this));
+				AreaBoundaryGenerator = co_await WaitForComponent<UAreaBoundaryComponent>(this);
 			}
+			
+			auto AreaMeshGenerator = NewObject<UAreaMeshGeneratorComponent>(this);
+			AreaMeshGenerator->SetMeshSource(AreaBoundaryGenerator);
+			AreaMeshGenerator->SetMeshDestination(AreaMesh);
+			AreaMeshGenerator->RegisterComponent();
 		});
 	}
 
@@ -70,13 +77,4 @@ private:
 			ReplicatedAreaBoundary->RegisterComponent();
 		}
 	}
-
-	static void SetUpAreaBoundaryWithAreaMesh(UAreaMeshComponent* AreaMesh, auto AreaBoundary)
-	{
-		AreaMesh->SetMeshByWorldBoundary(AreaBoundary->GetBoundary());
-		AreaBoundary->OnBoundaryChanged.AddWeakLambda(AreaMesh, [AreaMesh]<typename T>(T&& Boundary)
-		{
-			AreaMesh->SetMeshByWorldBoundary(Forward<T>(Boundary));
-		});
-	};
 };

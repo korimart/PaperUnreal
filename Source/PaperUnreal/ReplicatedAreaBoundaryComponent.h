@@ -4,37 +4,34 @@
 
 #include "CoreMinimal.h"
 #include "AreaMeshComponent.h"
+#include "Vector2DArrayReplicatorComponent.h"
 #include "Core/ActorComponent2.h"
-#include "Net/UnrealNetwork.h"
 #include "ReplicatedAreaBoundaryComponent.generated.h"
 
 
 UCLASS()
-class UReplicatedAreaBoundaryComponent : public UActorComponent2
+class UReplicatedAreaBoundaryComponent : public UActorComponent2, public IVectorArray2DEventGenerator
 {
 	GENERATED_BODY()
 
 public:
-	DECLARE_MULTICAST_DELEGATE_OneParam(FOnBoundaryChanged, const FLoopedSegmentArray2D&);
-	FOnBoundaryChanged OnBoundaryChanged;
+	virtual TValueGenerator<FVector2DArrayEvent> CreateEventGenerator() override
+	{
+		return Replicator->CreateEventGenerator();
+	}
 	
 	void SetAreaBoundarySource(UAreaBoundaryComponent* Source)
 	{
 		BoundarySource = Source;
 	}
 	
-	FLoopedSegmentArray2D GetBoundary() const
-	{
-		return RepPoints;
-	}
-
 private:
 	UPROPERTY()
 	UAreaBoundaryComponent* BoundarySource;
 	
-	UPROPERTY(ReplicatedUsing=OnRep_Points)
-	TArray<FVector2D> RepPoints;
-
+	UPROPERTY(Replicated)
+	UVector2DArrayReplicatorComponent* Replicator;
+	
 	UReplicatedAreaBoundaryComponent()
 	{
 		bWantsInitializeComponent = true;
@@ -52,22 +49,21 @@ private:
 
 		check(AllValid(BoundarySource));
 
-		RepPoints = BoundarySource->GetBoundary().GetPoints();
-		BoundarySource->OnBoundaryChanged.AddWeakLambda(this, [this]<typename T>(T&& Boundary)
-		{
-			RepPoints = Forward<T>(Boundary).GetPoints();
-		});
-	}
+		Replicator = NewObject<UVector2DArrayReplicatorComponent>(this);
+		Replicator->RegisterComponent();
 
-	UFUNCTION()
-	void OnRep_Points()
-	{
-		OnBoundaryChanged.Broadcast(GetBoundary());
+		RunWeakCoroutine(this, [this](auto&) -> FWeakCoroutine
+		{
+			for (auto Events = BoundarySource->CreateEventGenerator();;)
+			{
+				Replicator->SetFromEvent(co_await Events.Next());
+			}
+		});
 	}
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-		DOREPLIFETIME(ThisClass, RepPoints);
+		DOREPLIFETIME_CONDITION(ThisClass, Replicator, COND_InitialOnly);
 	}
 };

@@ -481,10 +481,10 @@ public:
 	
 	TWeakAwaitable<T> Next()
 	{
-		if (ReadyValues.IsValidIndex(NextReadyIndex))
+		if (ReadyValues.IsValidIndex(0))
 		{
-			TWeakAwaitable<T> Ret{ReadyValues[NextReadyIndex]};
-			NextReadyIndex++;
+			TWeakAwaitable<T> Ret{ReadyValues[0]};
+			ReadyValues.RemoveAt(0);
 			return Ret;
 		}
 
@@ -500,7 +500,6 @@ public:
 
 private:
 	TArray<T> ReadyValues;
-	int32 NextReadyIndex = 0;
 	FOnReadyValuesDeprived OnReadyValuesDeprived;
 };
 

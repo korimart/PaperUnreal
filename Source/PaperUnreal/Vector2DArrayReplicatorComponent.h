@@ -134,6 +134,23 @@ public:
 		RepArray.SetLast(Forward<Vector2DType>(NewElement));
 	}
 
+	template <typename EventType> requires std::is_convertible_v<EventType, FVector2DArrayEvent>
+	void SetFromEvent(EventType&& Event)
+	{
+		if (Event.Event == EVector2DArrayEvent::Reset)
+		{
+			ResetArray(Forward<EventType>(Event).Affected);
+		}
+		else if (Event.Event == EVector2DArrayEvent::Appended)
+		{
+			AppendArray(Forward<EventType>(Event).Affected);
+		}
+		else if (Event.Event == EVector2DArrayEvent::LastModified)
+		{
+			SetLastElement(Forward<EventType>(Event).Affected[0]);
+		}
+	}
+
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_Array)
 	FRepVector2DArray RepArray;

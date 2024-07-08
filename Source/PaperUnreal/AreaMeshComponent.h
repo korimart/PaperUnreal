@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "VectorArray2DEventGenerator.h"
 #include "Core/SegmentArray.h"
 #include "Core/ActorComponent2.h"
 #include "Components/DynamicMeshComponent.h"
@@ -11,13 +12,15 @@
 
 
 UCLASS()
-class UAreaBoundaryComponent : public UActorComponent2
+class UAreaBoundaryComponent : public UActorComponent2, public IVectorArray2DEventGenerator
 {
 	GENERATED_BODY()
 
 public:
-	DECLARE_MULTICAST_DELEGATE_OneParam(FOnBoundaryChanged, const FLoopedSegmentArray2D&);
-	FOnBoundaryChanged OnBoundaryChanged;
+	virtual TValueGenerator<FVector2DArrayEvent> CreateEventGenerator() override
+	{
+		return CreateMulticastValueGenerator(this, TArray{CreateResetEvent()}, OnEvent);
+	}
 
 	void ResetToStartingBoundary(const FVector& Location)
 	{
@@ -33,7 +36,7 @@ public:
 		}();
 
 		AreaBoundary.ReplacePoints(0, 0, VertexPositions);
-		OnBoundaryChanged.Broadcast(AreaBoundary);
+		OnEvent.Broadcast(CreateResetEvent());
 	}
 
 	struct FExpansionResult
@@ -47,7 +50,7 @@ public:
 		{
 			if (TOptional<FLoopedSegmentArray2D::FUnionResult> UnionResult = AreaBoundary.Union(Path))
 			{
-				OnBoundaryChanged.Broadcast(AreaBoundary);
+				OnEvent.Broadcast(CreateResetEvent());
 				return FExpansionResult{.bAddedToTheLeftOfPath = UnionResult->bUnionedToTheLeftOfPath};
 			}
 		}
@@ -59,13 +62,8 @@ public:
 		if (Path.IsValid())
 		{
 			AreaBoundary.Difference(Path, bToTheLeftOfPath);
-			OnBoundaryChanged.Broadcast(AreaBoundary);
+			OnEvent.Broadcast(CreateResetEvent());
 		}
-	}
-
-	const FLoopedSegmentArray2D& GetBoundary() const
-	{
-		return AreaBoundary;
 	}
 
 	bool IsInside(const FVector& Point) const
@@ -117,6 +115,11 @@ public:
 
 private:
 	FLoopedSegmentArray2D AreaBoundary;
+
+	FVector2DArrayEvent CreateResetEvent() const
+	{
+		return {.Event = EVector2DArrayEvent::Reset, .Affected = AreaBoundary.GetPoints()};
+	}
 };
 
 
