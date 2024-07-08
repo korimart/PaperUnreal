@@ -51,15 +51,12 @@ private:
 
 		check(AllValid(Tracer, ConversionDestination));
 
-		Tracer->OnPathEvent.AddWeakLambda(this, [this](const FTracerPathEvent& Event)
+		Tracer->OnCompletePathGenerated.AddWeakLambda(this, [this](const FSegmentArray2D& CompletePath)
 		{
-			if (Event.GenerationEnded())
+			if (TOptional<UAreaBoundaryComponent::FExpansionResult> Result
+				= ConversionDestination->ExpandByPath(CompletePath))
 			{
-				if (TOptional<UAreaBoundaryComponent::FExpansionResult> Result
-					= ConversionDestination->ExpandByPath(Tracer->GetPath()))
-				{
-					OnTracerToAreaConversion.Broadcast(Tracer->GetPath(), Result->bAddedToTheLeftOfPath);
-				}
+				OnTracerToAreaConversion.Broadcast(CompletePath, Result->bAddedToTheLeftOfPath);
 			}
 		});
 	}

@@ -55,13 +55,13 @@ private:
 
 		// TODO destroy self on slash target end play
 
-		Slasher->OnPathEvent.AddWeakLambda(this, [this](const FTracerPathEvent& Event)
-		{
-			if (Event.NewPointGenerated() || Event.LastPointModified())
-			{
-				DoCollisionTest();
-			}
-		});
+		// Slasher->OnPathEvent.AddWeakLambda(this, [this](const FTracerPathEvent& Event)
+		// {
+		// 	if (Event.NewPointGenerated() || Event.LastPointModified())
+		// 	{
+		// 		DoCollisionTest();
+		// 	}
+		// });
 
 		TracerToAreaConverter->OnTracerToAreaConversion.AddWeakLambda(
 			this, [this](const FSegmentArray2D& Tracer, bool bToTheLeft)

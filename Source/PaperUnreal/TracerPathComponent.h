@@ -15,11 +15,16 @@ class UTracerPathComponent : public UActorComponent2, public ITracerPathGenerato
 	GENERATED_BODY()
 
 public:
-	// UTracerPathComponent의 구현은 옛날 Event를 기록하지 않음 (새 Event만 받을 수 있음)
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnPathEvent, FTracerPathEvent);
+	FOnPathEvent OnPathEvent;
+
 	virtual TValueGenerator<FTracerPathEvent> CreatePathEventGenerator() override
 	{
 		return CreateMulticastValueGenerator(TArray<FTracerPathEvent>{}, OnPathEvent);
 	}
+
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnCompletePathGenerated, const FSegmentArray2D&);
+	FOnCompletePathGenerated OnCompletePathGenerated;
 
 	const FSegmentArray2D& GetPath() const { return Path; }
 
@@ -60,7 +65,7 @@ private:
 		if (!bGeneratedLastFrame && bWillGenerateThisFrame)
 		{
 			Path.Empty();
-			OnPathEvent.Broadcast({.Event = ETracerPathEvent::GenerationStarted});
+			// OnPathEvent.Broadcast({.Event = EArrayEvent::GenerationStarted});
 		}
 
 		if (bWillGenerateThisFrame)
@@ -72,8 +77,8 @@ private:
 		if (bGeneratedLastFrame && !bGeneratedThisFrame)
 		{
 			Path.SetLastPoint(NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint());
-			OnPathEvent.Broadcast(CreateEventWithPointAndDir(ETracerPathEvent::LastPointModified));
-			OnPathEvent.Broadcast({.Event = ETracerPathEvent::GenerationEnded});
+			OnPathEvent.Broadcast(CreateEvent(EArrayEvent::LastModified));
+			// OnPathEvent.Broadcast({.Event = ETracerPathEvent::GenerationEnded});
 		}
 	}
 
@@ -85,7 +90,7 @@ private:
 		{
 			Path.AddPoint(ActorLocation2D);
 			Path.SetLastPoint(NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint());
-			OnPathEvent.Broadcast(CreateEventWithPointAndDir(ETracerPathEvent::NewPointGenerated));
+			OnPathEvent.Broadcast(CreateEvent(EArrayEvent::Appended));
 			return;
 		}
 
@@ -97,7 +102,7 @@ private:
 		if (Path.PointCount() < 3)
 		{
 			Path.AddPoint(ActorLocation2D);
-			OnPathEvent.Broadcast(CreateEventWithPointAndDir(ETracerPathEvent::NewPointGenerated));
+			OnPathEvent.Broadcast(CreateEvent(EArrayEvent::Appended));
 			return;
 		}
 
@@ -130,22 +135,26 @@ private:
 		if (Curvature > 0.005f || CurrentDeviation > 10.f)
 		{
 			Path.AddPoint(ActorLocation2D);
-			OnPathEvent.Broadcast(CreateEventWithPointAndDir(ETracerPathEvent::NewPointGenerated));
+			OnPathEvent.Broadcast(CreateEvent(EArrayEvent::Appended));
 		}
 		else
 		{
 			Path.SetLastPoint(ActorLocation2D);
-			OnPathEvent.Broadcast(CreateEventWithPointAndDir(ETracerPathEvent::LastPointModified));
+			OnPathEvent.Broadcast(CreateEvent(EArrayEvent::LastModified));
 		}
 	}
 
-	FTracerPathEvent CreateEventWithPointAndDir(ETracerPathEvent Event) const
+	FTracerPathEvent CreateEvent(EArrayEvent Event) const
 	{
-		return FTracerPathEvent
+		const FTracerPathPoint Point
 		{
-			.Event = Event,
 			.Point = Path.GetLastPoint(),
 			.PathDirection = FVector2D{GetOwner()->GetActorForwardVector()},
 		};
+
+		FTracerPathEvent Ret;
+		Ret.Event = Event;
+		Ret.Affected = {Point};
+		return Ret;
 	}
 };

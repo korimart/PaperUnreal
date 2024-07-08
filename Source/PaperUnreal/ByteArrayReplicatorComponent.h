@@ -26,6 +26,10 @@ struct TArrayEvent
 {
 	EArrayEvent Event;
 	TArray<T> Affected;
+
+	bool IsReset() const { return Event == EArrayEvent::Reset; }
+	bool IsAppended() const { return Event == EArrayEvent::Appended; }
+	bool IsLastModified() const { return Event == EArrayEvent::LastModified; }
 };
 
 

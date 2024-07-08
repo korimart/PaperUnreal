@@ -55,36 +55,34 @@ private:
 
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			auto PathEventGenerator = MeshSource->CreatePathEventGenerator();
-
-			while (true)
+			for (auto PathEventGenerator = MeshSource->CreatePathEventGenerator();;)
 			{
-				const FTracerPathEvent Event = co_await PathEventGenerator.Next();
-
-				if (Event.GenerationStarted())
-				{
-					MeshDestination->Reset();
-				}
-				else if (Event.NewPointGenerated())
-				{
-					auto [Left, Right] = CreateVertexPositions(*Event.Point, *Event.PathDirection);
-					if (MeshDestination->GetVertexCount() == 0)
-					{
-						AttachVerticesToAttachmentTarget(Left, Right);
-					}
-					MeshDestination->AppendVertices(Left, Right);
-				}
-				else if (Event.LastPointModified())
-				{
-					auto [Left, Right] = CreateVertexPositions(*Event.Point, *Event.PathDirection);
-					MeshDestination->SetLastVertices(Left, Right);
-				}
-				else if (Event.GenerationEnded())
-				{
-					auto [Left, Right] = MeshDestination->GetLastVertices();
-					AttachVerticesToAttachmentTarget(Left, Right);
-					MeshDestination->SetLastVertices(Left, Right);
-				}
+				// const FTracerPathEvent Event = co_await PathEventGenerator.Next();
+				//
+				// if (Event.IsReset())
+				// {
+				// 	MeshDestination->Reset();
+				// }
+				// else if (Event.IsAppended())
+				// {
+				// 	auto [Left, Right] = CreateVertexPositions(Event.Point(), Event.PathDirection());
+				// 	if (MeshDestination->GetVertexCount() == 0)
+				// 	{
+				// 		AttachVerticesToAttachmentTarget(Left, Right);
+				// 	}
+				// 	MeshDestination->AppendVertices(Left, Right);
+				// }
+				// else if (Event.LastPointModified())
+				// {
+				// 	auto [Left, Right] = CreateVertexPositions(Event.Point(), Event.PathDirection());
+				// 	MeshDestination->SetLastVertices(Left, Right);
+				// }
+				// else if (Event.GenerationEnded())
+				// {
+				// 	auto [Left, Right] = MeshDestination->GetLastVertices();
+				// 	AttachVerticesToAttachmentTarget(Left, Right);
+				// 	MeshDestination->SetLastVertices(Left, Right);
+				// }
 			}
 		});
 	}

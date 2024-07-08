@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "ByteArrayReplicatorComponent.h"
 #include "Core/SegmentArray.h"
 #include "UObject/Interface.h"
 #include "TracerPathGenerator.generated.h"
@@ -15,26 +16,15 @@ class UTracerPathGenerator : public UInterface
 };
 
 
-UENUM()
-enum class ETracerPathEvent
+struct FTracerPathPoint
 {
-	GenerationStarted,
-	NewPointGenerated,
-	LastPointModified,
-	GenerationEnded,
+	FVector2D Point;
+	FVector2D PathDirection;
 };
 
 
-struct FTracerPathEvent
+struct FTracerPathEvent : TArrayEvent<FTracerPathPoint>
 {
-	ETracerPathEvent Event;
-	TOptional<FVector2D> Point;
-	TOptional<FVector2D> PathDirection;
-
-	bool GenerationStarted() const { return Event == ETracerPathEvent::GenerationStarted; }
-	bool NewPointGenerated() const { return Event == ETracerPathEvent::NewPointGenerated; }
-	bool LastPointModified() const { return Event == ETracerPathEvent::LastPointModified; }
-	bool GenerationEnded() const { return Event == ETracerPathEvent::GenerationEnded; }
 };
 
 
@@ -46,8 +36,5 @@ class ITracerPathGenerator
 	GENERATED_BODY()
 
 public:
-	DECLARE_MULTICAST_DELEGATE_OneParam(FOnPathEvent, FTracerPathEvent);
-	FOnPathEvent OnPathEvent;
-
 	virtual TValueGenerator<FTracerPathEvent> CreatePathEventGenerator() = 0;
 };
