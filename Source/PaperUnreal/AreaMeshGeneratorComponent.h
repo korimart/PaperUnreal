@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "AreaMeshComponent.h"
-#include "VectorArray2DEventGenerator.h"
 #include "Core/ActorComponent2.h"
 #include "AreaMeshGeneratorComponent.generated.h"
 
@@ -15,7 +14,7 @@ class UAreaMeshGeneratorComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	void SetMeshSource(IVectorArray2DEventGenerator* Source)
+	void SetMeshSource(IAreaBoundaryGenerator* Source)
 	{
 		MeshSource = Cast<UObject>(Source);
 	}
@@ -27,7 +26,7 @@ public:
 
 private:
 	UPROPERTY()
-	TScriptInterface<IVectorArray2DEventGenerator> MeshSource;
+	TScriptInterface<IAreaBoundaryGenerator> MeshSource;
 	
 	UPROPERTY()
 	UAreaMeshComponent* MeshDest;
@@ -45,9 +44,9 @@ private:
 
 		RunWeakCoroutine(this, [this](auto&) -> FWeakCoroutine
 		{
-			for (auto Events = MeshSource->CreateEventGenerator();;)
+			for (auto Boundaries = MeshSource->CreateBoundaryGenerator();;)
 			{
-				MeshDest->SetMeshByWorldBoundary((co_await Events.Next()).Affected);
+				MeshDest->SetMeshByWorldBoundary((co_await Boundaries.Next()));
 			}
 		});
 	}

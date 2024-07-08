@@ -47,12 +47,10 @@ private:
 			AreaMesh->RegisterComponent();
 			AreaMesh->ConfigureMaterialSet({RR->GetAreaMaterialFor(TeamIndex)});
 
-			IVectorArray2DEventGenerator* AreaBoundaryGenerator = nullptr;
+			IAreaBoundaryGenerator* AreaBoundaryGenerator = nullptr;
 			if (GetNetMode() == NM_Client)
 			{
-				auto ReplicatedAreaBoundary = co_await WaitForComponent<UReplicatedAreaBoundaryComponent>(this);
-				co_await ReplicatedAreaBoundary->WaitForClientInitComplete();
-				AreaBoundaryGenerator = ReplicatedAreaBoundary;
+				AreaBoundaryGenerator = co_await WaitForComponent<UReplicatedAreaBoundaryComponent>(this);
 			}
 			else
 			{

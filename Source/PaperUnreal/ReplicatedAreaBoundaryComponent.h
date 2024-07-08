@@ -3,44 +3,40 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AreaBoundaryGenerator.h"
 #include "AreaMeshComponent.h"
-#include "Vector2DArrayReplicatorComponent.h"
 #include "Core/ActorComponent2.h"
-#include "Core/ComponentRegistry.h"
+#include "Net/UnrealNetwork.h"
 #include "ReplicatedAreaBoundaryComponent.generated.h"
 
 
 UCLASS()
-class UReplicatedAreaBoundaryComponent : public UActorComponent2, public IVectorArray2DEventGenerator
+class UReplicatedAreaBoundaryComponent : public UActorComponent2, public IAreaBoundaryGenerator
 {
 	GENERATED_BODY()
 
 public:
-	virtual TValueGenerator<FVector2DArrayEvent> CreateEventGenerator() override
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnBoundaryChanged, const FLoopedSegmentArray2D&);
+	FOnBoundaryChanged OnBoundaryChanged;
+	
+	virtual TValueGenerator<FLoopedSegmentArray2D> CreateBoundaryGenerator() override
 	{
-		check(IsValid(Replicator)); // did you wait for init complete?
-		return Replicator->CreateEventGenerator();
+		TArray<FLoopedSegmentArray2D> Init{{RepPoints}};
+		if (Init[0].IsValid()) { return CreateMulticastValueGenerator(Init, OnBoundaryChanged); }
+		return CreateMulticastValueGenerator(TArray<FLoopedSegmentArray2D>{}, OnBoundaryChanged);
 	}
-
+	
 	void SetAreaBoundarySource(UAreaBoundaryComponent* Source)
 	{
 		BoundarySource = Source;
 	}
-
-	TWeakAwaitable<bool> WaitForClientInitComplete()
-	{
-		check(GetNetMode() == NM_Client);
-		return CreateAwaitableToArray(IsValid(Replicator), true, InitAwaitableHandles);
-	}
-
+	
 private:
 	UPROPERTY()
 	UAreaBoundaryComponent* BoundarySource;
-
-	UPROPERTY(ReplicatedUsing=OnRep_Replicator)
-	UVector2DArrayReplicatorComponent* Replicator;
-
-	TArray<TWeakAwaitableHandle<bool>> InitAwaitableHandles;
+	
+	UPROPERTY(ReplicatedUsing=OnRep_Points)
+	TArray<FVector2D> RepPoints;
 
 	UReplicatedAreaBoundaryComponent()
 	{
@@ -59,30 +55,24 @@ private:
 
 		check(AllValid(BoundarySource));
 
-		Replicator = NewObject<UVector2DArrayReplicatorComponent>(this);
-		Replicator->RegisterComponent();
-
 		RunWeakCoroutine(this, [this](auto&) -> FWeakCoroutine
 		{
-			for (auto Events = BoundarySource->CreateEventGenerator();;)
+			for (auto Boundaries = BoundarySource->CreateBoundaryGenerator();;)
 			{
-				Replicator->SetFromEvent(co_await Events.Next());
+				RepPoints = (co_await Boundaries.Next()).GetPoints();
 			}
 		});
 	}
 
 	UFUNCTION()
-	void OnRep_Replicator()
+	void OnRep_Points()
 	{
-		if (IsValid(Replicator))
-		{
-			FlushAwaitablesArray(InitAwaitableHandles, true);
-		}
+		OnBoundaryChanged.Broadcast(RepPoints);
 	}
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-		DOREPLIFETIME_CONDITION(ThisClass, Replicator, COND_InitialOnly);
+		DOREPLIFETIME(ThisClass, RepPoints);
 	}
 };
