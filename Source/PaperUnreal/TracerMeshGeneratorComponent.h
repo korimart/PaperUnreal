@@ -8,41 +8,41 @@
 #include "TracerPathGenerator.h"
 #include "Core/ActorComponent2.h"
 #include "Core/Utils.h"
-#include "TracerVertexGeneratorComponent.generated.h"
+#include "TracerMeshGeneratorComponent.generated.h"
 
 
 UCLASS()
-class UTracerVertexGeneratorComponent : public UActorComponent2
+class UTracerMeshGeneratorComponent : public UActorComponent2
 {
 	GENERATED_BODY()
 
 public:
-	void SetVertexSource(ITracerPathGenerator* Source)
+	void SetMeshSource(ITracerPathGenerator* Source)
 	{
-		VertexSource = Cast<UObject>(Source);
+		MeshSource = Cast<UObject>(Source);
 	}
 
-	void SetVertexDestination(UTracerMeshComponent* Destination)
+	void SetMeshDestination(UTracerMeshComponent* Destination)
 	{
-		VertexDestination = Destination;
+		MeshDestination = Destination;
 	}
 
-	void SetVertexAttachmentTarget(UAreaMeshComponent* Target)
+	void SetMeshAttachmentTarget(UAreaMeshComponent* Target)
 	{
-		VertexAttachmentTarget = Target;
+		MeshAttachmentTarget = Target;
 	}
 
 private:
 	UPROPERTY()
-	TScriptInterface<ITracerPathGenerator> VertexSource;
+	TScriptInterface<ITracerPathGenerator> MeshSource;
 
 	UPROPERTY()
-	UTracerMeshComponent* VertexDestination;
+	UTracerMeshComponent* MeshDestination;
 
 	UPROPERTY()
-	UAreaMeshComponent* VertexAttachmentTarget;
+	UAreaMeshComponent* MeshAttachmentTarget;
 
-	UTracerVertexGeneratorComponent()
+	UTracerMeshGeneratorComponent()
 	{
 		bWantsInitializeComponent = true;
 	}
@@ -51,11 +51,11 @@ private:
 	{
 		Super::InitializeComponent();
 
-		check(AllValid(VertexSource, VertexDestination, VertexAttachmentTarget));
+		check(AllValid(MeshSource, MeshDestination, MeshAttachmentTarget));
 
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			auto PathEventGenerator = VertexSource->CreatePathEventGenerator();
+			auto PathEventGenerator = MeshSource->CreatePathEventGenerator();
 
 			while (true)
 			{
@@ -63,27 +63,27 @@ private:
 
 				if (Event.GenerationStarted())
 				{
-					VertexDestination->Reset();
+					MeshDestination->Reset();
 				}
 				else if (Event.NewPointGenerated())
 				{
 					auto [Left, Right] = CreateVertexPositions(*Event.Point, *Event.PathDirection);
-					if (VertexDestination->GetVertexCount() == 0)
+					if (MeshDestination->GetVertexCount() == 0)
 					{
 						AttachVerticesToAttachmentTarget(Left, Right);
 					}
-					VertexDestination->AppendVertices(Left, Right);
+					MeshDestination->AppendVertices(Left, Right);
 				}
 				else if (Event.LastPointModified())
 				{
 					auto [Left, Right] = CreateVertexPositions(*Event.Point, *Event.PathDirection);
-					VertexDestination->SetLastVertices(Left, Right);
+					MeshDestination->SetLastVertices(Left, Right);
 				}
 				else if (Event.GenerationEnded())
 				{
-					auto [Left, Right] = VertexDestination->GetLastVertices();
+					auto [Left, Right] = MeshDestination->GetLastVertices();
 					AttachVerticesToAttachmentTarget(Left, Right);
-					VertexDestination->SetLastVertices(Left, Right);
+					MeshDestination->SetLastVertices(Left, Right);
 				}
 			}
 		});
@@ -97,10 +97,10 @@ private:
 
 	void AttachVerticesToAttachmentTarget(FVector2D& Left, FVector2D& Right) const
 	{
-		if (VertexAttachmentTarget->IsValid())
+		if (MeshAttachmentTarget->IsValid())
 		{
-			Left = VertexAttachmentTarget->FindClosestPointOnBoundary2D(Left).GetPoint();
-			Right = VertexAttachmentTarget->FindClosestPointOnBoundary2D(Right).GetPoint();
+			Left = MeshAttachmentTarget->FindClosestPointOnBoundary2D(Left).GetPoint();
+			Right = MeshAttachmentTarget->FindClosestPointOnBoundary2D(Right).GetPoint();
 		}
 	}
 };

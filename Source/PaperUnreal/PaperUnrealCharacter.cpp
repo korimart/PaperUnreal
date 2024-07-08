@@ -10,7 +10,7 @@
 #include "TracerMeshComponent.h"
 #include "TracerPathGenerator.h"
 #include "TracerToAreaConverterComponent.h"
-#include "TracerVertexGeneratorComponent.h"
+#include "TracerMeshGeneratorComponent.h"
 #include "Core/UECoroutine.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Camera/CameraComponent.h"
@@ -73,25 +73,25 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 		// TODO graceful exit
 		check(co_await RR->GetbResourcesLoaded().WaitForValue(this));
 
-		ITracerPathGenerator* TracerVertexSource = nullptr;
+		ITracerPathGenerator* TracerMeshSource = nullptr;
 		if (GetNetMode() == NM_Client)
 		{
-			TracerVertexSource = co_await WaitForComponent<UReplicatedTracerPathComponent>(this);
+			TracerMeshSource = co_await WaitForComponent<UReplicatedTracerPathComponent>(this);
 		}
 		else
 		{
-			TracerVertexSource = co_await WaitForComponent<UTracerPathComponent>(this);
+			TracerMeshSource = co_await WaitForComponent<UTracerPathComponent>(this);
 		}
 
 		auto TracerMesh = NewObject<UTracerMeshComponent>(this);
 		TracerMesh->RegisterComponent();
 		TracerMesh->ConfigureMaterialSet({RR->GetTracerMaterialFor(MyTeamIndex)});
 
-		auto TracerVertexGenerator = NewObject<UTracerVertexGeneratorComponent>(this);
-		TracerVertexGenerator->SetVertexSource(TracerVertexSource);
-		TracerVertexGenerator->SetVertexDestination(TracerMesh);
-		TracerVertexGenerator->SetVertexAttachmentTarget(AreaMeshComponent);
-		TracerVertexGenerator->RegisterComponent();
+		auto TracerMeshGenerator = NewObject<UTracerMeshGeneratorComponent>(this);
+		TracerMeshGenerator->SetMeshSource(TracerMeshSource);
+		TracerMeshGenerator->SetMeshDestination(TracerMesh);
+		TracerMeshGenerator->SetMeshAttachmentTarget(AreaMeshComponent);
+		TracerMeshGenerator->RegisterComponent();
 	});
 }
 
