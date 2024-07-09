@@ -22,5 +22,5 @@ class IAreaBoundaryStream
 	GENERATED_BODY()
 
 public:
-	virtual TValueGenerator<FLoopedSegmentArray2D> CreateBoundaryStream() = 0;
+	virtual TValueStream<FLoopedSegmentArray2D> CreateBoundaryStream() = 0;
 };

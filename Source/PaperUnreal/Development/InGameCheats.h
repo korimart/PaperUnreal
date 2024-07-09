@@ -4,8 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/CheatManager.h"
-#include "GameFramework/GameStateBase.h"
-#include "PaperUnreal/Vector2DArrayReplicatorComponent.h"
 #include "InGameCheats.generated.h"
 
 /**
@@ -18,15 +16,7 @@ class UInGameCheats : public UCheatManagerExtension
 
 private:
 	UFUNCTION(Exec, BlueprintAuthorityOnly)
-	void SendLargeData(double Value)
+	void SomeCheat(double Value)
 	{
-		TArray<FVector2D> Arr;
-		for (int32 i = 0; i < 250; i++)
-		{
-			Arr.Add({Value, Value});
-		}
-		
-		auto Component = GetWorld()->GetGameState()->FindComponentByClass<UVector2DArrayReplicatorComponent>();
-		Component->ResetArray(Arr);
 	}
 };

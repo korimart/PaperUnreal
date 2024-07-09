@@ -33,9 +33,9 @@ public:
 		return Ret;
 	}
 
-	TValueGenerator<AAreaActor*> CreateSpawnedAreaGenerator()
+	TValueStream<AAreaActor*> CreateSpawnedAreaStream()
 	{
-		return CreateMulticastValueGenerator(RepSpawnedAreas, OnAreaSpawned);
+		return CreateMulticastValueStream(RepSpawnedAreas, OnAreaSpawned);
 	}
 
 	AAreaActor* SpawnAreaAtRandomEmptyLocation(int32 TeamIndex)

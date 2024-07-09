@@ -18,9 +18,9 @@ public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnPathEvent, FTracerPathEvent);
 	FOnPathEvent OnPathEvent;
 
-	virtual TValueGenerator<FTracerPathEvent> CreatePathStream() override
+	virtual TValueStream<FTracerPathEvent> CreatePathStream() override
 	{
-		return CreateMulticastValueGenerator(TArray<FTracerPathEvent>{}, OnPathEvent);
+		return CreateMulticastValueStream(TArray<FTracerPathEvent>{}, OnPathEvent);
 	}
 
 	// TODO maybe remove?

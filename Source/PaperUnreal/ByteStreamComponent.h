@@ -163,12 +163,12 @@ public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnByteStreamEvent, const FByteStreamEvent&);
 	FOnByteStreamEvent OnByteStreamEvent;
 
-	TValueGenerator<FByteStreamEvent> CreateEventGenerator()
+	TValueStream<FByteStreamEvent> CreateEventStream()
 	{
 		TArray<FByteStreamEvent> Init = RepStream.IsOpen()
 			? RepStream.CompareAndCreateEvents({})
 			: TArray<FByteStreamEvent>{};
-		return CreateMulticastValueGenerator(Init, OnByteStreamEvent);
+		return CreateMulticastValueStream(Init, OnByteStreamEvent);
 	}
 
 	const TArray<uint8>& GetBytes() const
@@ -301,13 +301,13 @@ public:
 	{
 	}
 
-	TValueGenerator<TStreamEvent<T>> CreateTypedEventGenerator()
+	TValueStream<TStreamEvent<T>> CreateTypedEventStream()
 	{
-		TValueGenerator<TStreamEvent<T>> Ret;
+		TValueStream<TStreamEvent<T>> Ret;
 		RunWeakCoroutine(this->AsShared(), [this, Receiver = Ret.GetReceiver()](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
 			Context.AddToWeakList(Receiver);
-			for (auto ByteEvents = ByteStream.CreateEventGenerator();;)
+			for (auto ByteEvents = ByteStream.CreateEventStream();;)
 			{
 				// 여기 NewEvent를 선언 안하고 inline으로 ToTypedEvent에 넣으면 프로그램 고장남
 				// 아마도 Pin()이 co_await 보다 먼저 호출될 수도 있을 것 같음

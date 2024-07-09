@@ -19,10 +19,10 @@ public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnPathEvent, FTracerPathEvent);
 	FOnPathEvent OnPathEvent;
 
-	virtual TValueGenerator<FTracerPathEvent> CreatePathStream() override
+	virtual TValueStream<FTracerPathEvent> CreatePathStream() override
 	{
 		check(TypedReplicator); // did you wait for init?
-		return TypedReplicator->CreateTypedEventGenerator();
+		return TypedReplicator->CreateTypedEventStream();
 	}
 
 	void SetTracerPathSource(UTracerPathComponent* Source)

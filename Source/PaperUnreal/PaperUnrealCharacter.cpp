@@ -136,11 +136,11 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 				Context.AddToWeakList(MyTeamArea);
 				Context.AddToWeakList(TracerToAreaConverter);
 
-				auto SpawnedAreaGenerator = AreaSpawnerComponent->CreateSpawnedAreaGenerator();
+				auto SpawnedAreaStream = AreaSpawnerComponent->CreateSpawnedAreaStream();
 
 				while (true)
 				{
-					if (AAreaActor* Area = co_await SpawnedAreaGenerator.Next(); MyTeamArea != Area)
+					if (AAreaActor* Area = co_await SpawnedAreaStream.Next(); MyTeamArea != Area)
 					{
 						auto AreaBoundaryComponent = co_await WaitForComponent<UAreaBoundaryComponent>(Area);
 						

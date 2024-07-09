@@ -198,18 +198,18 @@ bool UECoroutineTest::RunTest(const FString& Parameters)
 	{
 		DECLARE_MULTICAST_DELEGATE_OneParam(FOnInt32, int32);
 		FOnInt32 OnInt32;
-		TValueGenerator<int32> IntGen = CreateMulticastValueGenerator(TArray{1, 2, 3}, OnInt32);
+		TValueStream<int32> IntStream = CreateMulticastValueStream(TArray{1, 2, 3}, OnInt32);
 		
 		TArray<int32> Received;
 		RunWeakCoroutine(Provider, [&](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			Received.Add(co_await IntGen.Next());
-			Received.Add(co_await IntGen.Next());
-			Received.Add(co_await IntGen.Next());
+			Received.Add(co_await IntStream.Next());
+			Received.Add(co_await IntStream.Next());
+			Received.Add(co_await IntStream.Next());
 
 			while (true)
 			{
-				Received.Add(co_await IntGen.Next());
+				Received.Add(co_await IntStream.Next());
 			}
 		});
 
@@ -228,8 +228,8 @@ bool UECoroutineTest::RunTest(const FString& Parameters)
 	}
 	
 	{
-		TValueGenerator<int32> IntGen;
-		auto Receiver = IntGen.GetReceiver();
+		TValueStream<int32> IntStream;
+		auto Receiver = IntStream.GetReceiver();
 
 		auto Lifetime = MakeUnique<FUECoroutineTestLifetime>();
 		TSharedPtr<bool> bFreed = Lifetime->bDestroyed;
@@ -237,13 +237,13 @@ bool UECoroutineTest::RunTest(const FString& Parameters)
 		TArray<int32> Received;
 		RunWeakCoroutine(Provider, [&](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			Received.Add(co_await IntGen.Next());
-			Received.Add(co_await IntGen.Next());
-			Received.Add(co_await IntGen.Next());
+			Received.Add(co_await IntStream.Next());
+			Received.Add(co_await IntStream.Next());
+			Received.Add(co_await IntStream.Next());
 
-			while (co_await IntGen.NextIfNotEnd())
+			while (co_await IntStream.NextIfNotEnd())
 			{
-				Received.Add(IntGen.Pop());
+				Received.Add(IntStream.Pop());
 			}
 
 			Received.Add(42);

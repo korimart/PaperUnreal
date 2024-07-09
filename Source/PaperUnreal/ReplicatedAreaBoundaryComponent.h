@@ -19,11 +19,11 @@ public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnBoundaryChanged, const FLoopedSegmentArray2D&);
 	FOnBoundaryChanged OnBoundaryChanged;
 	
-	virtual TValueGenerator<FLoopedSegmentArray2D> CreateBoundaryStream() override
+	virtual TValueStream<FLoopedSegmentArray2D> CreateBoundaryStream() override
 	{
 		TArray<FLoopedSegmentArray2D> Init{{RepPoints}};
-		if (Init[0].IsValid()) { return CreateMulticastValueGenerator(Init, OnBoundaryChanged); }
-		return CreateMulticastValueGenerator(TArray<FLoopedSegmentArray2D>{}, OnBoundaryChanged);
+		if (Init[0].IsValid()) { return CreateMulticastValueStream(Init, OnBoundaryChanged); }
+		return CreateMulticastValueStream(TArray<FLoopedSegmentArray2D>{}, OnBoundaryChanged);
 	}
 	
 	void SetAreaBoundarySource(UAreaBoundaryComponent* Source)

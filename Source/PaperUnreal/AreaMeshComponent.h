@@ -20,9 +20,9 @@ public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnBoundaryChanged, const FLoopedSegmentArray2D&);
 	FOnBoundaryChanged OnBoundaryChanged;
 
-	virtual TValueGenerator<FLoopedSegmentArray2D> CreateBoundaryStream() override
+	virtual TValueStream<FLoopedSegmentArray2D> CreateBoundaryStream() override
 	{
-		return CreateMulticastValueGenerator(TArray{AreaBoundary}, OnBoundaryChanged);
+		return CreateMulticastValueStream(TArray{AreaBoundary}, OnBoundaryChanged);
 	}
 
 	void ResetToStartingBoundary(const FVector& Location)

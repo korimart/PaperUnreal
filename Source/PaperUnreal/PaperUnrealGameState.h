@@ -5,7 +5,6 @@
 #include "CoreMinimal.h"
 #include "AreaSpawnerComponent.h"
 #include "ResourceRegistryComponent.h"
-#include "Vector2DArrayReplicatorComponent.h"
 #include "GameFramework/GameStateBase.h"
 #include "PaperUnrealGameState.generated.h"
 
@@ -29,6 +28,5 @@ private:
 	{
 		ResourceRegistryComponent = CreateDefaultSubobject<UResourceRegistryComponent>(TEXT("ResourceRegistryComponent"));
 		AreaSpawnerComponent = CreateDefaultSubobject<UAreaSpawnerComponent>(TEXT("AreaSpawnerComponent"));
-		CreateDefaultSubobject<UVector2DArrayReplicatorComponent>(TEXT("VectorRep"));
 	}
 };

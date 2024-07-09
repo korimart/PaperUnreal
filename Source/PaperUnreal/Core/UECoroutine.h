@@ -498,7 +498,7 @@ private:
 
 
 template <typename T>
-class TValueGeneratorValueReceiver
+class TValueStreamValueReceiver
 {
 public:
 	template <typename U>
@@ -590,20 +590,20 @@ private:
 
 
 template <typename T>
-class TValueGenerator
+class TValueStream
 {
 public:
-	TValueGenerator() = default;
+	TValueStream() = default;
 
 	// 복사 허용하면 내가 Next하고 다른 애가 Next하면 다른 애의 Next는 나 다음에 호출되므로
 	// 사실상 Next가 아니라 NextNext임 이게 좀 혼란스러울 수 있으므로 일단 막음
-	TValueGenerator(const TValueGenerator&) = delete;
-	TValueGenerator& operator=(const TValueGenerator&) = delete;
+	TValueStream(const TValueStream&) = delete;
+	TValueStream& operator=(const TValueStream&) = delete;
 	
-	TValueGenerator(TValueGenerator&&) = default;
-	TValueGenerator& operator=(TValueGenerator&&) = default;
+	TValueStream(TValueStream&&) = default;
+	TValueStream& operator=(TValueStream&&) = default;
 	
-	TWeakPtr<TValueGeneratorValueReceiver<T>> GetReceiver() const
+	TWeakPtr<TValueStreamValueReceiver<T>> GetReceiver() const
 	{
 		return Receiver;
 	}
@@ -624,7 +624,7 @@ public:
 	}
 
 private:
-	TSharedPtr<TValueGeneratorValueReceiver<T>> Receiver = MakeShared<TValueGeneratorValueReceiver<T>>();
+	TSharedPtr<TValueStreamValueReceiver<T>> Receiver = MakeShared<TValueStreamValueReceiver<T>>();
 };
 
 
@@ -695,9 +695,9 @@ void FlushAwaitablesArray(TArray<TWeakAwaitableHandle<T>>& Array, const U& Value
 
 
 template <typename T, typename DelegateType>
-TValueGenerator<T> CreateMulticastValueGenerator(const TArray<T>& ReadyValues, DelegateType& MulticastDelegate)
+TValueStream<T> CreateMulticastValueStream(const TArray<T>& ReadyValues, DelegateType& MulticastDelegate)
 {
-	TValueGenerator<T> Ret;
+	TValueStream<T> Ret;
 
 	auto Receiver = Ret.GetReceiver();
 	for (const T& Each : ReadyValues)
