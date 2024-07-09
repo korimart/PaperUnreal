@@ -194,6 +194,82 @@ bool UECoroutineTest::RunTest(const FString& Parameters)
 		Provider->IssueValue(Temp4);
 		RETURN_IF_FALSE(TestEqual(TEXT(""), Reached.Num(), 3));
 	}
+
+	{
+		DECLARE_MULTICAST_DELEGATE_OneParam(FOnInt32, int32);
+		FOnInt32 OnInt32;
+		TValueGenerator<int32> IntGen = CreateMulticastValueGenerator(TArray{1, 2, 3}, OnInt32);
+		
+		TArray<int32> Received;
+		RunWeakCoroutine(Provider, [&](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			Received.Add(co_await IntGen.Next());
+			Received.Add(co_await IntGen.Next());
+			Received.Add(co_await IntGen.Next());
+
+			while (true)
+			{
+				Received.Add(co_await IntGen.Next());
+			}
+		});
+
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Received.Num(), 3));
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Received[0], 1));
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Received[1], 2));
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Received[2], 3));
+
+		OnInt32.Broadcast(4);
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Received.Num(), 4));
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Received[3], 4));
+		
+		OnInt32.Broadcast(5);
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Received.Num(), 5));
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Received[4], 5));
+	}
+	
+	{
+		TValueGenerator<int32> IntGen;
+		auto Receiver = IntGen.GetReceiver();
+
+		auto Lifetime = MakeUnique<FUECoroutineTestLifetime>();
+		TSharedPtr<bool> bFreed = Lifetime->bDestroyed;
+
+		TArray<int32> Received;
+		RunWeakCoroutine(Provider, [&](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			Received.Add(co_await IntGen.Next());
+			Received.Add(co_await IntGen.Next());
+			Received.Add(co_await IntGen.Next());
+
+			while (co_await IntGen.NextIfNotEnd())
+			{
+				Received.Add(IntGen.Pop());
+			}
+
+			Received.Add(42);
+		});
+
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Received.Num(), 0));
+		Receiver.Pin()->AddValue(1);
+		Receiver.Pin()->AddValue(2);
+		Receiver.Pin()->AddValue(3);
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Received.Num(), 3));
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Received[0], 1));
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Received[1], 2));
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Received[2], 3));
+
+		Receiver.Pin()->AddValue(50);
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Received.Num(), 4));
+		
+		Receiver.Pin()->AddValue(50);
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Received.Num(), 5));
+		
+		Receiver.Pin()->AddValue(50);
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Received.Num(), 6));
+		
+		Receiver.Pin()->End();
+		RETURN_IF_FALSE(TestEqual(TEXT(""), Received.Last(), 42));
+	}
 	
 	return true;
 }

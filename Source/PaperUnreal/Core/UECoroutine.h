@@ -504,11 +504,13 @@ public:
 	template <typename U>
 	void AddValue(U&& Value)
 	{
-		if (ValueAwaitableHandles.Num() > 0)
+		check(!bEnded);
+
+		if (ValueHandlers.Num() > 0)
 		{
-			auto Handle = MoveTemp(ValueAwaitableHandles[0]);
-			ValueAwaitableHandles.RemoveAt(0);
-			Handle.SetValue(Forward<U>(Value));
+			auto Handle = MoveTemp(ValueHandlers[0]);
+			ValueHandlers.RemoveAt(0);
+			Handle(Forward<U>(Value));
 		}
 		else
 		{
@@ -516,7 +518,24 @@ public:
 		}
 	}
 
-	TWeakAwaitable<T> GetValue()
+	T PopValue()
+	{
+		T Ret = MoveTemp(Values[0]);
+		Values.RemoveAt(0);
+		return Ret;
+	}
+
+	void End()
+	{
+		bEnded = true;
+		for (auto& Each : ValueHandlers)
+		{
+			Each({});
+		}
+		ValueHandlers.Empty();
+	}
+
+	TWeakAwaitable<T> WaitForValue()
 	{
 		if (Values.Num() > 0)
 		{
@@ -525,14 +544,48 @@ public:
 			return Ret;
 		}
 
+		if (!bEnded)
+		{
+			TWeakAwaitable<T> Ret;
+			ValueHandlers.Add([Handle = Ret.GetHandle()](TOptional<T> NewValue) mutable
+			{
+				if (NewValue)
+				{
+					Handle.SetValue(MoveTemp(*NewValue));
+				}
+			});
+			return Ret;
+		}
+		
 		TWeakAwaitable<T> Ret;
-		ValueAwaitableHandles.Add(Ret.GetHandle());
+		Ret.SetNeverReady();
+		return Ret;
+	}
+
+	TWeakAwaitable<bool> WaitForValueIfNotEnd()
+	{
+		if (Values.Num() > 0)
+		{
+			return{true};
+		}
+
+		TWeakAwaitable<bool> Ret;
+		ValueHandlers.Add([this, Handle = Ret.GetHandle()](TOptional<T> NewValue) mutable
+		{
+			if (NewValue)
+			{
+				Values.Add(MoveTemp(*NewValue));
+			}
+
+			Handle.SetValue(NewValue.IsSet());
+		});
 		return Ret;
 	}
 
 private:
+	bool bEnded = false;
 	TArray<T> Values;
-	TArray<TWeakAwaitableHandle<T>> ValueAwaitableHandles;
+	TArray<TUniqueFunction<void(TOptional<T>)>> ValueHandlers;
 };
 
 
@@ -540,6 +593,16 @@ template <typename T>
 class TValueGenerator
 {
 public:
+	TValueGenerator() = default;
+
+	// 복사 허용하면 내가 Next하고 다른 애가 Next하면 다른 애의 Next는 나 다음에 호출되므로
+	// 사실상 Next가 아니라 NextNext임 이게 좀 혼란스러울 수 있으므로 일단 막음
+	TValueGenerator(const TValueGenerator&) = delete;
+	TValueGenerator& operator=(const TValueGenerator&) = delete;
+	
+	TValueGenerator(TValueGenerator&&) = default;
+	TValueGenerator& operator=(TValueGenerator&&) = default;
+	
 	TWeakPtr<TValueGeneratorValueReceiver<T>> GetReceiver() const
 	{
 		return Receiver;
@@ -547,7 +610,17 @@ public:
 
 	TWeakAwaitable<T> Next()
 	{
-		return Receiver->GetValue();
+		return Receiver->WaitForValue();
+	}
+	
+	TWeakAwaitable<bool> NextIfNotEnd()
+	{
+		return Receiver->WaitForValueIfNotEnd();
+	}
+
+	T Pop()
+	{
+		return Receiver->PopValue();
 	}
 
 private:
