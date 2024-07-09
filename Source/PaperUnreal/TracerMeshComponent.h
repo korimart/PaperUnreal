@@ -30,7 +30,7 @@ public:
 	{
 		if (!DynamicMeshVertexIndices.IsEmpty())
 		{
-			Segments.SetLastPoint(NewPosition);
+			Segments.SetPoint(-1, NewPosition);
 			// TODO 50 조절 가능하게
 			DynamicMesh->GetMeshRef().SetVertex(DynamicMeshVertexIndices.Last(), FVector{NewPosition, 51.f});
 		}

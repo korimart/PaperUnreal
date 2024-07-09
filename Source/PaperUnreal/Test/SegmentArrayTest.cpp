@@ -62,7 +62,8 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			FLoopedSegmentArray2D SegmentArray{VertexPositions};
 			auto Result = SegmentArray.Union(Path);
 			TestPointsEqual(TEXT("TestCase 0: Union"), SegmentArray.GetPoints(), Joined);
-			TestTrue(TEXT("TestCase 0: Union Result"), Result->bUnionedToTheLeftOfPath);
+			TestEqual(TEXT("TestCase 0: Union Result"), Result.Num(), 1);
+			TestTrue(TEXT("TestCase 0: Union Result"), Result[0].bUnionedToTheLeftOfPath);
 		}
 
 		{
@@ -71,7 +72,8 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			FLoopedSegmentArray2D SegmentArray{VertexPositions};
 			auto Result = SegmentArray.Union(ReversedPath);
 			TestPointsEqual(TEXT("TestCase 0: Reverse Union"), SegmentArray.GetPoints(), Joined);
-			TestFalse(TEXT("TestCase 0: Reverse Union Result"), Result->bUnionedToTheLeftOfPath);
+			TestEqual(TEXT("TestCase 0: Union Result"), Result.Num(), 1);
+			TestFalse(TEXT("TestCase 0: Reverse Union Result"), Result[0].bUnionedToTheLeftOfPath);
 		}
 	}
 
@@ -247,6 +249,146 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			FLoopedSegmentArray2D SegmentArray{VertexPositions};
 			auto Result = SegmentArray.Clip({{-2.f, 0.f}, {0.f, 0.f}});
 			TestEqual(TEXT("TestCase 5: Clip"), FSegment2D{Result}, FSegment2D{{-1.f, 0.f}, {0.f, 0.f}});
+		}
+	}
+
+	{
+		const TArray<FVector2D> VertexPositions
+		{
+			{-4.f, 2.f},
+			{-4.f, 0.f},
+			{4.f, 0.f},
+			{4.f, 2.f},
+			{3.f, 2.f},
+			{3.f, 1.f},
+			{2.f, 1.f},
+			{2.f, 2.f},
+			{1.f, 2.f},
+			{1.f, 1.f},
+			{-1.f, 1.f},
+			{-1.f, 2.f},
+			{-2.f, 2.f},
+			{-2.f, 1.f},
+			{-3.f, 1.f},
+			{-3.f, 2.f},
+		};
+
+		const TArray<FVector2D> Path
+		{
+			{5.f, 1.5f},
+			{-5.f, 1.5f},
+		};
+
+		const TArray<FVector2D> Joined
+		{
+			{-4.f, 2.f},
+			{-4.f, 0.f},
+			{4.f, 0.f},
+			{4.f, 2.f},
+			{3.f, 2.f},
+			{3.f, 1.5f},
+			{2.f, 1.5f},
+			{2.f, 2.f},
+			{1.f, 2.f},
+			{1.f, 1.5f},
+			{-1.f, 1.5f},
+			{-1.f, 2.f},
+			{-2.f, 2.f},
+			{-2.f, 1.5f},
+			{-3.f, 1.5f},
+			{-3.f, 2.f},
+		};
+		
+		{
+			FLoopedSegmentArray2D SegmentArray{VertexPositions};
+			auto Result = SegmentArray.Union(Path);
+			TestPointsEqual(TEXT("TestCase 6: Union"), SegmentArray.GetPoints(), Joined);
+			TestEqual(TEXT("TestCase 6: Union"), Result.Num(), 3);
+			TestTrue(TEXT("TestCase 6: Union"), Result[0].bUnionedToTheLeftOfPath);
+			TestTrue(TEXT("TestCase 6: Union"), Result[1].bUnionedToTheLeftOfPath);
+			TestTrue(TEXT("TestCase 6: Union"), Result[2].bUnionedToTheLeftOfPath);
+		}
+
+		{
+			auto ReversedPath = Path;
+			std::reverse(ReversedPath.begin(), ReversedPath.end());
+			FLoopedSegmentArray2D SegmentArray{VertexPositions};
+			auto Result = SegmentArray.Union(ReversedPath);
+			TestPointsEqual(TEXT("TestCase 6: Reverse Union"), SegmentArray.GetPoints(), Joined);
+			TestEqual(TEXT("TestCase 6: Reverse Union"), Result.Num(), 3);
+			TestFalse(TEXT("TestCase 6: Reverse Union"), Result[0].bUnionedToTheLeftOfPath);
+			TestFalse(TEXT("TestCase 6: Reverse Union"), Result[1].bUnionedToTheLeftOfPath);
+			TestFalse(TEXT("TestCase 6: Reverse Union"), Result[2].bUnionedToTheLeftOfPath);
+		}
+	}
+	
+	{
+		const TArray<FVector2D> VertexPositions
+		{
+			{-4.f, 2.f},
+			{-4.f, 0.f},
+			{4.f, 0.f},
+			{4.f, 2.f},
+			{3.f, 2.f},
+			{3.f, 1.f},
+			{2.f, 1.f},
+			{2.f, 2.f},
+			{1.f, 2.f},
+			{1.f, 1.f},
+			{-1.f, 1.f},
+			{-1.f, 2.f},
+			{-2.f, 2.f},
+			{-2.f, 1.f},
+			{-3.f, 1.f},
+			{-3.f, 2.f},
+		};
+
+		const TArray<FVector2D> Path
+		{
+			{3.f - UE_KINDA_SMALL_NUMBER, 1.5f},
+			{-3.f + UE_KINDA_SMALL_NUMBER, 1.5f},
+		};
+
+		const TArray<FVector2D> Joined
+		{
+			{-4.f, 2.f},
+			{-4.f, 0.f},
+			{4.f, 0.f},
+			{4.f, 2.f},
+			{3.f, 2.f},
+			{3.f, 1.5f},
+			{2.f, 1.5f},
+			{2.f, 2.f},
+			{1.f, 2.f},
+			{1.f, 1.5f},
+			{-1.f, 1.5f},
+			{-1.f, 2.f},
+			{-2.f, 2.f},
+			{-2.f, 1.5f},
+			{-3.f, 1.5f},
+			{-3.f, 2.f},
+		};
+		
+		{
+			FLoopedSegmentArray2D SegmentArray{VertexPositions};
+			auto Result = SegmentArray.Union(Path);
+			TestPointsEqual(TEXT("TestCase 7: Union"), SegmentArray.GetPoints(), Joined);
+			TestEqual(TEXT("TestCase 7: Union"), Result.Num(), 3);
+			TestTrue(TEXT("TestCase 7: Union"), Result[0].bUnionedToTheLeftOfPath);
+			TestTrue(TEXT("TestCase 7: Union"), Result[1].bUnionedToTheLeftOfPath);
+			TestTrue(TEXT("TestCase 7: Union"), Result[2].bUnionedToTheLeftOfPath);
+		}
+
+		{
+			auto ReversedPath = Path;
+			std::reverse(ReversedPath.begin(), ReversedPath.end());
+			FLoopedSegmentArray2D SegmentArray{VertexPositions};
+			auto Result = SegmentArray.Union(ReversedPath);
+			TestPointsEqual(TEXT("TestCase 7: Reverse Union"), SegmentArray.GetPoints(), Joined);
+			TestEqual(TEXT("TestCase 7: Reverse Union"), Result.Num(), 3);
+			TestFalse(TEXT("TestCase 7: Reverse Union"), Result[0].bUnionedToTheLeftOfPath);
+			TestFalse(TEXT("TestCase 7: Reverse Union"), Result[1].bUnionedToTheLeftOfPath);
+			TestFalse(TEXT("TestCase 7: Reverse Union"), Result[2].bUnionedToTheLeftOfPath);
 		}
 	}
 

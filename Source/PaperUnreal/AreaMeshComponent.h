@@ -47,14 +47,15 @@ public:
 		bool bAddedToTheLeftOfPath;
 	};
 
+	// TODO
 	TOptional<FExpansionResult> ExpandByPath(const FSegmentArray2D& Path)
 	{
 		if (Path.IsValid())
 		{
-			if (TOptional<FLoopedSegmentArray2D::FUnionResult> UnionResult = AreaBoundary.Union(Path))
+			if (TArray<FUnionResult> UnionResult = AreaBoundary.Union(Path); !UnionResult.IsEmpty())
 			{
 				OnBoundaryChanged.Broadcast(AreaBoundary);
-				return FExpansionResult{.bAddedToTheLeftOfPath = UnionResult->bUnionedToTheLeftOfPath};
+				return FExpansionResult{.bAddedToTheLeftOfPath = UnionResult[0].bUnionedToTheLeftOfPath};
 			}
 		}
 		return {};

@@ -77,7 +77,7 @@ private:
 
 		if (bGeneratedLastFrame && !bGeneratedThisFrame)
 		{
-			Path.SetLastPoint(NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint());
+			Path.SetPoint(-1, NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint());
 			OnPathEvent.Broadcast(CreateEvent(EArrayEvent::LastModified));
 			// OnPathEvent.Broadcast({.Event = ETracerPathEvent::GenerationEnded});
 		}
@@ -90,7 +90,7 @@ private:
 		if (Path.PointCount() == 0)
 		{
 			Path.AddPoint(ActorLocation2D);
-			Path.SetLastPoint(NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint());
+			Path.SetPoint(-1, NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint());
 			OnPathEvent.Broadcast(CreateEvent(EArrayEvent::Appended));
 			return;
 		}
@@ -140,7 +140,7 @@ private:
 		}
 		else
 		{
-			Path.SetLastPoint(ActorLocation2D);
+			Path.SetPoint(-1, ActorLocation2D);
 			OnPathEvent.Broadcast(CreateEvent(EArrayEvent::LastModified));
 		}
 	}
