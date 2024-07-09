@@ -58,32 +58,25 @@ private:
 			for (auto PathEventGenerator = MeshSource->CreatePathEventGenerator();;)
 			{
 				const FTracerPathEvent Event = co_await PathEventGenerator.Next();
-				UE_LOG(LogTemp, Warning, TEXT("Event %d"), Event.Affected.Num());
-				//
-				// if (Event.IsReset())
-				// {
-				// 	MeshDestination->Reset();
-				// }
-				// else if (Event.IsAppended())
-				// {
-				// 	auto [Left, Right] = CreateVertexPositions(Event.Point(), Event.PathDirection());
-				// 	if (MeshDestination->GetVertexCount() == 0)
-				// 	{
-				// 		AttachVerticesToAttachmentTarget(Left, Right);
-				// 	}
-				// 	MeshDestination->AppendVertices(Left, Right);
-				// }
-				// else if (Event.LastPointModified())
-				// {
-				// 	auto [Left, Right] = CreateVertexPositions(Event.Point(), Event.PathDirection());
-				// 	MeshDestination->SetLastVertices(Left, Right);
-				// }
-				// else if (Event.GenerationEnded())
-				// {
-				// 	auto [Left, Right] = MeshDestination->GetLastVertices();
-				// 	AttachVerticesToAttachmentTarget(Left, Right);
-				// 	MeshDestination->SetLastVertices(Left, Right);
-				// }
+
+				MeshDestination->Edit([&]()
+				{
+					if (Event.IsReset())
+					{
+						MeshDestination->Reset();
+						AppendVerticesFromTracerPath(Event.Affected);
+					}
+					else if (Event.IsAppended())
+					{
+						AppendVerticesFromTracerPath(Event.Affected);
+					}
+					else if (Event.IsLastModified())
+					{
+						// 현재 이 클래스의 가정: 수정은 Path의 가장 마지막 점에 대해서만 발생. 이 전제가 바뀌면 로직 수정해야 됨
+						check(Event.Affected.Num() == 1);
+						ModifyLastVerticesWithTracerPoint(Event.Affected[0]);
+					}
+				});
 			}
 		});
 	}
@@ -101,5 +94,24 @@ private:
 			Left = MeshAttachmentTarget->FindClosestPointOnBoundary2D(Left).GetPoint();
 			Right = MeshAttachmentTarget->FindClosestPointOnBoundary2D(Right).GetPoint();
 		}
+	}
+
+	void AppendVerticesFromTracerPath(const TArray<FTracerPathPoint>& TracerPath)
+	{
+		for (const FTracerPathPoint& Each : TracerPath)
+		{
+			auto [Left, Right] = CreateVertexPositions(Each.Point, Each.PathDirection);
+			if (MeshDestination->GetVertexCount() == 0)
+			{
+				AttachVerticesToAttachmentTarget(Left, Right);
+			}
+			MeshDestination->AppendVertices(Left, Right);
+		}
+	}
+
+	void ModifyLastVerticesWithTracerPoint(const FTracerPathPoint& Point)
+	{
+		auto [Left, Right] = CreateVertexPositions(Point.Point, Point.PathDirection);
+		MeshDestination->SetLastVertices(Left, Right);
 	}
 };

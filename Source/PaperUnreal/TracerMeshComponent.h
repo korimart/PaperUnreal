@@ -74,8 +74,32 @@ public:
 		return {LeftSegments.GetLastVertexPosition(), RightSegments.GetLastVertexPosition()};
 	}
 
+	template <typename Func>
+	void Edit(Func&& EditFunc)
+	{
+		check(!bEditBegun);
+		bEditBegun = true;
+		EditFunc();
+		bEditBegun = false;
+
+		if (bModified)
+		{
+			DynamicMeshComponent->NotifyMeshModified();
+		}
+		else if (bFastModified)
+		{
+			DynamicMeshComponent->FastNotifyPositionsUpdated();
+		}
+
+		bModified = false;
+		bFastModified = false;
+	}
+
 	void Reset()
 	{
+		check(bEditBegun);
+		bModified = true;
+
 		DynamicMeshComponent->GetDynamicMesh()->Reset();
 
 		UE::Geometry::FDynamicMeshNormalOverlay* NormalOverlay = DynamicMeshComponent->GetMesh()->Attributes()->PrimaryNormals();
@@ -95,6 +119,9 @@ public:
 
 	void AppendVertices(const FVector2D& Left, const FVector2D& Right)
 	{
+		check(bEditBegun);
+		bModified = true;
+
 		LeftSegments.AddVertex(Left);
 		RightSegments.AddVertex(Right);
 
@@ -115,15 +142,14 @@ public:
 			Mesh->Attributes()->PrimaryUV()->SetTriangle(Tri0, {0, 1, 2});
 			Mesh->Attributes()->PrimaryUV()->SetTriangle(Tri1, {1, 3, 2});
 		}
-
-		DynamicMeshComponent->NotifyMeshModified();
 	}
 
 	void SetLastVertices(const FVector2D& Left, const FVector2D& Right)
 	{
+		check(bEditBegun);
+		bFastModified = true;
 		LeftSegments.SetLastVertexPosition(Left);
 		RightSegments.SetLastVertexPosition(Right);
-		DynamicMeshComponent->FastNotifyPositionsUpdated();
 	}
 
 	void ConfigureMaterialSet(const TArray<UMaterialInterface*>& NewMaterialSet)
@@ -137,6 +163,9 @@ private:
 
 	FDynamicMeshSegment2D LeftSegments;
 	FDynamicMeshSegment2D RightSegments;
+	bool bEditBegun = false;
+	bool bModified = false;
+	bool bFastModified = false;
 
 	UTracerMeshComponent()
 	{
@@ -149,7 +178,7 @@ private:
 
 		DynamicMeshComponent = NewObject<UDynamicMeshComponent>(GetOwner(), TEXT("DynamicMeshComponent"));
 		DynamicMeshComponent->RegisterComponent();
-		Reset();
+		Edit([&]() { Reset(); });
 	}
 
 	virtual void UninitializeComponent() override

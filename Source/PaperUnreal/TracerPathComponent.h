@@ -67,6 +67,7 @@ private:
 		if (!bGeneratedLastFrame && bWillGenerateThisFrame)
 		{
 			Path.Empty();
+			OnPathEvent.Broadcast(CreateEvent(EArrayEvent::Reset));
 			bGenerating = true;
 		}
 
@@ -148,15 +149,19 @@ private:
 
 	FTracerPathEvent CreateEvent(EArrayEvent Event) const
 	{
-		const FTracerPathPoint Point
+		if (Event == EArrayEvent::Reset)
 		{
-			.Point = Path.GetLastPoint(),
-			.PathDirection = FVector2D{GetOwner()->GetActorForwardVector()},
-		};
+			return {.Event = EArrayEvent::Reset, .Affected = {}};
+		}
 
-		FTracerPathEvent Ret;
-		Ret.Event = Event;
-		Ret.Affected = {Point};
-		return Ret;
+		return {
+			.Event = Event,
+			.Affected = {
+				{
+					.Point = Path.GetLastPoint(),
+					.PathDirection = FVector2D{GetOwner()->GetActorForwardVector()}
+				}
+			}
+		};
 	}
 };
