@@ -11,7 +11,7 @@
 
 
 UCLASS()
-class UReplicatedTracerPathComponent : public UActorComponent2, public ITracerPathGenerator
+class UReplicatedTracerPathComponent : public UActorComponent2, public ITracerPathStream
 {
 	GENERATED_BODY()
 
@@ -19,7 +19,7 @@ public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnPathEvent, FTracerPathEvent);
 	FOnPathEvent OnPathEvent;
 
-	virtual TValueGenerator<FTracerPathEvent> CreatePathEventGenerator() override
+	virtual TValueGenerator<FTracerPathEvent> CreatePathStream() override
 	{
 		check(TypedReplicator); // did you wait for init?
 		return TypedReplicator->CreateTypedEventGenerator();
@@ -42,9 +42,9 @@ private:
 	UTracerPathComponent* ServerTracerPath;
 	
 	UPROPERTY(ReplicatedUsing=OnRep_Replicator)
-	UByteArrayReplicatorComponent* Replicator;
+	UByteStreamComponent* Replicator;
 	
-	TSharedPtr<TTypedByteArrayReplicatorView<FTracerPathPoint>> TypedReplicator;
+	TSharedPtr<TTypedStreamView<FTracerPathPoint>> TypedReplicator;
 	TArray<TWeakAwaitableHandle<bool>> InitCompleteHandles;
 
 	UReplicatedTracerPathComponent()
@@ -64,15 +64,15 @@ private:
 
 		check(AllValid(ServerTracerPath));
 
-		Replicator = NewObject<UByteArrayReplicatorComponent>(this);
+		Replicator = NewObject<UByteStreamComponent>(this);
 		Replicator->RegisterComponent();
-		TypedReplicator = MakeShared<TTypedByteArrayReplicatorView<FTracerPathPoint>>(*Replicator);
+		TypedReplicator = MakeShared<TTypedStreamView<FTracerPathPoint>>(*Replicator);
 
 		RunWeakCoroutine(this, [this](auto&) -> FWeakCoroutine
 		{
-			for (auto PathEvents = ServerTracerPath->CreatePathEventGenerator();;)
+			for (auto PathEvents = ServerTracerPath->CreatePathStream();;)
 			{
-				TypedReplicator->SetFromEvent(co_await PathEvents.Next());
+				TypedReplicator->TriggerEvent(co_await PathEvents.Next());
 			}
 		});
 	}
@@ -82,7 +82,7 @@ private:
 	{
 		if (IsValid(Replicator))
 		{
-			TypedReplicator = MakeShared<TTypedByteArrayReplicatorView<FTracerPathPoint>>(*Replicator);
+			TypedReplicator = MakeShared<TTypedStreamView<FTracerPathPoint>>(*Replicator);
 			FlushAwaitablesArray(InitCompleteHandles, true);
 		}
 	}

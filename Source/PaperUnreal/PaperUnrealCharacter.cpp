@@ -73,7 +73,7 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 		// TODO graceful exit
 		check(co_await RR->GetbResourcesLoaded().WaitForValue(this));
 
-		ITracerPathGenerator* TracerMeshSource = nullptr;
+		ITracerPathStream* TracerMeshSource = nullptr;
 		if (GetNetMode() == NM_Client)
 		{
 			TracerMeshSource = co_await WaitForComponent<UReplicatedTracerPathComponent>(this);

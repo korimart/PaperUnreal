@@ -17,7 +17,7 @@ class UTracerMeshGeneratorComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	void SetMeshSource(ITracerPathGenerator* Source)
+	void SetMeshSource(ITracerPathStream* Source)
 	{
 		MeshSource = Cast<UObject>(Source);
 	}
@@ -34,7 +34,7 @@ public:
 
 private:
 	UPROPERTY()
-	TScriptInterface<ITracerPathGenerator> MeshSource;
+	TScriptInterface<ITracerPathStream> MeshSource;
 
 	UPROPERTY()
 	UTracerMeshComponent* MeshDestination;
@@ -53,32 +53,7 @@ private:
 
 		check(AllValid(MeshSource, MeshDestination, MeshAttachmentTarget));
 
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
-		{
-			for (auto PathEventGenerator = MeshSource->CreatePathEventGenerator();;)
-			{
-				const FTracerPathEvent Event = co_await PathEventGenerator.Next();
-
-				MeshDestination->Edit([&]()
-				{
-					if (Event.IsReset())
-					{
-						MeshDestination->Reset();
-						AppendVerticesFromTracerPath(Event.Affected);
-					}
-					else if (Event.IsAppended())
-					{
-						AppendVerticesFromTracerPath(Event.Affected);
-					}
-					else if (Event.IsLastModified())
-					{
-						// 현재 이 클래스의 가정: 수정은 Path의 가장 마지막 점에 대해서만 발생. 이 전제가 바뀌면 로직 수정해야 됨
-						check(Event.Affected.Num() == 1);
-						ModifyLastVerticesWithTracerPoint(Event.Affected[0]);
-					}
-				});
-			}
-		});
+		ListenToNextTracerStream();
 	}
 
 	static std::tuple<FVector2D, FVector2D> CreateVertexPositions(const FVector2D& Center, const FVector2D& Forward)
@@ -87,31 +62,68 @@ private:
 		return {Center - 5.f * Right, Center + 5.f * Right};
 	}
 
-	void AttachVerticesToAttachmentTarget(FVector2D& Left, FVector2D& Right) const
-	{
-		if (MeshAttachmentTarget->IsValid())
-		{
-			Left = MeshAttachmentTarget->FindClosestPointOnBoundary2D(Left).GetPoint();
-			Right = MeshAttachmentTarget->FindClosestPointOnBoundary2D(Right).GetPoint();
-		}
-	}
-
-	void AppendVerticesFromTracerPath(const TArray<FTracerPathPoint>& TracerPath)
+	void AppendVerticesFromTracerPath(const TArray<FTracerPathPoint>& TracerPath) const
 	{
 		for (const FTracerPathPoint& Each : TracerPath)
 		{
 			auto [Left, Right] = CreateVertexPositions(Each.Point, Each.PathDirection);
-			if (MeshDestination->GetVertexCount() == 0)
-			{
-				AttachVerticesToAttachmentTarget(Left, Right);
-			}
 			MeshDestination->AppendVertices(Left, Right);
 		}
 	}
 
-	void ModifyLastVerticesWithTracerPoint(const FTracerPathPoint& Point)
+	void ModifyLastVerticesWithTracerPoint(const FTracerPathPoint& Point) const
 	{
 		auto [Left, Right] = CreateVertexPositions(Point.Point, Point.PathDirection);
-		MeshDestination->SetLastVertices(Left, Right);
+		MeshDestination->SetVertices(-1, Left, Right);
+	}
+
+	void AttachVerticesToAttachmentTarget(int32 Index) const
+	{
+		if (MeshAttachmentTarget->IsValid())
+		{
+			auto [Left, Right] = MeshDestination->GetVertices(Index);
+			Left = MeshAttachmentTarget->FindClosestPointOnBoundary2D(Left).GetPoint();
+			Right = MeshAttachmentTarget->FindClosestPointOnBoundary2D(Right).GetPoint();
+			MeshDestination->SetVertices(Index, Left, Right);
+		}
+	}
+
+	void ListenToNextTracerStream()
+	{
+		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			auto PathStream = MeshSource->CreatePathStream();
+			check((co_await PathStream.Next()).IsOpenedEvent());
+
+			MeshDestination->Edit([&, FirstEvent = co_await PathStream.Next()]()
+			{
+				MeshDestination->Reset();
+				AppendVerticesFromTracerPath(FirstEvent.Affected);
+				AttachVerticesToAttachmentTarget(0);
+			});
+
+			while (co_await PathStream.NextIfNotEnd())
+			{
+				const auto Event = PathStream.Pop();
+
+				if (Event.IsAppendedEvent())
+				{
+					MeshDestination->Edit([&]() { AppendVerticesFromTracerPath(Event.Affected); });
+				}
+				else if (Event.IsLastModifiedEvent())
+				{
+					// 현재 이 클래스의 가정: 수정은 Path의 가장 마지막 점에 대해서만 발생. 이 전제가 바뀌면 로직 수정해야 됨
+					check(Event.Affected.Num() == 1);
+					MeshDestination->Edit([&]() { ModifyLastVerticesWithTracerPoint(Event.Affected[0]); });
+				}
+				else
+				{
+					break;
+				}
+			}
+
+			MeshDestination->Edit([&]() { AttachVerticesToAttachmentTarget(-1); });
+			ListenToNextTracerStream();
+		});
 	}
 };

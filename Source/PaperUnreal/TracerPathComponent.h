@@ -5,13 +5,12 @@
 #include "CoreMinimal.h"
 #include "AreaMeshComponent.h"
 #include "TracerPathGenerator.h"
-#include "Core/LiveData.h"
 #include "Core/Utils.h"
 #include "TracerPathComponent.generated.h"
 
 
 UCLASS()
-class UTracerPathComponent : public UActorComponent2, public ITracerPathGenerator
+class UTracerPathComponent : public UActorComponent2, public ITracerPathStream
 {
 	GENERATED_BODY()
 
@@ -19,9 +18,7 @@ public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnPathEvent, FTracerPathEvent);
 	FOnPathEvent OnPathEvent;
 
-	DECLARE_LIVE_DATA_AND_GETTER(bool, bGenerating);
-
-	virtual TValueGenerator<FTracerPathEvent> CreatePathEventGenerator() override
+	virtual TValueGenerator<FTracerPathEvent> CreatePathStream() override
 	{
 		return CreateMulticastValueGenerator(TArray<FTracerPathEvent>{}, OnPathEvent);
 	}
@@ -67,8 +64,7 @@ private:
 		if (!bGeneratedLastFrame && bWillGenerateThisFrame)
 		{
 			Path.Empty();
-			OnPathEvent.Broadcast(CreateEvent(EArrayEvent::Reset));
-			bGenerating = true;
+			OnPathEvent.Broadcast(CreateEvent(EStreamEvent::Opened));
 		}
 
 		if (bWillGenerateThisFrame)
@@ -80,8 +76,8 @@ private:
 		if (bGeneratedLastFrame && !bGeneratedThisFrame)
 		{
 			Path.SetPoint(-1, NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint());
-			OnPathEvent.Broadcast(CreateEvent(EArrayEvent::LastModified));
-			bGenerating = false;
+			OnPathEvent.Broadcast(CreateEvent(EStreamEvent::LastModified));
+			OnPathEvent.Broadcast(CreateEvent(EStreamEvent::Closed));
 		}
 	}
 
@@ -93,7 +89,7 @@ private:
 		{
 			Path.AddPoint(ActorLocation2D);
 			Path.SetPoint(-1, NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint());
-			OnPathEvent.Broadcast(CreateEvent(EArrayEvent::Appended));
+			OnPathEvent.Broadcast(CreateEvent(EStreamEvent::Appended));
 			return;
 		}
 
@@ -105,7 +101,7 @@ private:
 		if (Path.PointCount() < 3)
 		{
 			Path.AddPoint(ActorLocation2D);
-			OnPathEvent.Broadcast(CreateEvent(EArrayEvent::Appended));
+			OnPathEvent.Broadcast(CreateEvent(EStreamEvent::Appended));
 			return;
 		}
 
@@ -138,20 +134,20 @@ private:
 		if (Curvature > 0.005f || CurrentDeviation > 10.f)
 		{
 			Path.AddPoint(ActorLocation2D);
-			OnPathEvent.Broadcast(CreateEvent(EArrayEvent::Appended));
+			OnPathEvent.Broadcast(CreateEvent(EStreamEvent::Appended));
 		}
 		else
 		{
 			Path.SetPoint(-1, ActorLocation2D);
-			OnPathEvent.Broadcast(CreateEvent(EArrayEvent::LastModified));
+			OnPathEvent.Broadcast(CreateEvent(EStreamEvent::LastModified));
 		}
 	}
 
-	FTracerPathEvent CreateEvent(EArrayEvent Event) const
+	FTracerPathEvent CreateEvent(EStreamEvent Event) const
 	{
-		if (Event == EArrayEvent::Reset)
+		if (Event == EStreamEvent::Opened || Event == EStreamEvent::Closed)
 		{
-			return {.Event = EArrayEvent::Reset, .Affected = {}};
+			return {.Event = Event, .Affected = {}};
 		}
 
 		return {

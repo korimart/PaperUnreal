@@ -53,9 +53,9 @@ private:
 
 		check(AllValid(Tracer, ConversionDestination));
 
-		Tracer->GetbGenerating().ObserveValid(this, [this](bool bTracerBeingGenerated)
+		Tracer->OnPathEvent.AddWeakLambda(this, [this](const FTracerPathEvent& Event)
 		{
-			if (!bTracerBeingGenerated)
+			if (Event.IsClosedEvent())
 			{
 				bConvertingForTracerCompletion = true;
 				ConvertPathToArea();

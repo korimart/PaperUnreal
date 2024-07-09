@@ -6,111 +6,137 @@
 #include "Core/ActorComponent2.h"
 #include "Core/UECoroutine.h"
 #include "Net/UnrealNetwork.h"
-#include "ByteArrayReplicatorComponent.generated.h"
+#include "ByteStreamComponent.generated.h"
 
 
 template <typename T>
 concept CByteArray = std::is_convertible_v<T, TArray<uint8>>;
 
 
-enum class EArrayEvent
+enum class EStreamEvent
 {
-	Reset,
+	Opened,
 	Appended,
 	LastModified,
+	Closed,
 };
 
 
 template <typename T>
-struct TArrayEvent
+struct TStreamEvent
 {
-	EArrayEvent Event;
+	EStreamEvent Event;
 	TArray<T> Affected;
 
-	bool IsReset() const { return Event == EArrayEvent::Reset; }
-	bool IsAppended() const { return Event == EArrayEvent::Appended; }
-	bool IsLastModified() const { return Event == EArrayEvent::LastModified; }
+	bool IsOpenedEvent() const { return Event == EStreamEvent::Opened; }
+	bool IsAppendedEvent() const { return Event == EStreamEvent::Appended; }
+	bool IsLastModifiedEvent() const { return Event == EStreamEvent::LastModified; }
+	bool IsClosedEvent() const { return Event == EStreamEvent::Closed; }
 };
 
 
-using FByteArrayEvent = TArrayEvent<uint8>;
+using FByteStreamEvent = TStreamEvent<uint8>;
 
 
 USTRUCT()
-struct FRepByteArray
+struct FRepByteStream
 {
 	GENERATED_BODY()
 
-	const TArray<uint8>& GetArray() const
+	const TArray<uint8>& GetBytes() const
 	{
 		return Array;
 	}
 
-	template <CByteArray ArrayType>
-	void Reset(ArrayType&& NewArray)
+	bool IsOpen() const
 	{
+		return bOpen;
+	}
+
+	void Open()
+	{
+		check(!bOpen);
 		Id++;
-		Array = Forward<ArrayType>(NewArray);
+		bOpen = true;
+		Array.Empty();
+	}
+
+	void Close()
+	{
+		bOpen = false;
 	}
 
 	template <CByteArray ArrayType>
-	void Append(ArrayType&& NewArray)
+	void PushBytes(ArrayType&& NewArray)
 	{
 		Array.Append(Forward<ArrayType>(NewArray));
 	}
 
 	template <CByteArray ArrayType>
-	void SetLast(ArrayType&& NewArray)
+	void ModifyLastBytes(ArrayType&& NewArray)
 	{
 		check(Array.Num() >= NewArray.Num());
 
 		if (NewArray.Num() > 0)
 		{
 			Array.SetNum(Array.Num() - NewArray.Num(), false);
-			Append(Forward<ArrayType>(NewArray));
+			PushBytes(Forward<ArrayType>(NewArray));
 		}
 	}
 
-	TArray<FByteArrayEvent> CompareAndCreateEvents(const FRepByteArray& OldArray) const
+	TArray<FByteStreamEvent> CompareAndCreateEvents(const FRepByteStream& OldStream) const
 	{
-		if (Id != OldArray.Id)
+		TArray<FByteStreamEvent> Ret;
+
+		if (Id != OldStream.Id)
 		{
-			return {{.Event = EArrayEvent::Reset, .Affected = Array,}};
+			Ret.Add({.Event = EStreamEvent::Opened, .Affected = {},});
+			Ret.Add({.Event = EStreamEvent::Appended, .Affected = Array,});
+
+			if (!bOpen)
+			{
+				Ret.Add({.Event = EStreamEvent::Closed, .Affected = {},});
+			}
+
+			return Ret;
 		}
 
 		// 현재 원소 삭제 연산은 지원하지 않는데 추가해놓고 이 함수를 수정하는 것을 까먹은 경우
-		check(OldArray.Array.Num() <= Array.Num());
+		check(OldStream.Array.Num() <= Array.Num());
 
 		const int32 ModifiedByteCount = [&]()
 		{
-			for (int32 i = 0; i < OldArray.Array.Num(); i++)
+			for (int32 i = 0; i < OldStream.Array.Num(); i++)
 			{
-				if (OldArray.Array[i] != Array[i])
+				if (OldStream.Array[i] != Array[i])
 				{
-					return OldArray.Array.Num() - i;
+					return OldStream.Array.Num() - i;
 				}
 			}
 			return 0;
 		}();
 
-		const int32 AppendedByteCount = Array.Num() - OldArray.Array.Num();
-
-		TArray<FByteArrayEvent> Ret;
+		const int32 AppendedByteCount = Array.Num() - OldStream.Array.Num();
 
 		if (ModifiedByteCount > 0)
 		{
 			Ret.Add({
-				.Event = EArrayEvent::LastModified,
-				.Affected = TArray<uint8>{TArrayView<const uint8>{OldArray.Array}.Right(ModifiedByteCount)}
+				.Event = EStreamEvent::LastModified,
+				.Affected = TArray<uint8>{TArrayView<const uint8>{OldStream.Array}.Right(ModifiedByteCount)}
 			});
 		}
 
 		if (AppendedByteCount > 0)
 		{
 			Ret.Add({
-				.Event = EArrayEvent::Appended,
+				.Event = EStreamEvent::Appended,
 				.Affected = TArray<uint8>{TArrayView<const uint8>{Array}.Right(AppendedByteCount)}
 			});
+		}
+
+		if (!bOpen)
+		{
+			Ret.Add({.Event = EStreamEvent::Closed, .Affected = {},});
 		}
 
 		return Ret;
@@ -121,71 +147,86 @@ private:
 	int32 Id = -1;
 
 	UPROPERTY()
+	bool bOpen = false;
+
+	UPROPERTY()
 	TArray<uint8> Array;
 };
 
 
 UCLASS()
-class UByteArrayReplicatorComponent : public UActorComponent2
+class UByteStreamComponent : public UActorComponent2
 {
 	GENERATED_BODY()
 
 public:
-	DECLARE_MULTICAST_DELEGATE_OneParam(FOnByteArrayEvent, const FByteArrayEvent&);
-	FOnByteArrayEvent OnByteArrayEvent;
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnByteStreamEvent, const FByteStreamEvent&);
+	FOnByteStreamEvent OnByteStreamEvent;
 
-	TValueGenerator<FByteArrayEvent> CreateEventGenerator()
+	TValueGenerator<FByteStreamEvent> CreateEventGenerator()
 	{
-		return CreateMulticastValueGenerator(RepArray.CompareAndCreateEvents({}), OnByteArrayEvent);
+		TArray<FByteStreamEvent> Init = RepStream.IsOpen()
+			? RepStream.CompareAndCreateEvents({})
+			: TArray<FByteStreamEvent>{};
+		return CreateMulticastValueGenerator(Init, OnByteStreamEvent);
 	}
 
-	const TArray<uint8>& GetArray() const
+	const TArray<uint8>& GetBytes() const
 	{
-		return RepArray.GetArray();
+		return RepStream.GetBytes();
+	}
+
+	void OpenStream()
+	{
+		check(GetNetMode() != NM_Client);
+		RepStream.Open();
+	}
+
+	void CloseStream()
+	{
+		check(GetNetMode() != NM_Client);
+		RepStream.Close();
 	}
 
 	template <CByteArray ArrayType>
-	void ResetArray(ArrayType&& NewArray)
+	void PushBytes(ArrayType&& Bytes)
 	{
 		check(GetNetMode() != NM_Client);
-		RepArray.Reset(Forward<ArrayType>(NewArray));
+		RepStream.PushBytes(Forward<ArrayType>(Bytes));
 	}
 
-	template <CByteArray ArrayType>
-	void AppendArray(ArrayType&& NewArray)
+	void ModifyLastBytes(const TArray<uint8>& Bytes)
 	{
 		check(GetNetMode() != NM_Client);
-		RepArray.Append(Forward<ArrayType>(NewArray));
+		RepStream.ModifyLastBytes(Bytes);
 	}
 
-	void SetLast(const TArray<uint8>& NewData)
+	template <typename EventType> requires std::is_convertible_v<EventType, FByteStreamEvent>
+	void TriggerEvent(EventType&& Event)
 	{
-		check(GetNetMode() != NM_Client);
-		RepArray.SetLast(NewData);
-	}
-
-	template <typename EventType> requires std::is_convertible_v<EventType, FByteArrayEvent>
-	void SetFromEvent(EventType&& Event)
-	{
-		if (Event.Event == EArrayEvent::Reset)
+		if (Event.Event == EStreamEvent::Opened)
 		{
-			ResetArray(Forward<EventType>(Event).Affected);
+			OpenStream();
 		}
-		else if (Event.Event == EArrayEvent::Appended)
+		else if (Event.Event == EStreamEvent::Closed)
 		{
-			AppendArray(Forward<EventType>(Event).Affected);
+			CloseStream();
 		}
-		else if (Event.Event == EArrayEvent::LastModified)
+		else if (Event.Event == EStreamEvent::Appended)
 		{
-			SetLast(Forward<EventType>(Event).Affected);
+			PushBytes(Forward<EventType>(Event).Affected);
+		}
+		else if (Event.Event == EStreamEvent::LastModified)
+		{
+			ModifyLastBytes(Forward<EventType>(Event).Affected);
 		}
 	}
 
 private:
-	UPROPERTY(ReplicatedUsing=OnRep_Array)
-	FRepByteArray RepArray;
+	UPROPERTY(ReplicatedUsing=OnRep_Stream)
+	FRepByteStream RepStream;
 
-	UByteArrayReplicatorComponent()
+	UByteStreamComponent()
 	{
 		SetIsReplicatedByDefault(true);
 	}
@@ -231,79 +272,88 @@ private:
 	 * (OnRep 함수에 브레이크 포인트 찍어서 콜스택 보면 관련 함수들을 많이 볼 수 있음)
 	 */
 	UFUNCTION()
-	void OnRep_Array(const FRepByteArray& OldArray)
+	void OnRep_Stream(const FRepByteStream& OldStream)
 	{
-		for (const FByteArrayEvent& Each : RepArray.CompareAndCreateEvents(OldArray))
+		for (const FByteStreamEvent& Each : RepStream.CompareAndCreateEvents(OldStream))
 		{
-			OnByteArrayEvent.Broadcast(Each);
+			OnByteStreamEvent.Broadcast(Each);
 		}
 	}
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-		DOREPLIFETIME(ThisClass, RepArray);
+		DOREPLIFETIME(ThisClass, RepStream);
 	}
 };
 
 
 template <typename T, typename U>
-concept CTypedByteArray = std::is_convertible_v<T, TArray<U>>;
+concept CTypedStream = std::is_convertible_v<T, TArray<U>>;
 
 
 template <typename T>
-class TTypedByteArrayReplicatorView : public TSharedFromThis<TTypedByteArrayReplicatorView<T>>
+class TTypedStreamView : public TSharedFromThis<TTypedStreamView<T>>
 {
 public:
-	TTypedByteArrayReplicatorView(UByteArrayReplicatorComponent& Replicator)
-		: ByteArrayReplicator(Replicator)
+	TTypedStreamView(UByteStreamComponent& Stream)
+		: ByteStream(Stream)
 	{
 	}
 
-	TValueGenerator<TArrayEvent<T>> CreateTypedEventGenerator()
+	TValueGenerator<TStreamEvent<T>> CreateTypedEventGenerator()
 	{
-		TValueGenerator<TArrayEvent<T>> Ret;
+		TValueGenerator<TStreamEvent<T>> Ret;
 		RunWeakCoroutine(this->AsShared(), [this, Receiver = Ret.GetReceiver()](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
 			Context.AddToWeakList(Receiver);
-			for (auto ByteEvents = ByteArrayReplicator.CreateEventGenerator();;)
+			for (auto ByteEvents = ByteStream.CreateEventGenerator();;)
 			{
-				Receiver.Pin()->AddValue(ToTypedEvent(co_await ByteEvents.Next()));
+				// 여기 NewEvent를 선언 안하고 inline으로 ToTypedEvent에 넣으면 프로그램 고장남
+				// 아마도 Pin()이 co_await 보다 먼저 호출될 수도 있을 것 같음
+				// C++ order of evaluation 관련 문제로 의심되니까 순서를 명시한다
+				const FByteStreamEvent NewEvent = co_await ByteEvents.Next();
+				Receiver.Pin()->AddValue(ToTypedEvent(NewEvent));
 			}
 		});
 		return Ret;
 	}
-	
-	void ResetArray(const TArray<T>& NewArray)
+
+	void OpenStream()
 	{
-		ByteArrayReplicator.ResetArray(Serialize(NewArray));
+		ByteStream.OpenStream();
 	}
 
-	void AppendArray(const TArray<T>& NewArray)
+	void CloseStream()
 	{
-		ByteArrayReplicator.AppendArray(Serialize(NewArray));
+		ByteStream.CloseStream();
 	}
 
-	void SetLast(const TArray<T>& NewArray)
+	void Push(const TArray<T>& TypedData)
 	{
-		ByteArrayReplicator.SetLast(Serialize(NewArray));
+		ByteStream.PushBytes(Serialize(TypedData));
 	}
 
-	void SetFromEvent(const TArrayEvent<T>& Event)
+	void ModifyLast(const TArray<T>& TypedData)
 	{
-		ByteArrayReplicator.SetFromEvent(FByteArrayEvent{
+		ByteStream.ModifyLastBytes(Serialize(TypedData));
+	}
+
+	void TriggerEvent(const TStreamEvent<T>& Event)
+	{
+		ByteStream.TriggerEvent(FByteStreamEvent{
 			.Event = Event.Event,
 			.Affected = Serialize(Event.Affected),
 		});
 	}
 
-	TArrayEvent<T> ToTypedEvent(const FByteArrayEvent& Event)
+	TStreamEvent<T> ToTypedEvent(const FByteStreamEvent& Event)
 	{
-		return { .Event = Event.Event, .Affected = Deserialize(Event.Affected), };
+		return {.Event = Event.Event, .Affected = Deserialize(Event.Affected),};
 	}
 
 private:
-	UByteArrayReplicatorComponent& ByteArrayReplicator;
+	UByteStreamComponent& ByteStream;
 
 	TArray<uint8> Serialize(const TArray<T>& Source)
 	{
@@ -315,7 +365,7 @@ private:
 		}
 		return Serialized;
 	}
-	
+
 	TArray<T> Deserialize(const TArray<uint8>& Source)
 	{
 		FMemoryReader Reader{Source};

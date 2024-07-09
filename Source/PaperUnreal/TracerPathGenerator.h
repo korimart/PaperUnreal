@@ -3,13 +3,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "ByteArrayReplicatorComponent.h"
+#include "ByteStreamComponent.h"
 #include "UObject/Interface.h"
 #include "TracerPathGenerator.generated.h"
 
 // This class does not need to be modified.
 UINTERFACE()
-class UTracerPathGenerator : public UInterface
+class UTracerPathStream : public UInterface
 {
 	GENERATED_BODY()
 };
@@ -29,16 +29,16 @@ struct FTracerPathPoint
 };
 
 
-using FTracerPathEvent = TArrayEvent<FTracerPathPoint>;
+using FTracerPathEvent = TStreamEvent<FTracerPathPoint>;
 
 
 /**
  * 
  */
-class ITracerPathGenerator
+class ITracerPathStream
 {
 	GENERATED_BODY()
 
 public:
-	virtual TValueGenerator<FTracerPathEvent> CreatePathEventGenerator() = 0;
+	virtual TValueGenerator<FTracerPathEvent> CreatePathStream() = 0;
 };

@@ -187,6 +187,11 @@ public:
 		return Index >= 0 ? Index : SegmentCount() + Index;
 	}
 
+	FVector2D GetPoint(int32 Index) const
+	{
+		return Points[PositivePointIndex(Index)];
+	}
+
 	FVector2D GetLastPoint(int32 IndexFromLast = 0) const
 	{
 		return Points[Points.Num() - IndexFromLast - 1];

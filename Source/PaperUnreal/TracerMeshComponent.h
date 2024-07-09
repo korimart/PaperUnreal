@@ -26,11 +26,11 @@ public:
 		DynamicMeshVertexIndices.Push(DynamicMesh->GetMeshRef().AppendVertex(FVector{Position, 51.f}));
 	}
 
-	void SetLastVertexPosition(const FVector2D& NewPosition)
+	void SetVertexPosition(int32 Index, const FVector2D& NewPosition)
 	{
 		if (!DynamicMeshVertexIndices.IsEmpty())
 		{
-			Segments.SetPoint(-1, NewPosition);
+			Segments.SetPoint(Index, NewPosition);
 			// TODO 50 조절 가능하게
 			DynamicMesh->GetMeshRef().SetVertex(DynamicMeshVertexIndices.Last(), FVector{NewPosition, 51.f});
 		}
@@ -41,9 +41,9 @@ public:
 		return Segments;
 	}
 
-	const FVector2D& GetLastVertexPosition() const
+	const FVector2D& GetVertexPosition(int32 Index) const
 	{
-		return Segments.GetLastPoint();
+		return Segments.GetPoint(Index);
 	}
 
 	int GetLastVertexDynamicIndex(int32 IndexFromLast = 0) const
@@ -69,11 +69,11 @@ public:
 		return DynamicMeshComponent->GetMesh()->VertexCount();
 	}
 
-	std::tuple<FVector2D, FVector2D> GetLastVertices() const
+	std::tuple<FVector2D, FVector2D> GetVertices(int32 Index) const
 	{
-		return {LeftSegments.GetLastVertexPosition(), RightSegments.GetLastVertexPosition()};
+		return {LeftSegments.GetVertexPosition(Index), RightSegments.GetVertexPosition(Index)};
 	}
-
+	
 	template <typename Func>
 	void Edit(Func&& EditFunc)
 	{
@@ -144,12 +144,12 @@ public:
 		}
 	}
 
-	void SetLastVertices(const FVector2D& Left, const FVector2D& Right)
+	void SetVertices(int32 Index, const FVector2D& Left, const FVector2D& Right)
 	{
 		check(bEditBegun);
 		bFastModified = true;
-		LeftSegments.SetLastVertexPosition(Left);
-		RightSegments.SetLastVertexPosition(Right);
+		LeftSegments.SetVertexPosition(Index, Left);
+		RightSegments.SetVertexPosition(Index, Right);
 	}
 
 	void ConfigureMaterialSet(const TArray<UMaterialInterface*>& NewMaterialSet)
