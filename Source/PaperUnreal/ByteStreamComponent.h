@@ -53,6 +53,14 @@ struct FRepByteStream
 		return bOpen;
 	}
 
+	// 클라이언트에서 Modified Event를 감지해 Affected에 바이트를 넣을 때
+	// 몇 바이트 기준으로 넣을 것인지 (즉 1바이트만 감지해도 이게 4면 주변 3바이트를 같이 넣음)
+	// TODO ByteStream이 이걸 알아야 되는게 좀 별로 같은데 다른 방법은 없는지 생각해보자
+	void SetChunkSize(int32 ByteCount)
+	{
+		ChunkSize = ByteCount;
+	}
+
 	void Open()
 	{
 		check(!bOpen);
@@ -110,19 +118,20 @@ struct FRepByteStream
 			{
 				if (OldStream.Array[i] != Array[i])
 				{
-					return OldStream.Array.Num() - i;
+					return (OldStream.Array.Num() - i + ChunkSize - 1) / ChunkSize * ChunkSize;
 				}
 			}
 			return 0;
 		}();
 
+		const int32 ModificationStartIndex = OldStream.Array.Num() - ModifiedByteCount;
 		const int32 AppendedByteCount = Array.Num() - OldStream.Array.Num();
 
 		if (ModifiedByteCount > 0)
 		{
 			Ret.Add({
 				.Event = EStreamEvent::LastModified,
-				.Affected = TArray<uint8>{TArrayView<const uint8>{OldStream.Array}.Right(ModifiedByteCount)}
+				.Affected = TArray<uint8>{TArrayView<const uint8>{&Array[ModificationStartIndex], ModifiedByteCount}},
 			});
 		}
 
@@ -138,7 +147,7 @@ struct FRepByteStream
 		{
 			Ret.Add({.Event = EStreamEvent::Closed, .Affected = {},});
 		}
-
+		
 		return Ret;
 	}
 
@@ -151,6 +160,8 @@ private:
 
 	UPROPERTY()
 	TArray<uint8> Array;
+
+	int32 ChunkSize = 1;
 };
 
 
@@ -174,6 +185,11 @@ public:
 	const TArray<uint8>& GetBytes() const
 	{
 		return RepStream.GetBytes();
+	}
+
+	void SetChunkSize(int32 ByteCount)
+	{
+		RepStream.SetChunkSize(ByteCount);
 	}
 
 	void OpenStream()
@@ -299,6 +315,7 @@ public:
 	TTypedStreamView(UByteStreamComponent& Stream)
 		: ByteStream(Stream)
 	{
+		Stream.SetChunkSize(T::ChunkSize);
 	}
 
 	TValueStream<TStreamEvent<T>> CreateTypedEventStream()

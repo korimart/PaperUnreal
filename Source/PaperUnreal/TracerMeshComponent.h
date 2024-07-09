@@ -31,8 +31,10 @@ public:
 		if (!DynamicMeshVertexIndices.IsEmpty())
 		{
 			Segments.SetPoint(Index, NewPosition);
+			
 			// TODO 50 조절 가능하게
-			DynamicMesh->GetMeshRef().SetVertex(DynamicMeshVertexIndices.Last(), FVector{NewPosition, 51.f});
+			const int32 PositiveIndex = Index >= 0 ? Index : DynamicMeshVertexIndices.Num() + Index;
+			DynamicMesh->GetMeshRef().SetVertex(DynamicMeshVertexIndices[PositiveIndex], FVector{NewPosition, 51.f});
 		}
 	}
 

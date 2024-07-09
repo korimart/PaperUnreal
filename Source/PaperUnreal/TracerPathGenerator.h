@@ -17,6 +17,8 @@ class UTracerPathStream : public UInterface
 
 struct FTracerPathPoint
 {
+	static constexpr int32 ChunkSize = 32;
+
 	FVector2D Point;
 	FVector2D PathDirection;
 
