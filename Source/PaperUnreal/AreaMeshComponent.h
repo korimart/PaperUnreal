@@ -19,7 +19,7 @@ class UAreaBoundaryComponent : public UActorComponent2, public IAreaBoundaryGene
 public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnBoundaryChanged, const FLoopedSegmentArray2D&);
 	FOnBoundaryChanged OnBoundaryChanged;
-	
+
 	virtual TValueGenerator<FLoopedSegmentArray2D> CreateBoundaryGenerator() override
 	{
 		return CreateMulticastValueGenerator(TArray{AreaBoundary}, OnBoundaryChanged);
@@ -44,18 +44,29 @@ public:
 
 	struct FExpansionResult
 	{
+		FSegmentArray2D Path;
 		bool bAddedToTheLeftOfPath;
+
+		FExpansionResult(FUnionResult&& Result)
+			: Path(MoveTemp(Result.Path)), bAddedToTheLeftOfPath(Result.bUnionedToTheLeftOfPath)
+		{
+		}
 	};
 
-	// TODO
-	TOptional<FExpansionResult> ExpandByPath(const FSegmentArray2D& Path)
+	TArray<FExpansionResult> ExpandByPath(const FSegmentArray2D& Path)
 	{
 		if (Path.IsValid())
 		{
 			if (TArray<FUnionResult> UnionResult = AreaBoundary.Union(Path); !UnionResult.IsEmpty())
 			{
 				OnBoundaryChanged.Broadcast(AreaBoundary);
-				return FExpansionResult{.bAddedToTheLeftOfPath = UnionResult[0].bUnionedToTheLeftOfPath};
+
+				TArray<FExpansionResult> Ret;
+				for (FUnionResult& Each : UnionResult)
+				{
+					Ret.Add(MoveTemp(Each));
+				}
+				return Ret;
 			}
 		}
 		return {};

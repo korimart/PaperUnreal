@@ -22,7 +22,7 @@ public:
 	{
 		Tracer = InTracer;
 	}
-	
+
 	void SetConversionDestination(UAreaBoundaryComponent* Destination)
 	{
 		ConversionDestination = Destination;
@@ -40,6 +40,8 @@ private:
 	UPROPERTY()
 	UAreaBoundaryComponent* ConversionDestination;
 
+	bool bConvertingForTracerCompletion = false;
+
 	UTracerToAreaConverterComponent()
 	{
 		bWantsInitializeComponent = true;
@@ -51,13 +53,31 @@ private:
 
 		check(AllValid(Tracer, ConversionDestination));
 
-		Tracer->OnCompletePathGenerated.AddWeakLambda(this, [this](const FSegmentArray2D& CompletePath)
+		Tracer->GetbGenerating().ObserveValid(this, [this](bool bTracerBeingGenerated)
 		{
-			if (TOptional<UAreaBoundaryComponent::FExpansionResult> Result
-				= ConversionDestination->ExpandByPath(CompletePath))
+			if (!bTracerBeingGenerated)
 			{
-				OnTracerToAreaConversion.Broadcast(CompletePath, Result->bAddedToTheLeftOfPath);
+				bConvertingForTracerCompletion = true;
+				ConvertPathToArea();
+				bConvertingForTracerCompletion = false;
 			}
 		});
+		
+		ConversionDestination->OnBoundaryChanged.AddWeakLambda(this, [this](auto&)
+		{
+			if (!bConvertingForTracerCompletion)
+			{
+				ConvertPathToArea();
+			}
+		});
+	}
+
+	void ConvertPathToArea()
+	{
+		using FExpansionResult = UAreaBoundaryComponent::FExpansionResult;
+		for (const FExpansionResult& Each : ConversionDestination->ExpandByPath(Tracer->GetPath()))
+		{
+			OnTracerToAreaConversion.Broadcast(Each.Path, Each.bAddedToTheLeftOfPath);
+		}
 	}
 };

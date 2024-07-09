@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "AreaMeshComponent.h"
 #include "TracerPathGenerator.h"
+#include "Core/LiveData.h"
 #include "Core/Utils.h"
 #include "TracerPathComponent.generated.h"
 
@@ -18,17 +19,17 @@ public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnPathEvent, FTracerPathEvent);
 	FOnPathEvent OnPathEvent;
 
+	DECLARE_LIVE_DATA_AND_GETTER(bool, bGenerating);
+
 	virtual TValueGenerator<FTracerPathEvent> CreatePathEventGenerator() override
 	{
 		return CreateMulticastValueGenerator(TArray<FTracerPathEvent>{}, OnPathEvent);
 	}
 
-	DECLARE_MULTICAST_DELEGATE_OneParam(FOnCompletePathGenerated, const FSegmentArray2D&);
-	FOnCompletePathGenerated OnCompletePathGenerated;
-
 	// TODO maybe remove?
 	const FSegmentArray2D& GetPath() const { return Path; }
 
+	// TODO remove dependency
 	void SetNoPathArea(UAreaBoundaryComponent* Area)
 	{
 		NoPathArea = Area;
@@ -66,7 +67,7 @@ private:
 		if (!bGeneratedLastFrame && bWillGenerateThisFrame)
 		{
 			Path.Empty();
-			// OnPathEvent.Broadcast({.Event = EArrayEvent::GenerationStarted});
+			bGenerating = true;
 		}
 
 		if (bWillGenerateThisFrame)
@@ -79,7 +80,7 @@ private:
 		{
 			Path.SetPoint(-1, NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint());
 			OnPathEvent.Broadcast(CreateEvent(EArrayEvent::LastModified));
-			// OnPathEvent.Broadcast({.Event = ETracerPathEvent::GenerationEnded});
+			bGenerating = false;
 		}
 	}
 
