@@ -1,9 +1,8 @@
 ﻿#include "UECoroutineTest.h"
 #include "Misc/AutomationTest.h"
+#include "PaperUnreal/Core/Utils.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(UECoroutineTest, "PaperUnreal.PaperUnreal.Test.UECoroutineTest", EAutomationTestFlags::EditorContext | EAutomationTestFlags::SmokeFilter)
-
-#define RETURN_IF_FALSE(boolean) if (!boolean) return true;
 
 bool UECoroutineTest::RunTest(const FString& Parameters)
 {
@@ -198,5 +197,3 @@ bool UECoroutineTest::RunTest(const FString& Parameters)
 	
 	return true;
 }
-
-#undef RETURN_IF_FALSE

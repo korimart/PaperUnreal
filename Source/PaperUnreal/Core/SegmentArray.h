@@ -456,7 +456,7 @@ public:
 		return Ret;
 	}
 
-	auto Union(const FSegmentArray2D& Path) requires bLoop;
+	auto Union(FSegmentArray2D Path) requires bLoop;
 
 	void Difference(FSegmentArray2D Path, bool bRemoveToTheLeftOfPath) requires bLoop
 	{
@@ -629,13 +629,17 @@ auto TSegmentArray2D<bLoop>::UnionAssumeTwoIntersections(FSegmentArray2D Path) r
 
 
 template <bool bLoop>
-auto TSegmentArray2D<bLoop>::Union(const FSegmentArray2D& Path) requires bLoop
+auto TSegmentArray2D<bLoop>::Union(FSegmentArray2D Path) requires bLoop
 {
 	struct FPathIntersection
 	{
 		int32 PathSegmentIndex;
 		FVector2D Point;
 	};
+
+	// Segment의 양 지점이 Boundary 위에 정확하게 걸쳐져 있는 경우 Intersection Test에 실패할 수 있기 때문에 조금 늘려줌
+	Path.SetPoint(0, Path.GetPoints()[0] - Path[0].Direction * UE_KINDA_SMALL_NUMBER);
+	Path.SetPoint(-1, Path.GetLastPoint() + Path.GetLastSegmentDirection() * UE_KINDA_SMALL_NUMBER);
 
 	TArray<FPathIntersection> AllIntersections;
 	for (int32 i = 0; i < Path.SegmentCount(); i++)

@@ -101,3 +101,6 @@ TWeakAwaitable<bool> RequestAsyncLoad(const TSoftObjectPtr<SoftObjectType>& Soft
 	check(GetNetMode() != NM_Client);\
 	Repped##VarName = NewValue;\
 	OnRep_##VarName();
+
+
+#define RETURN_IF_FALSE(boolean) if (!boolean) return true;
