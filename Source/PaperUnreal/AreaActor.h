@@ -47,18 +47,18 @@ private:
 			AreaMesh->RegisterComponent();
 			AreaMesh->ConfigureMaterialSet({RR->GetAreaMaterialFor(TeamIndex)});
 
-			IAreaBoundaryGenerator* AreaBoundaryGenerator = nullptr;
+			IAreaBoundaryStream* AreaBoundaryStream = nullptr;
 			if (GetNetMode() == NM_Client)
 			{
-				AreaBoundaryGenerator = co_await WaitForComponent<UReplicatedAreaBoundaryComponent>(this);
+				AreaBoundaryStream = co_await WaitForComponent<UReplicatedAreaBoundaryComponent>(this);
 			}
 			else
 			{
-				AreaBoundaryGenerator = co_await WaitForComponent<UAreaBoundaryComponent>(this);
+				AreaBoundaryStream = co_await WaitForComponent<UAreaBoundaryComponent>(this);
 			}
 			
 			auto AreaMeshGenerator = NewObject<UAreaMeshGeneratorComponent>(this);
-			AreaMeshGenerator->SetMeshSource(AreaBoundaryGenerator);
+			AreaMeshGenerator->SetMeshSource(AreaBoundaryStream);
 			AreaMeshGenerator->SetMeshDestination(AreaMesh);
 			AreaMeshGenerator->RegisterComponent();
 		});

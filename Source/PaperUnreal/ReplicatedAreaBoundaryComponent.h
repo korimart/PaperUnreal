@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AreaBoundaryGenerator.h"
+#include "AreaBoundaryStream.h"
 #include "AreaMeshComponent.h"
 #include "Core/ActorComponent2.h"
 #include "Net/UnrealNetwork.h"
@@ -11,7 +11,7 @@
 
 
 UCLASS()
-class UReplicatedAreaBoundaryComponent : public UActorComponent2, public IAreaBoundaryGenerator
+class UReplicatedAreaBoundaryComponent : public UActorComponent2, public IAreaBoundaryStream
 {
 	GENERATED_BODY()
 
@@ -19,7 +19,7 @@ public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnBoundaryChanged, const FLoopedSegmentArray2D&);
 	FOnBoundaryChanged OnBoundaryChanged;
 	
-	virtual TValueGenerator<FLoopedSegmentArray2D> CreateBoundaryGenerator() override
+	virtual TValueGenerator<FLoopedSegmentArray2D> CreateBoundaryStream() override
 	{
 		TArray<FLoopedSegmentArray2D> Init{{RepPoints}};
 		if (Init[0].IsValid()) { return CreateMulticastValueGenerator(Init, OnBoundaryChanged); }
@@ -57,7 +57,7 @@ private:
 
 		RunWeakCoroutine(this, [this](auto&) -> FWeakCoroutine
 		{
-			for (auto Boundaries = BoundarySource->CreateBoundaryGenerator();;)
+			for (auto Boundaries = BoundarySource->CreateBoundaryStream();;)
 			{
 				RepPoints = (co_await Boundaries.Next()).GetPoints();
 			}

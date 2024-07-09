@@ -14,7 +14,7 @@ class UAreaMeshGeneratorComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	void SetMeshSource(IAreaBoundaryGenerator* Source)
+	void SetMeshSource(IAreaBoundaryStream* Source)
 	{
 		MeshSource = Cast<UObject>(Source);
 	}
@@ -26,7 +26,7 @@ public:
 
 private:
 	UPROPERTY()
-	TScriptInterface<IAreaBoundaryGenerator> MeshSource;
+	TScriptInterface<IAreaBoundaryStream> MeshSource;
 	
 	UPROPERTY()
 	UAreaMeshComponent* MeshDest;
@@ -44,9 +44,9 @@ private:
 
 		RunWeakCoroutine(this, [this](auto&) -> FWeakCoroutine
 		{
-			for (auto Boundaries = MeshSource->CreateBoundaryGenerator();;)
+			for (auto BoundaryStream = MeshSource->CreateBoundaryStream();;)
 			{
-				MeshDest->SetMeshByWorldBoundary((co_await Boundaries.Next()));
+				MeshDest->SetMeshByWorldBoundary(co_await BoundaryStream.Next());
 			}
 		});
 	}

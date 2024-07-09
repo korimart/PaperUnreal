@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AreaBoundaryGenerator.h"
+#include "AreaBoundaryStream.h"
 #include "Core/SegmentArray.h"
 #include "Core/ActorComponent2.h"
 #include "Components/DynamicMeshComponent.h"
@@ -12,7 +12,7 @@
 
 
 UCLASS()
-class UAreaBoundaryComponent : public UActorComponent2, public IAreaBoundaryGenerator
+class UAreaBoundaryComponent : public UActorComponent2, public IAreaBoundaryStream
 {
 	GENERATED_BODY()
 
@@ -20,7 +20,7 @@ public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnBoundaryChanged, const FLoopedSegmentArray2D&);
 	FOnBoundaryChanged OnBoundaryChanged;
 
-	virtual TValueGenerator<FLoopedSegmentArray2D> CreateBoundaryGenerator() override
+	virtual TValueGenerator<FLoopedSegmentArray2D> CreateBoundaryStream() override
 	{
 		return CreateMulticastValueGenerator(TArray{AreaBoundary}, OnBoundaryChanged);
 	}

@@ -6,10 +6,10 @@
 #include "Core/SegmentArray.h"
 #include "Core/UECoroutine.h"
 #include "UObject/Interface.h"
-#include "AreaBoundaryGenerator.generated.h"
+#include "AreaBoundaryStream.generated.h"
 
 UINTERFACE()
-class UAreaBoundaryGenerator : public UInterface
+class UAreaBoundaryStream : public UInterface
 {
 	GENERATED_BODY()
 };
@@ -17,10 +17,10 @@ class UAreaBoundaryGenerator : public UInterface
 /**
  * 
  */
-class IAreaBoundaryGenerator
+class IAreaBoundaryStream
 {
 	GENERATED_BODY()
 
 public:
-	virtual TValueGenerator<FLoopedSegmentArray2D> CreateBoundaryGenerator() = 0;
+	virtual TValueGenerator<FLoopedSegmentArray2D> CreateBoundaryStream() = 0;
 };
