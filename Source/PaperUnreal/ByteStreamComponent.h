@@ -98,6 +98,11 @@ struct FRepByteStream
 
 		if (Id != OldStream.Id)
 		{
+			if (OldStream.IsOpen())
+			{
+				Ret.Add({.Event = EStreamEvent::Closed, .Affected = {},});
+			}
+			
 			Ret.Add({.Event = EStreamEvent::Opened, .Affected = {},});
 			Ret.Add({.Event = EStreamEvent::Appended, .Affected = Array,});
 
