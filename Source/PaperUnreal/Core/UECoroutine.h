@@ -95,7 +95,7 @@ struct FWeakCoroutine
 		{
 			WeakList.Add([Weak = TWeakPtr<T>{Object}]() { return Weak.IsValid(); });
 		}
-		
+
 		template <typename T>
 		void AddToWeakList(const TSharedRef<T>& Object)
 		{
@@ -556,7 +556,7 @@ public:
 			});
 			return Ret;
 		}
-		
+
 		TWeakAwaitable<T> Ret;
 		Ret.SetNeverReady();
 		return Ret;
@@ -564,9 +564,14 @@ public:
 
 	TWeakAwaitable<bool> WaitForValueIfNotEnd()
 	{
+		if (bEnded)
+		{
+			return false;
+		}
+
 		if (Values.Num() > 0)
 		{
-			return{true};
+			return true;
 		}
 
 		TWeakAwaitable<bool> Ret;
@@ -579,6 +584,7 @@ public:
 
 			Handle.SetValue(NewValue.IsSet());
 		});
+
 		return Ret;
 	}
 
@@ -599,10 +605,10 @@ public:
 	// 사실상 Next가 아니라 NextNext임 이게 좀 혼란스러울 수 있으므로 일단 막음
 	TValueStream(const TValueStream&) = delete;
 	TValueStream& operator=(const TValueStream&) = delete;
-	
+
 	TValueStream(TValueStream&&) = default;
 	TValueStream& operator=(TValueStream&&) = default;
-	
+
 	TWeakPtr<TValueStreamValueReceiver<T>> GetReceiver() const
 	{
 		return Receiver;
@@ -612,7 +618,7 @@ public:
 	{
 		return Receiver->WaitForValue();
 	}
-	
+
 	TWeakAwaitable<bool> NextIfNotEnd()
 	{
 		return Receiver->WaitForValueIfNotEnd();
