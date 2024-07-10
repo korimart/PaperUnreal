@@ -13,7 +13,7 @@ TWeakAwaitable<AController*> ACharacter2::WaitForController()
 		return ValidController;
 	}
 
-	return WaitForBroadcast(this, OnControllerChanged);
+	return WaitForBroadcast(OnControllerChanged);
 }
 
 TWeakAwaitable<APlayerState*> ACharacter2::WaitForPlayerState()
@@ -23,7 +23,7 @@ TWeakAwaitable<APlayerState*> ACharacter2::WaitForPlayerState()
 		return ValidPlayerState;
 	}
 
-	return WaitForBroadcast(this, OnNewPlayerState);
+	return WaitForBroadcast(OnNewPlayerState);
 }
 
 void ACharacter2::NotifyControllerChanged()

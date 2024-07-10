@@ -260,14 +260,26 @@ public:
 	template <typename ArgType>
 	void SetValue(ArgType&& Arg)
 	{
+		check(!Value.IsSet());
 		Value.Emplace(Forward<ArgType>(Arg));
 		Handle.Resume();
+	}
+	
+	template <typename ArgType>
+	void SetValueIfNotSet(ArgType&& Arg)
+	{
+		if (!Value.IsSet())
+		{
+			SetValue(Forward<ArgType>(Arg));
+		}
 	}
 
 	void Destroy()
 	{
 		Handle.Destroy();
 	}
+
+	bool IsValueSet() const { return !!Value; }
 
 	const ValueType& GetValue() const { return *Value; }
 
@@ -289,8 +301,9 @@ public:
 	}
 
 	TWeakAwaitableHandle(const TWeakAwaitableHandle&) = delete;
-	TWeakAwaitableHandle(TWeakAwaitableHandle&&) = default;
 	TWeakAwaitableHandle& operator=(const TWeakAwaitableHandle&) = delete;
+	
+	TWeakAwaitableHandle(TWeakAwaitableHandle&&) = default;
 	TWeakAwaitableHandle& operator=(TWeakAwaitableHandle&&) = default;
 
 	~TWeakAwaitableHandle()
@@ -299,11 +312,6 @@ public:
 		{
 			Impl->Destroy();
 		}
-	}
-
-	bool IsWaitingForValue() const
-	{
-		return Impl && !bSetValue;
 	}
 
 	template <typename ArgType>
@@ -315,22 +323,10 @@ public:
 		Impl = nullptr;
 	}
 
-	template <typename ArgType>
-	void SetValueIfNotSet(ArgType&& Arg)
-	{
-		if (!bSetValue)
-		{
-			SetValue(Forward<ArgType>(Arg));
-		}
-	}
-
 	void Cancel()
 	{
-		if (!bSetValue)
-		{
-			bSetValue = true;
-			Impl->Destroy();
-		}
+		bSetValue = true;
+		Impl->Destroy();
 	}
 
 	const ValueType& GetValue() const { return Impl->GetValue(); }
@@ -363,10 +359,9 @@ public:
 	}
 
 	template <typename DelegateType>
-	DelegateType CreateSetValueDelegate(UObject* Lifetime)
+	DelegateType CreateSetValueDelegate()
 	{
 		return CreateSetValueDelegate<DelegateType>(
-			Lifetime,
 			[]<typename ArgType>(ArgType&& Pass) -> decltype(auto)
 			{
 				return Forward<ArgType>(Pass);
@@ -374,43 +369,53 @@ public:
 	}
 
 	template <typename DelegateType, typename TransformFuncType>
-	DelegateType CreateSetValueDelegate(UObject* Lifetime, TransformFuncType&& TransformFunc)
+	DelegateType CreateSetValueDelegate(TransformFuncType&& TransformFunc)
 	{
-		auto DelegateUnbinder = MakeShared<bool>();
+		// 핸들을 만들어서 다른 곳에서 핸들을 만들지 못하게 한다.
+		GetHandle();
 
-		// TODO 현재 멀티캐스트 델리게이트가 복사될 경우 한 델리게이트가 SetValue를 완료해도
-		// 다른 델리게이트들에서 핸들을 들고 있어서 해당 델리게이트들이 파괴되거나 한 번 호출되기 전까지
-		// Value가 메모리에 유지됨 -> Value의 크기가 클 경우 메모리 낭비가 발생할 수 있으므로
-		// indirection을 한 번 더 해서 Value가 아니라 포인터 크기 정도의 메모리만 들고 있게 해야함
+		struct FAwaitableCanceler
+		{
+			TWeakPtr<TWeakAwaitableHandleImpl<ValueType>> WeakAwaitable;
+			
+			~FAwaitableCanceler()
+			{
+				if (auto Alive = WeakAwaitable.Pin(); Alive && !Alive->IsValueSet())
+				{
+					Alive->Destroy();
+				}
+			}
+		};
+
+		// TODO 아래 코드에 대한 설명
+		auto FireDelegateOnce = MakeShared<bool>(true);
 		return DelegateType::CreateSPLambda(
-			DelegateUnbinder,
+			FireDelegateOnce,
 			[
-				SharedHandle = MakeShared<TWeakAwaitableHandle<ValueType>>(GetHandle()),
-				DelegateUnbinder = DelegateUnbinder.ToSharedPtr(),
-				Lifetime = TWeakObjectPtr{Lifetime},
+				FireDelegateOnce = FireDelegateOnce.ToSharedPtr(),
+				Canceler = MakeShared<FAwaitableCanceler>(Value),
 				TransformFunc = Forward<TransformFuncType>(TransformFunc)
 			]<typename... ArgTypes>(ArgTypes&&... Args) mutable
 			{
-				if (Lifetime.IsValid())
+				if (auto Alive = Canceler->WeakAwaitable.Pin())
 				{
-					SharedHandle->SetValueIfNotSet(TransformFunc(Forward<ArgTypes>(Args)...));
+					Alive->SetValueIfNotSet(TransformFunc(Forward<ArgTypes>(Args)...));
 				}
-
-				DelegateUnbinder = nullptr;
+				FireDelegateOnce = nullptr;
 			}
 		);
 	}
 
 	template <typename MulticastDelegateType>
-	void SetValueFromMulticastDelegate(UObject* Lifetime, MulticastDelegateType& MulticastDelegate)
+	void SetValueFromMulticastDelegate(MulticastDelegateType& MulticastDelegate)
 	{
-		MulticastDelegate.Add(CreateSetValueDelegate<MulticastDelegateType::FDelegate>(Lifetime));
+		MulticastDelegate.Add(CreateSetValueDelegate<typename MulticastDelegateType::FDelegate>());
 	}
 
 	template <typename MulticastDelegateType, typename TransformFuncType>
-	void SetValueFromMulticastDelegate(UObject* Lifetime, MulticastDelegateType& MulticastDelegate, TransformFuncType&& TransformFunc)
+	void SetValueFromMulticastDelegate(MulticastDelegateType& MulticastDelegate, TransformFuncType&& TransformFunc)
 	{
-		MulticastDelegate.Add(CreateSetValueDelegate<MulticastDelegateType::FDelegate>(Lifetime, Forward<TransformFuncType>(TransformFunc)));
+		MulticastDelegate.Add(CreateSetValueDelegate<typename MulticastDelegateType::FDelegate>(Forward<TransformFuncType>(TransformFunc)));
 	}
 
 	void SetNeverReady()
@@ -644,10 +649,10 @@ TReadyWeakAwaitable<T> CreateReadyWeakAwaitable(T&& Value)
 template <
 	typename MulticastDelegateType,
 	typename ReturnType = std::decay_t<typename TGetFirstParam<typename MulticastDelegateType::FDelegate::TFuncType>::Type>>
-TWeakAwaitable<ReturnType> WaitForBroadcast(UObject* Lifetime, MulticastDelegateType& Delegate)
+TWeakAwaitable<ReturnType> WaitForBroadcast(MulticastDelegateType& Delegate)
 {
 	TWeakAwaitable<ReturnType> Ret;
-	Ret.SetValueFromMulticastDelegate(Lifetime, Delegate);
+	Ret.SetValueFromMulticastDelegate(Delegate);
 	return Ret;
 }
 
@@ -655,13 +660,13 @@ TWeakAwaitable<ReturnType> WaitForBroadcast(UObject* Lifetime, MulticastDelegate
 template <
 	typename MulticastDelegateType,
 	typename TransformFuncType>
-auto WaitForBroadcast(UObject* Lifetime, MulticastDelegateType& Delegate, TransformFuncType&& TransformFunc)
+auto WaitForBroadcast(MulticastDelegateType& Delegate, TransformFuncType&& TransformFunc)
 {
 	using DelegateReturnType = typename TGetFirstParam<typename MulticastDelegateType::FDelegate::TFuncType>::Type;
 	using ReturnType = std::decay_t<decltype(std::declval<TransformFuncType>()(std::declval<DelegateReturnType>()))>;
 
 	TWeakAwaitable<ReturnType> Ret;
-	Ret.SetValueFromMulticastDelegate(Lifetime, Delegate, Forward<TransformFuncType>(TransformFunc));
+	Ret.SetValueFromMulticastDelegate(Delegate, Forward<TransformFuncType>(TransformFunc));
 	return Ret;
 }
 

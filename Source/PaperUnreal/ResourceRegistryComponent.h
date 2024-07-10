@@ -67,22 +67,23 @@ private:
 			};
 
 			// TODO 이 코루틴이 살아있는 동안 UObject의 생명을 연장시키는 기능 추가
-			auto SolidBlueAwaitable = RequestAsyncLoad(SoftSolidBlue, this, [this](UMaterialInstance* Material)
+			auto SolidBlueAwaitable = RequestAsyncLoad(SoftSolidBlue, [this](UMaterialInstance* Material)
 			{
+				// TODO 이 함수 인터페이스가 잘못됐음 콜백이 호출될 때 this가 살아있다는 보장이 없다.
 				TeamToAreaMaterialMap.FindOrAdd(0) = Material;
 			});
 			
-			auto SolidRedAwaitable = RequestAsyncLoad(SoftSolidRed, this, [this](UMaterialInstance* Material)
+			auto SolidRedAwaitable = RequestAsyncLoad(SoftSolidRed, [this](UMaterialInstance* Material)
 			{
 				TeamToAreaMaterialMap.FindOrAdd(1) = Material;
 			});
 			
-			auto SolidBlueLightAwaitable = RequestAsyncLoad(SoftSolidBlueLight, this, [this](UMaterialInstance* Material)
+			auto SolidBlueLightAwaitable = RequestAsyncLoad(SoftSolidBlueLight, [this](UMaterialInstance* Material)
 			{
 				TeamToTracerMaterialMap.FindOrAdd(0) = Material;
 			});
 			
-			auto SolidRedLightAwaitable = RequestAsyncLoad(SoftSolidRedLight, this, [this](UMaterialInstance* Material)
+			auto SolidRedLightAwaitable = RequestAsyncLoad(SoftSolidRedLight, [this](UMaterialInstance* Material)
 			{
 				TeamToTracerMaterialMap.FindOrAdd(1) = Material;
 			});

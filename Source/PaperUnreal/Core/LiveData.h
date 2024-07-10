@@ -65,7 +65,7 @@ public:
 		});
 	}
 
-	TWeakAwaitable<ValueType> WaitForValue(UObject* Lifetime)
+	TWeakAwaitable<ValueType> WaitForValue()
 	{
 		if (Value)
 		{
@@ -74,7 +74,7 @@ public:
 
 		// TODO TLiveData는 Broadcast와 달리 Value를 보관하고 있으므로
 		// 레퍼런스만 넘겨서 복사를 회피할 수 있음
-		return WaitForBroadcast(Lifetime, OnChanged);
+		return WaitForBroadcast(OnChanged);
 	}
 
 	template <typename T> requires std::is_convertible_v<T, ValueType>
@@ -241,9 +241,9 @@ public:
 		LiveData.ObserveEach(Lifetime, Forward<ObserverType>(Observer));
 	}
 
-	TWeakAwaitable<ValueType> WaitForValue(UObject* Lifetime)
+	TWeakAwaitable<ValueType> WaitForValue()
 	{
-		return LiveData.WaitForValue(Lifetime);
+		return LiveData.WaitForValue();
 	}
 
 	decltype(auto) GetValue() const

@@ -64,17 +64,17 @@ inline TWeakAwaitable<AGameStateBase*> WaitForGameState(UWorld* World)
 		return Ret;
 	}
 
-	return WaitForBroadcast(World, World->GameStateSetEvent);
+	return WaitForBroadcast( World->GameStateSetEvent);
 }
 
 
 template <typename SoftObjectType>
-TWeakAwaitable<SoftObjectType*> RequestAsyncLoad(UObject* Lifetime, const TSoftObjectPtr<SoftObjectType>& SoftPointer)
+TWeakAwaitable<SoftObjectType*> RequestAsyncLoad(const TSoftObjectPtr<SoftObjectType>& SoftPointer)
 {
 	TWeakAwaitable<SoftObjectType*> Ret;
 	UAssetManager::GetStreamableManager().RequestAsyncLoad(
 		SoftPointer.ToSoftObjectPath(),
-		Ret.CreateSetValueDelegate<FStreamableDelegate>(Lifetime, [SoftPointer]()
+		Ret.CreateSetValueDelegate<FStreamableDelegate>([SoftPointer]()
 		{
 			return SoftPointer.Get();
 		}));
@@ -83,12 +83,12 @@ TWeakAwaitable<SoftObjectType*> RequestAsyncLoad(UObject* Lifetime, const TSoftO
 
 
 template <typename SoftObjectType, typename CallbackType>
-TWeakAwaitable<bool> RequestAsyncLoad(const TSoftObjectPtr<SoftObjectType>& SoftPointer, UObject* Lifetime, CallbackType&& Callback)
+TWeakAwaitable<bool> RequestAsyncLoad(const TSoftObjectPtr<SoftObjectType>& SoftPointer, CallbackType&& Callback)
 {
 	TWeakAwaitable<bool> Ret;
 	UAssetManager::GetStreamableManager().RequestAsyncLoad(
 		SoftPointer.ToSoftObjectPath(),
-		Ret.CreateSetValueDelegate<FStreamableDelegate>(Lifetime, [SoftPointer, Callback = Forward<CallbackType>(Callback)]()
+		Ret.CreateSetValueDelegate<FStreamableDelegate>([SoftPointer, Callback = Forward<CallbackType>(Callback)]()
 		{
 			Callback(SoftPointer.Get());
 			return true;

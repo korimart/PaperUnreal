@@ -64,14 +64,14 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 	{
 		AGameStateBase* GameState = co_await WaitForGameState(GetWorld());
 		UTeamComponent* MyTeamComponent = co_await WaitForComponent<UTeamComponent>(co_await WaitForPlayerState());
-		const int32 MyTeamIndex = co_await MyTeamComponent->GetTeamIndex().WaitForValue(this);
+		const int32 MyTeamIndex = co_await MyTeamComponent->GetTeamIndex().WaitForValue();
 		UAreaSpawnerComponent* AreaSpawnerComponent = co_await WaitForComponent<UAreaSpawnerComponent>(GameState);
 		AAreaActor* MyTeamArea = co_await AreaSpawnerComponent->WaitForAreaOfTeam(MyTeamIndex);
 		UAreaMeshComponent* AreaMeshComponent = co_await WaitForComponent<UAreaMeshComponent>(MyTeamArea);
 
 		UResourceRegistryComponent* RR = co_await WaitForComponent<UResourceRegistryComponent>(GameState);
 		// TODO graceful exit
-		check(co_await RR->GetbResourcesLoaded().WaitForValue(this));
+		check(co_await RR->GetbResourcesLoaded().WaitForValue());
 
 		ITracerPathStream* TracerMeshSource = nullptr;
 		if (GetNetMode() == NM_Client)
@@ -102,7 +102,7 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 	{
 		AGameStateBase* GameState = co_await WaitForGameState(GetWorld());
 		UTeamComponent* MyTeamComponent = co_await WaitForComponent<UTeamComponent>(co_await WaitForPlayerState());
-		const int32 MyTeamIndex = co_await MyTeamComponent->GetTeamIndex().WaitForValue(this);
+		const int32 MyTeamIndex = co_await MyTeamComponent->GetTeamIndex().WaitForValue();
 		UAreaSpawnerComponent* AreaSpawnerComponent = co_await WaitForComponent<UAreaSpawnerComponent>(GameState);
 		AAreaActor* MyTeamArea = co_await AreaSpawnerComponent->WaitForAreaOfTeam(MyTeamIndex);
 		UAreaBoundaryComponent* AreaBoundaryComponent = co_await WaitForComponent<UAreaBoundaryComponent>(MyTeamArea);

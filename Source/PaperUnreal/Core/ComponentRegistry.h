@@ -72,9 +72,7 @@ TWeakAwaitable<ComponentType*> WaitForComponent(AActor* Owner)
 	}
 	
 	UComponentRegistry* Registry = Owner->GetWorld()->GetSubsystem<UComponentRegistry>();
-
 	return WaitForBroadcast(
-		Registry,
 		Registry->GetComponentMulticastDelegate(ComponentType::StaticClass(), Owner),
 		[](UActorComponent* BeforeCast)
 		{

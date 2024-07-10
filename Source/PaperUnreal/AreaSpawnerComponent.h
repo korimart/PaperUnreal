@@ -82,7 +82,7 @@ private:
 			{
 				Context.AddToWeakList(Each);
 				UTeamComponent* TeamComponent = co_await WaitForComponent<UTeamComponent>(Each);
-				const int32 TeamIndex = co_await TeamComponent->GetTeamIndex().WaitForValue(this);
+				const int32 TeamIndex = co_await TeamComponent->GetTeamIndex().WaitForValue();
 				OnAreaTeamReady(Each, TeamIndex);
 			});
 		}

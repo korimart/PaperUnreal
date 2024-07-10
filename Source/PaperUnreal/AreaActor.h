@@ -39,9 +39,9 @@ private:
 			UResourceRegistryComponent* RR = co_await WaitForComponent<UResourceRegistryComponent>(GameState);
 
 			// TODO graceful exit
-			check(co_await RR->GetbResourcesLoaded().WaitForValue(this));
+			check(co_await RR->GetbResourcesLoaded().WaitForValue());
 
-			const int32 TeamIndex = co_await TeamComponent->GetTeamIndex().WaitForValue(this);
+			const int32 TeamIndex = co_await TeamComponent->GetTeamIndex().WaitForValue();
 
 			auto AreaMesh = NewObject<UAreaMeshComponent>(this);
 			AreaMesh->RegisterComponent();
