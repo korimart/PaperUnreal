@@ -465,7 +465,7 @@ public:
 	auto Union(SegmentArrayType&& Path) requires bLoop;
 
 	template <CSegmentArray2D SegmentArrayType>
-	void Difference(SegmentArrayType&& Path, bool bRemoveToTheLeftOfPath) requires bLoop;
+	void Difference(SegmentArrayType&& Path) requires bLoop;
 
 	void ReverseVertexOrder()
 	{
@@ -576,14 +576,13 @@ private:
 
 	void ForEachNonInterruptedPath(FSegmentArray2D Path, const auto& Func);
 	auto UnionAssumeTwoIntersections(FSegmentArray2D Path) requires bLoop;
-	void DifferenceAssumeTwoIntersections(FSegmentArray2D Path, bool bRemoveToTheLeftOfPath) requires bLoop;
+	void DifferenceAssumeTwoIntersections(FSegmentArray2D Path) requires bLoop;
 };
 
 
 struct FUnionResult
 {
-	FSegmentArray2D Path;
-	bool bUnionedToTheLeftOfPath;
+	FSegmentArray2D CorrectlyAlignedPath;
 };
 
 
@@ -605,11 +604,11 @@ auto TSegmentArray2D<bLoop>::Union(SegmentArrayType&& Path) requires bLoop
 
 template <bool bLoop>
 template <CSegmentArray2D SegmentArrayType>
-void TSegmentArray2D<bLoop>::Difference(SegmentArrayType&& Path, bool bRemoveToTheLeftOfPath) requires bLoop
+void TSegmentArray2D<bLoop>::Difference(SegmentArrayType&& Path) requires bLoop
 {
 	ForEachNonInterruptedPath(Forward<SegmentArrayType>(Path), [&]<typename T>(T&& Clean)
 	{
-		DifferenceAssumeTwoIntersections(Forward<T>(Clean), bRemoveToTheLeftOfPath);
+		DifferenceAssumeTwoIntersections(Forward<T>(Clean));
 	});
 }
 
@@ -692,18 +691,13 @@ auto TSegmentArray2D<bLoop>::UnionAssumeTwoIntersections(FSegmentArray2D Path) r
 	FSegmentArray2D& UsedPath = Area0 < Area1 ? ReversedPath : Path;
 	Points = Area0 < Area1 ? MoveTemp(DestToSrcReplaced.Points) : MoveTemp(SrcToDestReplaced.Points);
 
-	return TOptional<FUnionResult>{{.Path = MoveTemp(UsedPath), .bUnionedToTheLeftOfPath = Area0 >= Area1,}};
+	return TOptional<FUnionResult>{{.CorrectlyAlignedPath = MoveTemp(UsedPath)}};
 }
 
 
 template <bool bLoop>
-void TSegmentArray2D<bLoop>::DifferenceAssumeTwoIntersections(FSegmentArray2D Path, bool bRemoveToTheLeftOfPath) requires bLoop
+void TSegmentArray2D<bLoop>::DifferenceAssumeTwoIntersections(FSegmentArray2D Path) requires bLoop
 {
-	if (bRemoveToTheLeftOfPath)
-	{
-		Path.ReverseVertexOrder();
-	}
-
 	const FIntersection BoundarySrcSegment = FindClosestPointTo(Path.GetPoints()[0]);
 	const FIntersection BoundaryDestSegment = FindClosestPointTo(Path.GetLastPoint());
 
@@ -712,7 +706,7 @@ void TSegmentArray2D<bLoop>::DifferenceAssumeTwoIntersections(FSegmentArray2D Pa
 		BoundarySrcSegment.SegmentIndex,
 		BoundaryDestSegment.SegmentIndex,
 		Path.GetPoints());
-	
+
 	if (SrcToDestReplaced.CalculateArea() < CalculateArea())
 	{
 		Points = MoveTemp(SrcToDestReplaced.Points);

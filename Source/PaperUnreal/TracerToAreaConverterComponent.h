@@ -15,7 +15,7 @@ class UTracerToAreaConverterComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	DECLARE_MULTICAST_DELEGATE_TwoParams(FOnTracerToAreaConversion, const FSegmentArray2D&, bool);
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnTracerToAreaConversion, const FSegmentArray2D&);
 	FOnTracerToAreaConversion OnTracerToAreaConversion;
 
 	void SetTracer(UTracerPathComponent* InTracer)
@@ -77,7 +77,7 @@ private:
 		using FExpansionResult = UAreaBoundaryComponent::FExpansionResult;
 		for (const FExpansionResult& Each : ConversionDestination->ExpandByPath(Tracer->GetPath()))
 		{
-			OnTracerToAreaConversion.Broadcast(Each.Path, Each.bAddedToTheLeftOfPath);
+			OnTracerToAreaConversion.Broadcast(Each.CorrectlyAlignedPath);
 		}
 	}
 };

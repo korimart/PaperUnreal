@@ -64,9 +64,10 @@ private:
 		// });
 
 		TracerToAreaConverter->OnTracerToAreaConversion.AddWeakLambda(
-			this, [this](const FSegmentArray2D& Tracer, bool bToTheLeft)
+			this, [this](FSegmentArray2D CorrectlyAlignedPath)
 			{
-				SlashTarget->ReduceByPath(Tracer, bToTheLeft);
+				CorrectlyAlignedPath.ReverseVertexOrder();
+				SlashTarget->ReduceByPath(CorrectlyAlignedPath);
 			});
 	}
 
@@ -136,7 +137,7 @@ private:
 			FSegmentArray2D MinimalSlicingPath = Slasher->GetPath().SubArray(FirstSegmentIndex, LastSegmentIndex);
 			MinimalSlicingPath.SetSegment(0, SlashTarget->Clip(MinimalSlicingPath[0]));
 			MinimalSlicingPath.SetSegment(-1, SlashTarget->Clip(MinimalSlicingPath[-1]));
-			SlashTarget->ReduceByPath(MoveTemp(MinimalSlicingPath), bExpandedToTheLeftOfPath);
+			// SlashTarget->ReduceByPath(MoveTemp(MinimalSlicingPath), bExpandedToTheLeftOfPath);
 		});
 	}
 };

@@ -63,7 +63,6 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			auto Result = SegmentArray.Union(Path);
 			TestPointsEqual(TEXT("TestCase 0: Union"), SegmentArray.GetPoints(), Joined);
 			TestEqual(TEXT("TestCase 0: Union Result"), Result.Num(), 1);
-			TestTrue(TEXT("TestCase 0: Union Result"), Result[0].bUnionedToTheLeftOfPath);
 		}
 
 		{
@@ -73,7 +72,6 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			auto Result = SegmentArray.Union(ReversedPath);
 			TestPointsEqual(TEXT("TestCase 0: Reverse Union"), SegmentArray.GetPoints(), Joined);
 			TestEqual(TEXT("TestCase 0: Union Result"), Result.Num(), 1);
-			TestFalse(TEXT("TestCase 0: Reverse Union Result"), Result[0].bUnionedToTheLeftOfPath);
 		}
 	}
 
@@ -218,12 +216,20 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			{1.f, -1.f},
 			{1.f, 1.f},
 		};
+		
+		const TArray<FVector2D> ReverseDifference
+		{
+			{-1.f, -1.f},
+			{0.f, -1.f},
+			{0.f, 0.f},
+			{-1.f, 0.f},
+		};
 
 		// 왼쪽 면으로 들어와서 아래 면으로 나가는 경우 테스트
 
 		{
 			FLoopedSegmentArray2D SegmentArray{VertexPositions};
-			SegmentArray.Difference(Path, false);
+			SegmentArray.Difference(Path);
 			TestPointsEqual(TEXT("TestCase 4: Difference"), SegmentArray.GetPoints(), Difference);
 		}
 
@@ -231,8 +237,8 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			auto ReversedPath = Path;
 			std::reverse(ReversedPath.begin(), ReversedPath.end());
 			FLoopedSegmentArray2D SegmentArray{VertexPositions};
-			SegmentArray.Difference(ReversedPath, true);
-			TestPointsEqual(TEXT("TestCase 4: Reverse Differnce"), SegmentArray.GetPoints(), Difference);
+			SegmentArray.Difference(ReversedPath);
+			TestPointsEqual(TEXT("TestCase 4: Reverse Differnce"), SegmentArray.GetPoints(), ReverseDifference);
 		}
 	}
 
@@ -304,9 +310,6 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			auto Result = SegmentArray.Union(Path);
 			TestPointsEqual(TEXT("TestCase 6: Union"), SegmentArray.GetPoints(), Joined);
 			RETURN_IF_FALSE(TestEqual(TEXT("TestCase 6: Union"), Result.Num(), 3));
-			TestTrue(TEXT("TestCase 6: Union"), Result[0].bUnionedToTheLeftOfPath);
-			TestTrue(TEXT("TestCase 6: Union"), Result[1].bUnionedToTheLeftOfPath);
-			TestTrue(TEXT("TestCase 6: Union"), Result[2].bUnionedToTheLeftOfPath);
 		}
 
 		{
@@ -316,9 +319,6 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			auto Result = SegmentArray.Union(ReversedPath);
 			TestPointsEqual(TEXT("TestCase 6: Reverse Union"), SegmentArray.GetPoints(), Joined);
 			RETURN_IF_FALSE(TestEqual(TEXT("TestCase 6: Reverse Union"), Result.Num(), 3));
-			TestFalse(TEXT("TestCase 6: Reverse Union"), Result[0].bUnionedToTheLeftOfPath);
-			TestFalse(TEXT("TestCase 6: Reverse Union"), Result[1].bUnionedToTheLeftOfPath);
-			TestFalse(TEXT("TestCase 6: Reverse Union"), Result[2].bUnionedToTheLeftOfPath);
 		}
 	}
 
@@ -374,9 +374,6 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			auto Result = SegmentArray.Union(Path);
 			TestPointsEqual(TEXT("TestCase 7: Union"), SegmentArray.GetPoints(), Joined);
 			RETURN_IF_FALSE(TestEqual(TEXT("TestCase 7: Union"), Result.Num(), 3));
-			TestTrue(TEXT("TestCase 7: Union"), Result[0].bUnionedToTheLeftOfPath);
-			TestTrue(TEXT("TestCase 7: Union"), Result[1].bUnionedToTheLeftOfPath);
-			TestTrue(TEXT("TestCase 7: Union"), Result[2].bUnionedToTheLeftOfPath);
 		}
 		
 		{
@@ -386,9 +383,6 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			auto Result = SegmentArray.Union(ReversedPath);
 			TestPointsEqual(TEXT("TestCase 7: Reverse Union"), SegmentArray.GetPoints(), Joined);
 			RETURN_IF_FALSE(TestEqual(TEXT("TestCase 7: Reverse Union"), Result.Num(), 3));
-			TestFalse(TEXT("TestCase 7: Reverse Union"), Result[0].bUnionedToTheLeftOfPath);
-			TestFalse(TEXT("TestCase 7: Reverse Union"), Result[1].bUnionedToTheLeftOfPath);
-			TestFalse(TEXT("TestCase 7: Reverse Union"), Result[2].bUnionedToTheLeftOfPath);
 		}
 	}
 

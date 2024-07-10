@@ -42,16 +42,7 @@ public:
 		OnBoundaryChanged.Broadcast(AreaBoundary);
 	}
 
-	struct FExpansionResult
-	{
-		FSegmentArray2D Path;
-		bool bAddedToTheLeftOfPath;
-
-		FExpansionResult(FUnionResult&& Result)
-			: Path(MoveTemp(Result.Path)), bAddedToTheLeftOfPath(Result.bUnionedToTheLeftOfPath)
-		{
-		}
-	};
+	using FExpansionResult = FUnionResult;
 
 	template <CSegmentArray2D SegmentArrayType>
 	TArray<FExpansionResult> ExpandByPath(SegmentArrayType&& Path)
@@ -79,11 +70,11 @@ public:
 	}
 
 	template <CSegmentArray2D SegmentArrayType>
-	void ReduceByPath(SegmentArrayType&& Path, bool bToTheLeftOfPath)
+	void ReduceByPath(SegmentArrayType&& Path)
 	{
 		if (Path.IsValid())
 		{
-			AreaBoundary.Difference(Forward<SegmentArrayType>(Path), bToTheLeftOfPath);
+			AreaBoundary.Difference(Forward<SegmentArrayType>(Path));
 			OnBoundaryChanged.Broadcast(AreaBoundary);
 		}
 	}
