@@ -3,8 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AreaBoundaryComponent.h"
 #include "AreaBoundaryStream.h"
-#include "AreaMeshComponent.h"
 #include "Core/ActorComponent2.h"
 #include "Net/UnrealNetwork.h"
 #include "ReplicatedAreaBoundaryComponent.generated.h"

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AreaBoundaryStream.h"
 #include "AreaMeshComponent.h"
 #include "Core/ActorComponent2.h"
 #include "AreaMeshGeneratorComponent.generated.h"
