@@ -151,6 +151,11 @@ struct FWeakCoroutine
 		TArray<TFunction<bool()>> WeakList;
 	};
 
+
+	void Init(
+		TSharedPtr<TUniqueFunction<FWeakCoroutine(FWeakCoroutineContext&)>> LambdaCaptures,
+		TUniquePtr<FWeakCoroutineContext> Context);
+
 	void Init(
 		auto& Lifetime,
 		TSharedPtr<TUniqueFunction<FWeakCoroutine(FWeakCoroutineContext&)>> LambdaCaptures,
@@ -164,6 +169,7 @@ private:
 	{
 	}
 };
+
 
 class FWeakCoroutineContext
 {
@@ -184,6 +190,16 @@ private:
 	friend struct FWeakCoroutine;
 	std::coroutine_handle<FWeakCoroutine::promise_type> Handle;
 };
+
+
+inline void FWeakCoroutine::Init(
+	TSharedPtr<TUniqueFunction<FWeakCoroutine(FWeakCoroutineContext&)>> LambdaCaptures,
+	TUniquePtr<FWeakCoroutineContext> Context)
+{
+	Context->Handle = Handle;
+	Handle.promise().LambdaCaptures = LambdaCaptures;
+	Handle.resume();
+}
 
 
 void FWeakCoroutine::Init(
@@ -264,7 +280,7 @@ public:
 		Value.Emplace(Forward<ArgType>(Arg));
 		Handle.Resume();
 	}
-	
+
 	template <typename ArgType>
 	void SetValueIfNotSet(ArgType&& Arg)
 	{
@@ -302,7 +318,7 @@ public:
 
 	TWeakAwaitableHandle(const TWeakAwaitableHandle&) = delete;
 	TWeakAwaitableHandle& operator=(const TWeakAwaitableHandle&) = delete;
-	
+
 	TWeakAwaitableHandle(TWeakAwaitableHandle&&) = default;
 	TWeakAwaitableHandle& operator=(TWeakAwaitableHandle&&) = default;
 
@@ -377,7 +393,7 @@ public:
 		struct FAwaitableCanceler
 		{
 			TWeakPtr<TWeakAwaitableHandleImpl<ValueType>> WeakAwaitable;
-			
+
 			~FAwaitableCanceler()
 			{
 				if (auto Alive = WeakAwaitable.Pin(); Alive && !Alive->IsValueSet())
@@ -672,6 +688,15 @@ auto WaitForBroadcast(MulticastDelegateType& Delegate, TransformFuncType&& Trans
 
 
 template <typename FuncType>
+void RunCoroutine(FuncType&& Func)
+{
+	auto LambdaCaptures = MakeShared<TUniqueFunction<FWeakCoroutine(FWeakCoroutineContext&)>>(Forward<FuncType>(Func));
+	auto Context = MakeUnique<FWeakCoroutineContext>();
+	(*LambdaCaptures)(*Context).Init(LambdaCaptures, MoveTemp(Context));
+}
+
+
+template <typename FuncType>
 void RunWeakCoroutine(const auto& Lifetime, FuncType&& Func)
 {
 	auto LambdaCaptures = MakeShared<TUniqueFunction<FWeakCoroutine(FWeakCoroutineContext&)>>(Forward<FuncType>(Func));
@@ -721,6 +746,29 @@ TValueStream<T> CreateMulticastValueStream(const TArray<T>& ReadyValues, Delegat
 		Receiver.Pin()->AddValue(Forward<U>(NewValue));
 	}));
 
+	return Ret;
+}
+
+
+template <typename T, typename PredicateType>
+TWeakAwaitable<T> FirstInStream(TValueStream<T>&& Stream, PredicateType&& Predicate)
+{
+	TWeakAwaitable<T> Ret;
+	RunCoroutine([
+			Handle = Ret.GetHandle(),
+			Stream = MoveTemp(Stream),
+			Predicate = Forward<PredicateType>(Predicate)](auto&) mutable -> FWeakCoroutine
+		{
+			while (true)
+			{
+				auto Value = co_await Stream.Next();
+				if (Predicate(Value))
+				{
+					Handle.SetValue(MoveTemp(Value));
+					break;
+				}
+			}
+		});
 	return Ret;
 }
 
