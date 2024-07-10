@@ -40,7 +40,7 @@ private:
 	UPROPERTY()
 	UAreaBoundaryComponent* ConversionDestination;
 
-	bool bConvertingForTracerCompletion = false;
+	bool bImConversionInstigator = false;
 
 	UTracerToAreaConverterComponent()
 	{
@@ -57,27 +57,29 @@ private:
 		{
 			if (Event.IsClosedEvent())
 			{
-				bConvertingForTracerCompletion = true;
 				ConvertPathToArea();
-				bConvertingForTracerCompletion = false;
 			}
 		});
 		
 		ConversionDestination->OnBoundaryChanged.AddWeakLambda(this, [this](auto&)
 		{
-			if (!bConvertingForTracerCompletion)
-			{
-				ConvertPathToArea();
-			}
+			ConvertPathToArea();
 		});
 	}
 
 	void ConvertPathToArea()
 	{
+		if (bImConversionInstigator)
+		{
+			return;
+		}
+		
+		bImConversionInstigator = true;
 		using FExpansionResult = UAreaBoundaryComponent::FExpansionResult;
 		for (const FExpansionResult& Each : ConversionDestination->ExpandByPath(Tracer->GetPath()))
 		{
 			OnTracerToAreaConversion.Broadcast(Each.CorrectlyAlignedPath);
 		}
+		bImConversionInstigator = false;
 	}
 };
