@@ -14,7 +14,7 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 
 		for (int32 i = 0; i < Points0.Num(); i++)
 		{
-			TestEqual(Text, Points0[i], Points1[i]);
+			TestTrue(Text, Points0[i].Equals(Points1[i]));
 		}
 	};
 
@@ -216,7 +216,7 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			{1.f, -1.f},
 			{1.f, 1.f},
 		};
-		
+
 		const TArray<FVector2D> ReverseDifference
 		{
 			{-1.f, -1.f},
@@ -281,6 +281,8 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 
 		const TArray<FVector2D> Path
 		{
+			{-5.f, -5.f},
+			{5.f, -5.f},
 			{5.f, 1.5f},
 			{-5.f, 1.5f},
 		};
@@ -304,7 +306,7 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			{-3.f, 1.5f},
 			{-3.f, 2.f},
 		};
-		
+
 		{
 			FLoopedSegmentArray2D SegmentArray{VertexPositions};
 			auto Result = SegmentArray.Union(Path);
@@ -375,7 +377,7 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			TestPointsEqual(TEXT("TestCase 7: Union"), SegmentArray.GetPoints(), Joined);
 			RETURN_IF_FALSE(TestEqual(TEXT("TestCase 7: Union"), Result.Num(), 3));
 		}
-		
+
 		{
 			auto ReversedPath = Path;
 			std::reverse(ReversedPath.begin(), ReversedPath.end());
@@ -386,5 +388,48 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 		}
 	}
 
+	{
+		const TArray<FVector2D> VertexPositions
+		{
+			{-10.f, 10.f},
+			{-10.f, 0.f},
+			{10.f, 0.f},
+			{10.f, 10.f},
+		};
+
+		const TArray<FVector2D> Path
+		{
+			{-5.f, -1.f},
+			{-5.f, 1.f},
+			{-3.f, 1.f},
+			{-3.f, -1.f},
+			{3.f, -1.f},
+			{3.f, 1.f},
+			{5.f, 1.f},
+			{5.f, -1.f},
+		};
+
+		const TArray<FVector2D> Difference
+		{
+			{-10.f, 10.f},
+			{-10.f, 0.f},
+			{-5.f, 0.f},
+			{-5.f, 1.f},
+			{-3.f, 1.f},
+			{-3.f, 0.f},
+			{3.f, 0.f},
+			{3.f, 1.f},
+			{5.f, 1.f},
+			{5.f, 0.f},
+			{10.f, 0.f},
+			{10.f, 10.f},
+		};
+
+		{
+			FLoopedSegmentArray2D SegmentArray{VertexPositions};
+			SegmentArray.Difference(Path);
+			TestPointsEqual(TEXT("TestCase 8: Difference"), SegmentArray.GetPoints(), Difference);
+		}
+	}
 	return true;
 }

@@ -640,9 +640,13 @@ void TSegmentArray2D<bLoop>::ForEachNonInterruptedPath(FSegmentArray2D Path, con
 
 	AllIntersections.Sort([&](const FPathIntersection& Left, const FPathIntersection& Right)
 	{
-		const double LeftDist = (Left.Point - Path.GetPoints()[0]).Length();
-		const double RightDist = (Right.Point - Path.GetPoints()[0]).Length();
-		return LeftDist < RightDist;
+		if (Left.PathSegmentIndex == Right.PathSegmentIndex)
+		{
+			const FVector2D SegmentStart = Path[Left.PathSegmentIndex].StartPoint();
+			return (Left.Point - SegmentStart).Length() < (Right.Point - SegmentStart).Length();
+		}
+		
+		return Left.PathSegmentIndex < Right.PathSegmentIndex;
 	});
 
 	for (int32 i = 0; i < AllIntersections.Num() - 1; i++)
