@@ -66,18 +66,8 @@ private:
 		TracerToAreaConverter->OnTracerToAreaConversion.AddWeakLambda(
 			this, [this](const FSegmentArray2D& Tracer, bool bToTheLeft)
 			{
-				// 영역이 맞닿아 있는 경우 SlashTarget에서 나가기 전에 Tracer-to-Area conversion이 발생할 수 있음
-				// 어쨌든 conversion이 발생했기 때문에 현재 인덱스가 마지막 인덱스임
-				FlushAwaitablesArray(LastInsideIndexAwaitables, Tracer.PointCount() - 1);
-				FlushAwaitablesArray(ConversionAwaitables, bToTheLeft);
-
-				FirstInsideIndexAwaitables.Empty();
-				LastInsideIndexAwaitables.Empty();
-				ConversionAwaitables.Empty();
-				StartSlashingProcess();
+				SlashTarget->ReduceByPath(Tracer, bToTheLeft);
 			});
-
-		StartSlashingProcess();
 	}
 
 	FWeakAwaitableInt32 WaitForFirstInsidePointIndex()

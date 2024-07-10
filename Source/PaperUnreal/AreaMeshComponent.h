@@ -53,30 +53,37 @@ public:
 		}
 	};
 
-	TArray<FExpansionResult> ExpandByPath(const FSegmentArray2D& Path)
+	template <CSegmentArray2D SegmentArrayType>
+	TArray<FExpansionResult> ExpandByPath(SegmentArrayType&& Path)
 	{
-		if (Path.IsValid())
+		if (!Path.IsValid())
 		{
-			if (TArray<FUnionResult> UnionResult = AreaBoundary.Union(Path); !UnionResult.IsEmpty())
-			{
-				OnBoundaryChanged.Broadcast(AreaBoundary);
-
-				TArray<FExpansionResult> Ret;
-				for (FUnionResult& Each : UnionResult)
-				{
-					Ret.Add(MoveTemp(Each));
-				}
-				return Ret;
-			}
+			return {};
 		}
+		
+		if (TArray<FUnionResult> UnionResult
+			= AreaBoundary.Union(Forward<SegmentArrayType>(Path)); !UnionResult.IsEmpty())
+		{
+			OnBoundaryChanged.Broadcast(AreaBoundary);
+
+			TArray<FExpansionResult> Ret;
+			for (FUnionResult& Each : UnionResult)
+			{
+				Ret.Add(MoveTemp(Each));
+			}
+
+			return Ret;
+		}
+		
 		return {};
 	}
 
-	void ReduceByPath(const FSegmentArray2D& Path, bool bToTheLeftOfPath)
+	template <CSegmentArray2D SegmentArrayType>
+	void ReduceByPath(SegmentArrayType&& Path, bool bToTheLeftOfPath)
 	{
 		if (Path.IsValid())
 		{
-			AreaBoundary.Difference(Path, bToTheLeftOfPath);
+			AreaBoundary.Difference(Forward<SegmentArrayType>(Path), bToTheLeftOfPath);
 			OnBoundaryChanged.Broadcast(AreaBoundary);
 		}
 	}

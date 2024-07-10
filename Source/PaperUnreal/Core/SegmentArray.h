@@ -461,23 +461,11 @@ public:
 		return Ret;
 	}
 
-	auto Union(FSegmentArray2D Path) requires bLoop;
+	template <CSegmentArray2D SegmentArrayType>
+	auto Union(SegmentArrayType&& Path) requires bLoop;
 
-	void Difference(FSegmentArray2D Path, bool bRemoveToTheLeftOfPath) requires bLoop
-	{
-		if (bRemoveToTheLeftOfPath)
-		{
-			Path.ReverseVertexOrder();
-		}
-
-		const FIntersection BoundarySrcSegment = FindClosestPointTo(Path.GetPoints()[0]);
-		const FIntersection BoundaryDestSegment = FindClosestPointTo(Path.GetLastPoint());
-
-		ReplacePointsBySegmentIndices(
-			BoundarySrcSegment.SegmentIndex,
-			BoundaryDestSegment.SegmentIndex,
-			Path.GetPoints());
-	}
+	template <CSegmentArray2D SegmentArrayType>
+	void Difference(SegmentArrayType&& Path, bool bRemoveToTheLeftOfPath) requires bLoop;
 
 	void ReverseVertexOrder()
 	{
@@ -586,7 +574,9 @@ private:
 		}
 	};
 
+	void ForEachNonInterruptedPath(FSegmentArray2D Path, const auto& Func);
 	auto UnionAssumeTwoIntersections(FSegmentArray2D Path) requires bLoop;
+	void DifferenceAssumeTwoIntersections(FSegmentArray2D Path, bool bRemoveToTheLeftOfPath) requires bLoop;
 };
 
 
@@ -598,11 +588,84 @@ struct FUnionResult
 
 
 template <bool bLoop>
+template <CSegmentArray2D SegmentArrayType>
+auto TSegmentArray2D<bLoop>::Union(SegmentArrayType&& Path) requires bLoop
+{
+	TArray<FUnionResult> Ret;
+	ForEachNonInterruptedPath(Forward<SegmentArrayType>(Path), [&]<typename T>(T&& CleanPath)
+	{
+		if (TOptional<FUnionResult> UnionResult = UnionAssumeTwoIntersections(Forward<T>(CleanPath)))
+		{
+			Ret.Add(MoveTemp(*UnionResult));
+		}
+	});
+	return Ret;
+}
+
+
+template <bool bLoop>
+template <CSegmentArray2D SegmentArrayType>
+void TSegmentArray2D<bLoop>::Difference(SegmentArrayType&& Path, bool bRemoveToTheLeftOfPath) requires bLoop
+{
+	ForEachNonInterruptedPath(Forward<SegmentArrayType>(Path), [&]<typename T>(T&& Clean)
+	{
+		DifferenceAssumeTwoIntersections(Forward<T>(Clean), bRemoveToTheLeftOfPath);
+	});
+}
+
+
+template <bool bLoop>
+void TSegmentArray2D<bLoop>::ForEachNonInterruptedPath(FSegmentArray2D Path, const auto& Func)
+{
+	struct FPathIntersection
+	{
+		int32 PathSegmentIndex;
+		FVector2D Point;
+	};
+
+	// Segment의 양 지점이 Boundary 위에 정확하게 걸쳐져 있는 경우 Intersection Test에 실패할 수 있기 때문에 조금 늘려줌
+	Path.SetPoint(0, Path.GetPoints()[0] - Path[0].Direction * UE_KINDA_SMALL_NUMBER);
+	Path.SetPoint(-1, Path.GetLastPoint() + Path.GetLastSegmentDirection() * UE_KINDA_SMALL_NUMBER);
+
+	TArray<FPathIntersection> AllIntersections;
+	for (int32 i = 0; i < Path.SegmentCount(); i++)
+	{
+		for (const FIntersection& Each : FindAllIntersections(Path[i]))
+		{
+			AllIntersections.Add({
+				.PathSegmentIndex = i,
+				.Point = Each.Location(*this),
+			});
+		}
+	}
+
+	AllIntersections.Sort([&](const FPathIntersection& Left, const FPathIntersection& Right)
+	{
+		const double LeftDist = (Left.Point - Path.GetPoints()[0]).Length();
+		const double RightDist = (Right.Point - Path.GetPoints()[0]).Length();
+		return LeftDist < RightDist;
+	});
+
+	for (int32 i = 0; i < AllIntersections.Num() - 1; i++)
+	{
+		const FPathIntersection& Intersection0 = AllIntersections[i];
+		const FPathIntersection& Intersection1 = AllIntersections[i + 1];
+
+		FSegmentArray2D Sub = Path.SubArray(Intersection0.PathSegmentIndex, Intersection1.PathSegmentIndex);
+		Sub.SetPoint(0, Intersection0.Point);
+		Sub.SetPoint(-1, Intersection1.Point);
+
+		Func(MoveTemp(Sub));
+	}
+}
+
+
+template <bool bLoop>
 auto TSegmentArray2D<bLoop>::UnionAssumeTwoIntersections(FSegmentArray2D Path) requires bLoop
 {
 	const FIntersection BoundarySrcSegment = FindClosestPointTo(Path.GetPoints()[0]);
 	const FIntersection BoundaryDestSegment = FindClosestPointTo(Path.GetLastPoint());
-	
+
 	FLoopedSegmentArray2D SrcToDestReplaced = *this;
 	SrcToDestReplaced.ReplacePointsBySegmentIndices(
 		BoundarySrcSegment.SegmentIndex,
@@ -634,52 +697,24 @@ auto TSegmentArray2D<bLoop>::UnionAssumeTwoIntersections(FSegmentArray2D Path) r
 
 
 template <bool bLoop>
-auto TSegmentArray2D<bLoop>::Union(FSegmentArray2D Path) requires bLoop
+void TSegmentArray2D<bLoop>::DifferenceAssumeTwoIntersections(FSegmentArray2D Path, bool bRemoveToTheLeftOfPath) requires bLoop
 {
-	struct FPathIntersection
+	if (bRemoveToTheLeftOfPath)
 	{
-		int32 PathSegmentIndex;
-		FVector2D Point;
-	};
-
-	// Segment의 양 지점이 Boundary 위에 정확하게 걸쳐져 있는 경우 Intersection Test에 실패할 수 있기 때문에 조금 늘려줌
-	Path.SetPoint(0, Path.GetPoints()[0] - Path[0].Direction * UE_KINDA_SMALL_NUMBER);
-	Path.SetPoint(-1, Path.GetLastPoint() + Path.GetLastSegmentDirection() * UE_KINDA_SMALL_NUMBER);
-
-	TArray<FPathIntersection> AllIntersections;
-	for (int32 i = 0; i < Path.SegmentCount(); i++)
-	{
-		for (const FIntersection& Each : FindAllIntersections(Path[i]))
-		{
-			AllIntersections.Add({
-				.PathSegmentIndex = i,
-				.Point = Each.Location(*this),
-			});
-		}
+		Path.ReverseVertexOrder();
 	}
 
-	AllIntersections.Sort([&](const FPathIntersection& Left, const FPathIntersection& Right)
+	const FIntersection BoundarySrcSegment = FindClosestPointTo(Path.GetPoints()[0]);
+	const FIntersection BoundaryDestSegment = FindClosestPointTo(Path.GetLastPoint());
+
+	FLoopedSegmentArray2D SrcToDestReplaced = *this;
+	SrcToDestReplaced.ReplacePointsBySegmentIndices(
+		BoundarySrcSegment.SegmentIndex,
+		BoundaryDestSegment.SegmentIndex,
+		Path.GetPoints());
+	
+	if (SrcToDestReplaced.CalculateArea() < CalculateArea())
 	{
-		const double LeftDist = (Left.Point - Path.GetPoints()[0]).Length();
-		const double RightDist = (Right.Point - Path.GetPoints()[0]).Length();
-		return LeftDist < RightDist;
-	});
-
-	TArray<FUnionResult> Ret;
-	for (int32 i = 0; i < AllIntersections.Num() - 1; i++)
-	{
-		const FPathIntersection& Intersection0 = AllIntersections[i];
-		const FPathIntersection& Intersection1 = AllIntersections[i + 1];
-
-		FSegmentArray2D Sub = Path.SubArray(Intersection0.PathSegmentIndex, Intersection1.PathSegmentIndex);
-		Sub.SetPoint(0, Intersection0.Point);
-		Sub.SetPoint(-1, Intersection1.Point);
-
-		if (TOptional<FUnionResult> UnionResult = UnionAssumeTwoIntersections(MoveTemp(Sub)))
-		{
-			Ret.Add(MoveTemp(*UnionResult));
-		}
+		Points = MoveTemp(SrcToDestReplaced.Points);
 	}
-
-	return Ret;
 }
