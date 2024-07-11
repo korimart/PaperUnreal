@@ -31,6 +31,8 @@ public:
 		ServerTracerPath = Source;
 	}
 
+	// TODO BeginPlay 호출 이후에는 Server Initialize Component에서 설정한 값들이 이미 있기 때문에 필요 없음
+	// 액터에 붙인 다음에 Actor가 Replicate된 경우에는 확인했는데 액터 Replicate 이후 붙인 것도 해당 되는지 확인 필요
 	TWeakAwaitable<bool> WaitForClientInitComplete()
 	{
 		check(GetNetMode() == NM_Client);

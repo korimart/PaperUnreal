@@ -11,6 +11,7 @@
 #include "TracerPathGenerator.h"
 #include "TracerToAreaConverterComponent.h"
 #include "TracerMeshGeneratorComponent.h"
+#include "TracerOverlapCheckerComponent.h"
 #include "Core/UECoroutine.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Camera/CameraComponent.h"
@@ -72,7 +73,7 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 			{
 				return *Area->TeamComponent->GetTeamIndex().GetValue() == MyTeamIndex;
 			});
-		
+
 		UAreaMeshComponent* AreaMeshComponent = co_await WaitForComponent<UAreaMeshComponent>(MyTeamArea);
 
 		UResourceRegistryComponent* RR = co_await WaitForComponent<UResourceRegistryComponent>(GameState);
@@ -106,17 +107,18 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 {
 	RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 	{
+		// TODO 서버에서는 기다리지 말자
 		AGameStateBase* GameState = co_await WaitForGameState(GetWorld());
 		UTeamComponent* MyTeamComponent = co_await WaitForComponent<UTeamComponent>(co_await WaitForPlayerState());
 		const int32 MyTeamIndex = co_await MyTeamComponent->GetTeamIndex().WaitForValue();
 		UAreaSpawnerComponent* AreaSpawnerComponent = co_await WaitForComponent<UAreaSpawnerComponent>(GameState);
-		
+
 		AAreaActor* MyTeamArea = co_await FirstInStream(
 			AreaSpawnerComponent->CreateSpawnedAreaStream(), [MyTeamIndex](AAreaActor* Area)
 			{
 				return *Area->TeamComponent->GetTeamIndex().GetValue() == MyTeamIndex;
 			});
-		
+
 		UAreaBoundaryComponent* AreaBoundaryComponent = co_await WaitForComponent<UAreaBoundaryComponent>(MyTeamArea);
 
 		// TODO 아래 컴포넌트들은 위에 먼저 부착된 컴포넌트들에 의존함
@@ -138,19 +140,27 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		TracerToAreaConverter->SetConversionDestination(AreaBoundaryComponent);
 		TracerToAreaConverter->RegisterComponent();
 
+		auto TracerOverlapChecker = NewObject<UTracerOverlapCheckerComponent>(this);
+		TracerOverlapChecker->SetTracer(TracerPath);
+		TracerOverlapChecker->RegisterComponent();
+
+		TracerOverlapChecker->OnTracerBumpedInto.AddWeakLambda(this, [this](auto)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("sdfiljsdoif"));
+		});
+
 		RunWeakCoroutine(this, [
 				this,
 				AreaSpawnerComponent,
 				MyTeamArea,
-				TracerToAreaConverter](FWeakCoroutineContext& Context) -> FWeakCoroutine
+				TracerToAreaConverter
+			](FWeakCoroutineContext& Context) -> FWeakCoroutine
 			{
 				Context.AddToWeakList(AreaSpawnerComponent);
 				Context.AddToWeakList(MyTeamArea);
 				Context.AddToWeakList(TracerToAreaConverter);
 
-				auto SpawnedAreaStream = AreaSpawnerComponent->CreateSpawnedAreaStream();
-
-				while (true)
+				for (auto SpawnedAreaStream = AreaSpawnerComponent->CreateSpawnedAreaStream();;)
 				{
 					if (AAreaActor* Area = co_await SpawnedAreaStream.Next(); MyTeamArea != Area)
 					{
@@ -163,5 +173,20 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 					}
 				}
 			});
+
+		// RunWeakCoroutine(this, [
+		// 		this,
+		// 		TracerOverlapChecker
+		// 	](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		// 	{
+		// 		Context.AddToWeakList(TracerOverlapChecker);
+		//
+		// 		for (auto SpawnedPlayerCharacterStream = ;;)
+		// 		{
+		// 			APaperUnrealCharacter* Character = co_await SpawnedPlayerCharacterStream.Next();
+		// 			auto NewTracer = Character->FindComponentByClass<UTracerPathComponent>();
+		// 			TracerOverlapChecker->AddOverlapTarget(NewTracer);
+		// 		}
+		// 	});
 	});
 }
