@@ -295,6 +295,11 @@ public:
 		}, 0.f));
 	}
 
+	FBox2D CalculateBoundingBox() const
+	{
+		return { Points };
+	}
+
 	bool IsStraight() const
 	{
 		for (int32 i = 0; i < SegmentCount() - 2; i++)

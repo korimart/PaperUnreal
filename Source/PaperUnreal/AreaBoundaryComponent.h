@@ -23,6 +23,11 @@ public:
 		return CreateMulticastValueStream(TArray{AreaBoundary}, OnBoundaryChanged);
 	}
 
+	const FLoopedSegmentArray2D& GetBoundary() const
+	{
+		return AreaBoundary;
+	}
+
 	void ResetToStartingBoundary(const FVector& Location)
 	{
 		const TArray<FVector2D> VertexPositions = [&]()

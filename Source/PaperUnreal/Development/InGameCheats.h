@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/CheatManager.h"
+#include "PaperUnreal/PaperUnrealGameState.h"
 #include "InGameCheats.generated.h"
 
 /**
@@ -16,7 +17,9 @@ class UInGameCheats : public UCheatManagerExtension
 
 private:
 	UFUNCTION(Exec, BlueprintAuthorityOnly)
-	void SomeCheat(double Value)
+	void SpawnAreaForTeam(int32 TeamIndex)
 	{
+		GetWorld()->GetGameState<APaperUnrealGameState>()
+		          ->AreaSpawnerComponent->SpawnAreaAtRandomEmptyLocation(TeamIndex);
 	}
 };

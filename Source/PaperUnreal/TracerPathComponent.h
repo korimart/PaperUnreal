@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AreaBoundaryComponent.h"
 #include "AreaMeshComponent.h"
 #include "TracerPathGenerator.h"
 #include "Core/Utils.h"

@@ -37,6 +37,13 @@ T* ValidOrNull(T* Object)
 }
 
 
+template <typename T>
+T* ValidOrNull(T** Object)
+{
+	return Object ? *Object : nullptr;
+}
+
+
 bool AllValid(const auto&... Check)
 {
 	return (Utils_Private::IsValid(Check) && ...);
