@@ -9,22 +9,6 @@ bool UECoroutineTest::RunTest(const FString& Parameters)
 	UUECoroutineTestValueProvider* Provider = NewObject<UUECoroutineTestValueProvider>();
 
 	{
-		UUECoroutineTestValueProvider* Temp = NewObject<UUECoroutineTestValueProvider>();
-		TArray<int32> Reached;
-
-		RunWeakCoroutine(Temp, [&](FWeakCoroutineContext&) -> FWeakCoroutine
-		{
-			Reached.Add(co_await CreateReadyWeakAwaitable(0));
-			Reached.Add(co_await CreateReadyWeakAwaitable(1));
-			Reached.Add(co_await CreateReadyWeakAwaitable(2));
-			Reached.Add(co_await CreateReadyWeakAwaitable(3));
-			Reached.Add(co_await CreateReadyWeakAwaitable(4));
-		});
-
-		RETURN_IF_FALSE(TestEqual(TEXT(""), Reached.Num(), 5));
-	}
-
-	{
 		auto Lifetime = MakeUnique<FUECoroutineTestLifetime>();
 		TSharedPtr<bool> bFreed = Lifetime->bDestroyed;
 		UUECoroutineTestValueProvider* Temp = NewObject<UUECoroutineTestValueProvider>();

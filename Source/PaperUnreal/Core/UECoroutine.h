@@ -68,9 +68,6 @@ class FWeakCoroutineContext;
 template <typename>
 class TWeakAwaitable;
 
-template <typename>
-class TReadyWeakAwaitable;
-
 
 struct FWeakCoroutine
 {
@@ -136,9 +133,7 @@ struct FWeakCoroutine
 		template <typename AwaitableType>
 		decltype(auto) await_transform(AwaitableType&& Awaitable)
 		{
-			if constexpr (
-				TIsInstantiationOf_V<std::decay_t<AwaitableType>, TReadyWeakAwaitable>
-				|| TIsInstantiationOf_V<std::decay_t<AwaitableType>, TWeakAwaitable>)
+			if constexpr (TIsInstantiationOf_V<std::decay_t<AwaitableType>, TWeakAwaitable>)
 			{
 				return Forward<AwaitableType>(Awaitable);
 			}
@@ -357,6 +352,8 @@ private:
 };
 
 
+// TODO Object 타입에 대한 처리가 필요함 Cache 되어 있는 동안에 파괴될 수 있음
+// 이 경우 await_resume으로 반환하면 Dangling Pointer임
 template <typename ValueType>
 class TWeakAwaitable
 {
@@ -485,40 +482,6 @@ private:
 	std::coroutine_handle<FWeakCoroutine::promise_type> Handle;
 	TSharedPtr<TWeakAwaitableHandleImpl<ValueType>> Value = MakeShared<TWeakAwaitableHandleImpl<ValueType>>();
 	bool bNeverReady = false;
-};
-
-
-template <typename ValueType>
-class TReadyWeakAwaitable
-{
-public:
-	template <typename T>
-	TReadyWeakAwaitable(T&& InValue)
-		: Value(Forward<T>(InValue))
-	{
-	}
-
-	bool await_ready() const
-	{
-		return true;
-	}
-
-	void await_suspend(std::coroutine_handle<FWeakCoroutine::promise_type> InHandle)
-	{
-	}
-
-	ValueType& await_resume() &
-	{
-		return Value;
-	}
-
-	ValueType&& await_resume() &&
-	{
-		return MoveTemp(Value);
-	}
-
-private:
-	ValueType Value;
 };
 
 
@@ -659,13 +622,6 @@ public:
 private:
 	TSharedPtr<TValueStreamValueReceiver<T>> Receiver = MakeShared<TValueStreamValueReceiver<T>>();
 };
-
-
-template <typename T>
-TReadyWeakAwaitable<T> CreateReadyWeakAwaitable(T&& Value)
-{
-	return TReadyWeakAwaitable<T>{Forward<T>(Value)};
-}
 
 
 template <
