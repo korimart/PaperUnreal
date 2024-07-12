@@ -6,6 +6,7 @@
 #include "AreaSlasherComponent.h"
 #include "AreaSpawnerComponent.h"
 #include "InventoryComponent.h"
+#include "LifeComponent.h"
 #include "ReplicatedTracerPathComponent.h"
 #include "TracerMeshComponent.h"
 #include "TracerPathGenerator.h"
@@ -56,6 +57,24 @@ APaperUnrealCharacter::APaperUnrealCharacter()
 	// Activate ticking in order to update the cursor every frame.
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
+
+	LifeComponent = CreateDefaultSubobject<ULifeComponent>(TEXT("LifeComponent"));
+}
+
+void APaperUnrealCharacter::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+
+	RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+	{
+		co_await FirstInStream(LifeComponent->GetbAlive().CreateStream(), [](bool bAlive) { return !bAlive; });
+
+		// 현재 얘네만 파괴해주면 나머지 컴포넌트는 디펜던시가 사라짐에 따라
+		// 알아서 작동을 중지하기 때문에 사망 상태에 들어갈 때 일단 얘네만 파괴해준다
+		// (기능을 안 하는 컴포넌트들이 남아있다는 뜻임 하지만 곧 액터를 파괴할 것이므로 상관 없음)
+		FindAndDestroyComponent<UTracerPathComponent>(this);
+		FindAndDestroyComponent<UReplicatedTracerPathComponent>(this);
+	});
 }
 
 void APaperUnrealCharacter::AttachServerMachineComponents()
@@ -89,30 +108,32 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		// TODO 아래 컴포넌트들은 위에 먼저 부착된 컴포넌트들에 의존함
 		// 컴포넌트를 갈아끼울 때 이러한 의존성에 대한 경고를 하는 메카니즘이 존재하지 않음
 
-		auto TracerPath = NewObject<UTracerPathComponent>(this);
-		TracerPath->SetNoPathArea(MyHomeArea->ServerAreaBoundary);
-		TracerPath->RegisterComponent();
+		ServerTracerPath = NewObject<UTracerPathComponent>(this);
+		ServerTracerPath->SetNoPathArea(MyHomeArea->ServerAreaBoundary);
+		ServerTracerPath->RegisterComponent();
 
 		if (GetNetMode() != NM_Standalone)
 		{
 			auto TracerPathReplicator = NewObject<UReplicatedTracerPathComponent>(this);
-			TracerPathReplicator->SetTracerPathSource(TracerPath);
+			TracerPathReplicator->SetTracerPathSource(ServerTracerPath);
 			TracerPathReplicator->RegisterComponent();
 		}
 
 		auto TracerToAreaConverter = NewObject<UTracerToAreaConverterComponent>(this);
-		TracerToAreaConverter->SetTracer(TracerPath);
+		TracerToAreaConverter->SetTracer(ServerTracerPath);
 		TracerToAreaConverter->SetConversionDestination(MyHomeArea->ServerAreaBoundary);
 		TracerToAreaConverter->RegisterComponent();
 
 		auto TracerOverlapChecker = NewObject<UTracerOverlapCheckerComponent>(this);
-		TracerOverlapChecker->SetTracer(TracerPath);
-		TracerOverlapChecker->RegisterComponent();
-
-		TracerOverlapChecker->OnTracerBumpedInto.AddWeakLambda(this, [this](auto)
+		TracerOverlapChecker->SetTracer(ServerTracerPath);
+		TracerOverlapChecker->OnTracerBumpedInto.AddWeakLambda(this, [this](UTracerPathComponent* Bumpee)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("sdfiljsdoif"));
+			if (auto LifeComponent = Bumpee->GetOwner()->FindComponentByClass<ULifeComponent>())
+			{
+				LifeComponent->SetbAlive(false);
+			}
 		});
+		TracerOverlapChecker->RegisterComponent();
 
 		RunWeakCoroutine(this, [
 				this,

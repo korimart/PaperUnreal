@@ -64,6 +64,16 @@ bool IsNearlyLE(T Left, T Right)
 }
 
 
+template <typename T>
+void FindAndDestroyComponent(AActor* Actor)
+{
+	if (auto Found = Actor->FindComponentByClass<T>())
+	{
+		Found->DestroyComponent();
+	}
+}
+
+
 inline TWeakAwaitable<bool> WaitOneTick(UWorld* World)
 {
 	TWeakAwaitable<bool> Ret;

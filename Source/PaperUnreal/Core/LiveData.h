@@ -170,3 +170,10 @@ private:
 	public:\
 	TLiveDataView<Type> Get##Name() { return Name; };\
 	void Set##Name(const std::type_identity_t<Type>& NewValue) { DEFINE_REPPED_VAR_SETTER(Name, NewValue); }
+
+
+#define DECLARE_REPPED_LIVE_DATA_GETTER_SETTER_WITH_DEFAULT(Type, Name, Default)\
+	private: TLiveData<Type> Name{Default};\
+	public:\
+	TLiveDataView<Type> Get##Name() { return Name; };\
+	void Set##Name(const std::type_identity_t<Type>& NewValue) { DEFINE_REPPED_VAR_SETTER(Name, NewValue); }
