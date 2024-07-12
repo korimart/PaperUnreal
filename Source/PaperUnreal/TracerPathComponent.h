@@ -53,6 +53,16 @@ private:
 		check(AllValid(NoPathArea));
 	}
 
+	virtual void UninitializeComponent() override
+	{
+		Super::UninitializeComponent();
+
+		if (bGeneratedThisFrame)
+		{
+			OnPathEvent.Broadcast(CreateEvent(EStreamEvent::Closed));
+		}
+	}
+
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override
 	{
 		Super::TickComponent(DeltaTime, TickType, ThisTickFunction);

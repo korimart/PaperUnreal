@@ -15,17 +15,17 @@ namespace Utils_Private
 	{
 		return ::IsValid(Pointer);
 	}
-	
+
 	template <typename T>
 	bool IsValid(const TWeakObjectPtr<T>& Pointer)
 	{
 		return Pointer.IsValid();
 	}
-	
+
 	template <typename T>
 	bool IsValid(const TScriptInterface<T>& Pointer)
 	{
-		return Pointer != nullptr;
+		return IsValid(Pointer.GetObject());
 	}
 }
 
@@ -64,6 +64,18 @@ bool IsNearlyLE(T Left, T Right)
 }
 
 
+inline TWeakAwaitable<bool> WaitOneTick(UWorld* World)
+{
+	TWeakAwaitable<bool> Ret;
+	World->GetTimerManager().SetTimerForNextTick(
+		Ret.CreateSetValueDelegate<FTimerDelegate>([]()
+		{
+			return true;
+		}));
+	return Ret;
+}
+
+
 inline TWeakAwaitable<AGameStateBase*> WaitForGameState(UWorld* World)
 {
 	if (AGameStateBase* Ret = ValidOrNull(World->GetGameState()))
@@ -71,7 +83,7 @@ inline TWeakAwaitable<AGameStateBase*> WaitForGameState(UWorld* World)
 		return Ret;
 	}
 
-	return WaitForBroadcast( World->GameStateSetEvent);
+	return WaitForBroadcast(World->GameStateSetEvent);
 }
 
 

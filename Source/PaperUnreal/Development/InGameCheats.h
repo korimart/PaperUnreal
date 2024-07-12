@@ -6,6 +6,7 @@
 #include "EngineUtils.h"
 #include "GameFramework/CheatManager.h"
 #include "PaperUnreal/PaperUnrealGameState.h"
+#include "PaperUnreal/ReplicatedTracerPathComponent.h"
 #include "PaperUnreal/Core/Character2.h"
 #include "InGameCheats.generated.h"
 
@@ -35,6 +36,23 @@ private:
 		for (TActorIterator<ACharacter2> It{GetWorld()}; It; ++It)
 		{
 			It->Destroy();
+		}
+	}
+	
+	UFUNCTION(Exec, BlueprintAuthorityOnly)
+	void DestroyAllTracerPaths()
+	{
+		for (TActorIterator<ACharacter2> It{GetWorld()}; It; ++It)
+		{
+			if (UTracerPathComponent* Tracer = It->FindComponentByClass<UTracerPathComponent>())
+			{
+				Tracer->DestroyComponent();
+			}
+			
+			if (UReplicatedTracerPathComponent* Tracer = It->FindComponentByClass<UReplicatedTracerPathComponent>())
+			{
+				Tracer->DestroyComponent();
+			}
 		}
 	}
 };

@@ -69,6 +69,16 @@ private:
 		});
 	}
 
+	virtual void UninitializeComponent() override
+	{
+		Super::UninitializeComponent();
+
+		// TypedReplicator를 먼저 파괴하면Replicator의 종료 이벤트를 TypedReplicator가
+		// 전달하지 않음 전달 이후 즉시 파괴하여 내부에 Dangling Pointer가 없게 한다
+		Replicator->DestroyComponent();
+		TypedReplicator = nullptr;
+	}
+
 	UFUNCTION()
 	void OnRep_Replicator()
 	{

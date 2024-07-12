@@ -123,7 +123,20 @@ private:
 			}
 
 			MeshDestination->Edit([&]() { AttachVerticesToAttachmentTarget(-1); });
-			ListenToNextTracerStream();
+
+			// 스트림의 종료가 MeshSource의 파괴로 인한 것인지 검사한다
+			// 스트림이 끝난 시점에서는 살아 있는 상태에서 Clean up 중인거라 MeshSource의 파괴 여부를 알 수 없음
+			// 다음 틱에 Garbage가 되었는지 검사한다
+			co_await WaitOneTick(GetWorld());
+			
+			if (AllValid(MeshSource))
+			{
+				ListenToNextTracerStream();
+			}
+			else
+			{
+				MeshDestination->Edit([&]() { MeshDestination->Reset(); });
+			}
 		});
 	}
 };

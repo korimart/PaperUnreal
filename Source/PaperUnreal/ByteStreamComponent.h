@@ -102,7 +102,7 @@ struct FRepByteStream
 			{
 				Ret.Add({.Event = EStreamEvent::Closed, .Affected = {},});
 			}
-			
+
 			Ret.Add({.Event = EStreamEvent::Opened, .Affected = {},});
 			Ret.Add({.Event = EStreamEvent::Appended, .Affected = Array,});
 
@@ -152,7 +152,7 @@ struct FRepByteStream
 		{
 			Ret.Add({.Event = EStreamEvent::Closed, .Affected = {},});
 		}
-		
+
 		return Ret;
 	}
 
@@ -305,6 +305,16 @@ private:
 	{
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 		DOREPLIFETIME(ThisClass, RepStream);
+	}
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override
+	{
+		Super::EndPlay(EndPlayReason);
+
+		if (RepStream.IsOpen())
+		{
+			OnByteStreamEvent.Broadcast({.Event = EStreamEvent::Closed});
+		}
 	}
 };
 
