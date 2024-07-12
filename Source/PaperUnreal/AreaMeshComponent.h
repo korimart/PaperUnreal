@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "Core/SegmentArray.h"
 #include "Core/ActorComponent2.h"
-#include "Components/DynamicMeshComponent.h"
+#include "Core/DynamicMeshComponent2.h"
 #include "Generators/PlanarPolygonMeshGenerator.h"
 #include "AreaMeshComponent.generated.h"
 
@@ -40,6 +40,7 @@ public:
 	void ConfigureMaterialSet(const TArray<UMaterialInterface*>& NewMaterialSet)
 	{
 		DynamicMeshComponent->ConfigureMaterialSet(NewMaterialSet);
+		DynamicMeshComponent->NotifyMaterialSetUpdated();
 	}
 
 	bool IsValid() const
@@ -76,7 +77,7 @@ public:
 
 private:
 	UPROPERTY()
-	UDynamicMeshComponent* DynamicMeshComponent;
+	UDynamicMeshComponent2* DynamicMeshComponent;
 
 	FLoopedSegmentArray2D LastSetWorldBoundary;
 
@@ -94,7 +95,7 @@ private:
 	{
 		Super::BeginPlay();
 
-		DynamicMeshComponent = NewObject<UDynamicMeshComponent>(GetOwner(), TEXT("DynamicMeshComponent"));
+		DynamicMeshComponent = NewObject<UDynamicMeshComponent2>(GetOwner(), TEXT("DynamicMeshComponent"));
 		DynamicMeshComponent->AttachToComponent(GetOwner()->GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);
 		DynamicMeshComponent->RegisterComponent();
 	}

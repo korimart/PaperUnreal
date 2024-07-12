@@ -4,8 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "Core/SegmentArray.h"
-#include "Components/DynamicMeshComponent.h"
 #include "Core/ActorComponent2.h"
+#include "Core/DynamicMeshComponent2.h"
 #include "TracerMeshComponent.generated.h"
 
 
@@ -157,11 +157,12 @@ public:
 	void ConfigureMaterialSet(const TArray<UMaterialInterface*>& NewMaterialSet)
 	{
 		DynamicMeshComponent->ConfigureMaterialSet(NewMaterialSet);
+		DynamicMeshComponent->NotifyMaterialSetUpdated();
 	}
 
 private:
 	UPROPERTY()
-	UDynamicMeshComponent* DynamicMeshComponent;
+	UDynamicMeshComponent2* DynamicMeshComponent;
 
 	FDynamicMeshSegment2D LeftSegments;
 	FDynamicMeshSegment2D RightSegments;
@@ -178,7 +179,7 @@ private:
 	{
 		Super::InitializeComponent();
 
-		DynamicMeshComponent = NewObject<UDynamicMeshComponent>(GetOwner(), TEXT("DynamicMeshComponent"));
+		DynamicMeshComponent = NewObject<UDynamicMeshComponent2>(GetOwner(), TEXT("DynamicMeshComponent"));
 		DynamicMeshComponent->RegisterComponent();
 		Edit([&]() { Reset(); });
 	}
