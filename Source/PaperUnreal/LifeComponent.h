@@ -17,6 +17,11 @@ class ULifeComponent : public UActorComponent2
 
 public:
 	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER_WITH_DEFAULT(bool, bAlive, true);
+
+	TWeakAwaitable<bool> WaitForDeath()
+	{
+		return FirstInStream(GetbAlive().CreateStream(), [](bool bAlive) { return !bAlive; });
+	}
 	
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_bAlive)

@@ -620,6 +620,8 @@ private:
 };
 
 
+// TODO Object 타입에 대한 처리가 필요함 Queue 되어 있는 동안에 파괴될 수 있음
+// 이 경우 Next로 반환하면 Dangling Pointer임
 template <typename T>
 class TValueStream
 {
@@ -737,6 +739,16 @@ void FlushAwaitablesArray(TArray<TWeakAwaitableHandle<T>>& Array, const U& Value
 template <typename T, typename DelegateType>
 TValueStream<T> CreateMulticastValueStream(const TArray<T>& ReadyValues, DelegateType& MulticastDelegate)
 {
+	return CreateMulticastValueStream(ReadyValues, MulticastDelegate, []<typename ArgType>(ArgType&& Arg) -> decltype(auto)
+	{
+		return Forward<ArgType>(Arg);
+	});
+}
+
+
+template <typename T, typename DelegateType, typename TransformFuncType>
+TValueStream<T> CreateMulticastValueStream(const TArray<T>& ReadyValues, DelegateType& MulticastDelegate, TransformFuncType&& TransformFunc)
+{
 	TValueStream<T> Ret;
 
 	auto Receiver = Ret.GetReceiver();
@@ -745,10 +757,11 @@ TValueStream<T> CreateMulticastValueStream(const TArray<T>& ReadyValues, Delegat
 		Receiver.Pin()->AddValue(Each);
 	}
 
-	MulticastDelegate.Add(DelegateType::FDelegate::CreateSPLambda(Receiver.Pin().ToSharedRef(), [Receiver]<typename U>(U&& NewValue)
-	{
-		Receiver.Pin()->AddValue(Forward<U>(NewValue));
-	}));
+	MulticastDelegate.Add(DelegateType::FDelegate::CreateSPLambda(Receiver.Pin().ToSharedRef(),
+		[Receiver, TransformFunc = Forward<TransformFuncType>(TransformFunc)]<typename... ArgTypes>(ArgTypes&&... NewValues)
+		{
+			Receiver.Pin()->AddValue(TransformFunc(Forward<ArgTypes>(NewValues)...));
+		}));
 
 	return Ret;
 }

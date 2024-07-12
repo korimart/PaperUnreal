@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/UECoroutine.h"
 #include "GameFramework/PlayerController.h"
 #include "PlayerController2.generated.h"
 
@@ -18,13 +19,19 @@ public:
 	DECLARE_MULTICAST_DELEGATE_TwoParams(FOnPossessedPawnChanged2, APawn*, APawn*);
 	FOnPossessedPawnChanged2 OnPossessedPawnChanged2;
 
+	TValueStream<APawn*> CreatePossessedPawnStream()
+	{
+		auto Init = GetPawn() ? TArray{GetPawn()} : TArray<APawn*>{};
+		return CreateMulticastValueStream(Init, OnPossessedPawnChanged2, [](auto, APawn* New) { return New; });
+	}
+
 protected:
 	virtual void BeginPlay() override
 	{
 		Super::BeginPlay();
 		OnPossessedPawnChanged.AddUniqueDynamic(this, &ThisClass::OnPossessedPawnChangedDynamicCallback);
 	}
-	
+
 private:
 	UFUNCTION()
 	void OnPossessedPawnChangedDynamicCallback(APawn* InOldPawn, APawn* InNewPawn)

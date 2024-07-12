@@ -10,6 +10,7 @@
 #include "EnhancedInputComponent.h"
 #include "InputActionValue.h"
 #include "EnhancedInputSubsystems.h"
+#include "LifeComponent.h"
 #include "Development/InGameCheats.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/CheatManager.h"
@@ -32,17 +33,27 @@ void APaperUnrealPlayerController::BeginPlay()
 	//Add Input Mapping Context
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 	{
-		if (GetPawn())
+		RunWeakCoroutine(this, [this, Subsystem](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			Subsystem->AddMappingContext(DefaultMappingContext, 0);
-		}
-		
-		OnPossessedPawnChanged2.AddWeakLambda(this, [this, Subsystem](APawn* InOldPawn, APawn* InNewPawn)
-		{
-			Subsystem->ClearAllMappings();
-			if (InNewPawn)
+			for (auto PawnStream = CreatePossessedPawnStream();;)
 			{
+				APawn* PossessedPawn = co_await PawnStream.Next();
+				if (!PossessedPawn)
+				{
+					Subsystem->RemoveMappingContext(DefaultMappingContext);
+					continue;
+				}
+				
+				ULifeComponent* LifeComponent = PossessedPawn->FindComponentByClass<ULifeComponent>();
+				if (!LifeComponent)
+				{
+					Subsystem->RemoveMappingContext(DefaultMappingContext);
+					continue;
+				}
+				
 				Subsystem->AddMappingContext(DefaultMappingContext, 0);
+				co_await LifeComponent->WaitForDeath();
+				Subsystem->RemoveMappingContext(DefaultMappingContext);
 			}
 		});
 	}

@@ -67,7 +67,7 @@ void APaperUnrealCharacter::PostInitializeComponents()
 
 	RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 	{
-		co_await FirstInStream(LifeComponent->GetbAlive().CreateStream(), [](bool bAlive) { return !bAlive; });
+		co_await LifeComponent->WaitForDeath();
 
 		// 현재 얘네만 파괴해주면 나머지 컴포넌트는 디펜던시가 사라짐에 따라
 		// 알아서 작동을 중지하기 때문에 사망 상태에 들어갈 때 일단 얘네만 파괴해준다
