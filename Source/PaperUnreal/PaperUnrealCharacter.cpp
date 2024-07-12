@@ -79,7 +79,7 @@ void APaperUnrealCharacter::PostInitializeComponents()
 
 void APaperUnrealCharacter::AttachServerMachineComponents()
 {
-	RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+	RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
 	{
 		APlayerState* PlayerState = co_await WaitForPlayerState();
 		if (!IsValid(PlayerState))
@@ -109,27 +109,32 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 			co_return;
 		}
 
+		Context.AddToWeakList(AreaSpawner);
+		Context.AddToWeakList(Inventory);
+		Context.AddToWeakList(MyHomeArea);
+		auto HomeAreaBoundary = co_await WaitForComponent<UAreaBoundaryComponent>(MyHomeArea);
+
 		// TODO 아래 컴포넌트들은 위에 먼저 부착된 컴포넌트들에 의존함
 		// 컴포넌트를 갈아끼울 때 이러한 의존성에 대한 경고를 하는 메카니즘이 존재하지 않음
 
-		ServerTracerPath = NewObject<UTracerPathComponent>(this);
-		ServerTracerPath->SetNoPathArea(MyHomeArea->ServerAreaBoundary);
-		ServerTracerPath->RegisterComponent();
+		auto TracerPath = NewObject<UTracerPathComponent>(this);
+		TracerPath->SetNoPathArea(HomeAreaBoundary);
+		TracerPath->RegisterComponent();
 
 		if (GetNetMode() != NM_Standalone)
 		{
 			auto TracerPathReplicator = NewObject<UReplicatedTracerPathComponent>(this);
-			TracerPathReplicator->SetTracerPathSource(ServerTracerPath);
+			TracerPathReplicator->SetTracerPathSource(TracerPath);
 			TracerPathReplicator->RegisterComponent();
 		}
 
 		auto TracerToAreaConverter = NewObject<UTracerToAreaConverterComponent>(this);
-		TracerToAreaConverter->SetTracer(ServerTracerPath);
-		TracerToAreaConverter->SetConversionDestination(MyHomeArea->ServerAreaBoundary);
+		TracerToAreaConverter->SetTracer(TracerPath);
+		TracerToAreaConverter->SetConversionDestination(HomeAreaBoundary);
 		TracerToAreaConverter->RegisterComponent();
 
 		auto TracerOverlapChecker = NewObject<UTracerOverlapCheckerComponent>(this);
-		TracerOverlapChecker->SetTracer(ServerTracerPath);
+		TracerOverlapChecker->SetTracer(TracerPath);
 		TracerOverlapChecker->OnTracerBumpedInto.AddWeakLambda(this, [this](UTracerPathComponent* Bumpee)
 		{
 			if (auto LifeComponent = Bumpee->GetOwner()->FindComponentByClass<ULifeComponent>())
@@ -155,7 +160,7 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 					if (AAreaActor* Area = co_await SpawnedAreaStream.Next(); Area != MyHomeArea)
 					{
 						auto AreaSlasherComponent = NewObject<UAreaSlasherComponent>(this);
-						AreaSlasherComponent->SetSlashTarget(Area->ServerAreaBoundary);
+						AreaSlasherComponent->SetSlashTarget(Area->FindComponentByClass<UAreaBoundaryComponent>());
 						AreaSlasherComponent->SetTracerToAreaConverter(TracerToAreaConverter);
 						AreaSlasherComponent->RegisterComponent();
 					}
@@ -197,7 +202,7 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 		}
 
 		AAreaActor* MyHomeArea = co_await Inventory->GetHomeArea().WaitForValue();
-		co_await MyHomeArea->GetbClientComponentsAttached().WaitForValue();
+		auto MyHomeAreaMesh = co_await WaitForComponent<UAreaMeshComponent>(MyHomeArea);
 
 		ITracerPathStream* TracerMeshSource = GetNetMode() == NM_Client
 			? static_cast<ITracerPathStream*>(FindComponentByClass<UReplicatedTracerPathComponent>())
@@ -206,25 +211,28 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 		// 클래스 서버 코드에서 뭔가 실수한 거임 고쳐야 됨
 		check(TracerMeshSource);
 
-		ClientTracerMesh = NewObject<UTracerMeshComponent>(this);
-		ClientTracerMesh->RegisterComponent();
+		auto TracerMesh = NewObject<UTracerMeshComponent>(this);
+		TracerMesh->RegisterComponent();
 
 		auto TracerMeshGenerator = NewObject<UTracerMeshGeneratorComponent>(this);
 		TracerMeshGenerator->SetMeshSource(TracerMeshSource);
-		TracerMeshGenerator->SetMeshDestination(ClientTracerMesh);
-		TracerMeshGenerator->SetMeshAttachmentTarget(MyHomeArea->ClientAreaMesh);
+		TracerMeshGenerator->SetMeshDestination(TracerMesh);
+		TracerMeshGenerator->SetMeshAttachmentTarget(MyHomeAreaMesh);
 		TracerMeshGenerator->RegisterComponent();
 
 
 		// 일단 위에까지 완료했으면 플레이는 가능한 거임 여기부터는 미적인 요소들을 준비한다
 		RunWeakCoroutine(this, [
-				this, TracerMaterialStream = Inventory->GetTracerMaterial().CreateStream()
+				this,
+				TracerMesh,
+				TracerMaterialStream = Inventory->GetTracerMaterial().CreateStream()
 			](FWeakCoroutineContext& Context) mutable -> FWeakCoroutine
 			{
+				Context.AddToWeakList(TracerMesh);
 				while (true)
 				{
 					auto SoftTracerMaterial = co_await TracerMaterialStream.Next();
-					ClientTracerMesh->ConfigureMaterialSet({co_await RequestAsyncLoad(SoftTracerMaterial)});
+					TracerMesh->ConfigureMaterialSet({co_await RequestAsyncLoad(SoftTracerMaterial)});
 				}
 			});
 	});

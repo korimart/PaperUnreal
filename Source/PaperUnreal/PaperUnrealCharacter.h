@@ -31,12 +31,6 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	class USpringArmComponent* CameraBoom;
 	
-	UPROPERTY()
-	class UTracerPathComponent* ServerTracerPath;
-	
-	UPROPERTY()
-	class UTracerMeshComponent* ClientTracerMesh;
-
 	virtual void PostInitializeComponents() override;
 	virtual void AttachServerMachineComponents() override;
 	virtual void AttachPlayerMachineComponents() override;

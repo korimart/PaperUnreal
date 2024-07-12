@@ -21,13 +21,6 @@ public:
 	UPROPERTY()
 	UTeamComponent* TeamComponent;
 
-	UPROPERTY()
-	UAreaBoundaryComponent* ServerAreaBoundary;
-
-	UPROPERTY()
-	UAreaMeshComponent* ClientAreaMesh;
-
-	DECLARE_LIVE_DATA_AND_GETTER(bool, bClientComponentsAttached);
 	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(TSoftObjectPtr<UMaterialInstance>, AreaMaterial);
 
 private:
@@ -53,22 +46,22 @@ private:
 
 	virtual void AttachServerMachineComponents() override
 	{
-		ServerAreaBoundary = NewObject<UAreaBoundaryComponent>(this);
-		ServerAreaBoundary->ResetToStartingBoundary(GetActorLocation());
-		ServerAreaBoundary->RegisterComponent();
+		auto AreaBoundary = NewObject<UAreaBoundaryComponent>(this);
+		AreaBoundary->ResetToStartingBoundary(GetActorLocation());
+		AreaBoundary->RegisterComponent();
 
 		if (GetNetMode() != NM_Standalone)
 		{
 			auto ReplicatedAreaBoundary = NewObject<UReplicatedAreaBoundaryComponent>(this);
-			ReplicatedAreaBoundary->SetAreaBoundarySource(ServerAreaBoundary);
+			ReplicatedAreaBoundary->SetAreaBoundarySource(AreaBoundary);
 			ReplicatedAreaBoundary->RegisterComponent();
 		}
 	}
 
 	virtual void AttachPlayerMachineComponents() override
 	{
-		ClientAreaMesh = NewObject<UAreaMeshComponent>(this);
-		ClientAreaMesh->RegisterComponent();
+		auto AreaMesh = NewObject<UAreaMeshComponent>(this);
+		AreaMesh->RegisterComponent();
 
 		IAreaBoundaryStream* AreaBoundaryStream = GetNetMode() == NM_Client
 			? static_cast<IAreaBoundaryStream*>(FindComponentByClass<UReplicatedAreaBoundaryComponent>())
@@ -79,18 +72,17 @@ private:
 
 		auto AreaMeshGenerator = NewObject<UAreaMeshGeneratorComponent>(this);
 		AreaMeshGenerator->SetMeshSource(AreaBoundaryStream);
-		AreaMeshGenerator->SetMeshDestination(ClientAreaMesh);
+		AreaMeshGenerator->SetMeshDestination(AreaMesh);
 		AreaMeshGenerator->RegisterComponent();
 
-		RunWeakCoroutine(this, [this](auto&) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this, AreaMesh](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
+			Context.AddToWeakList(AreaMesh);
 			for (auto AreaMaterialStream = AreaMaterial.CreateStream();;)
 			{
 				auto SoftAreaMaterial = co_await AreaMaterialStream.Next();
-				ClientAreaMesh->ConfigureMaterialSet({co_await RequestAsyncLoad(SoftAreaMaterial)});
+				AreaMesh->ConfigureMaterialSet({co_await RequestAsyncLoad(SoftAreaMaterial)});
 			}
 		});
-
-		bClientComponentsAttached = true;
 	}
 };
