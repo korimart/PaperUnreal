@@ -12,6 +12,9 @@ class APaperUnrealCharacter : public ACharacter2
 	GENERATED_BODY()
 
 public:
+	UPROPERTY()
+	class UTracerMeshComponent* ClientTracerMesh;
+		
 	APaperUnrealCharacter();
 
 	/** Returns TopDownCameraComponent subobject **/

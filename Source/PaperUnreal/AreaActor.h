@@ -20,20 +20,34 @@ class AAreaActor : public AActor2
 public:
 	UPROPERTY()
 	UTeamComponent* TeamComponent;
-	
+
 	UPROPERTY()
 	UAreaBoundaryComponent* ServerAreaBoundary;
-	
+
 	UPROPERTY()
 	UAreaMeshComponent* ClientAreaMesh;
 
+	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(TSoftObjectPtr<UMaterialInstance>, AreaMaterial);
+
 private:
+	UPROPERTY(ReplicatedUsing=OnRep_AreaMaterial)
+	TSoftObjectPtr<UMaterialInstance> RepAreaMaterial;
+
 	AAreaActor()
 	{
 		bReplicates = true;
 		bAlwaysRelevant = true;
 		RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("RootComponent"));
 		TeamComponent = CreateDefaultSubobject<UTeamComponent>(TEXT("TeamComponent"));
+	}
+
+	UFUNCTION()
+	void OnRep_AreaMaterial() { AreaMaterial = RepAreaMaterial; }
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
+	{
+		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+		DOREPLIFETIME(ThisClass, RepAreaMaterial);
 	}
 
 	virtual void AttachServerMachineComponents() override
@@ -52,29 +66,28 @@ private:
 
 	virtual void AttachPlayerMachineComponents() override
 	{
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		ClientAreaMesh = NewObject<UAreaMeshComponent>(this);
+		ClientAreaMesh->RegisterComponent();
+
+		IAreaBoundaryStream* AreaBoundaryStream = GetNetMode() == NM_Client
+			? static_cast<IAreaBoundaryStream*>(FindComponentByClass<UReplicatedAreaBoundaryComponent>())
+			: static_cast<IAreaBoundaryStream*>(FindComponentByClass<UAreaBoundaryComponent>());
+
+		// 클래스 서버 코드에서 뭔가 실수한 거임 고쳐야 됨
+		check(AreaBoundaryStream);
+
+		auto AreaMeshGenerator = NewObject<UAreaMeshGeneratorComponent>(this);
+		AreaMeshGenerator->SetMeshSource(AreaBoundaryStream);
+		AreaMeshGenerator->SetMeshDestination(ClientAreaMesh);
+		AreaMeshGenerator->RegisterComponent();
+
+		RunWeakCoroutine(this, [this](auto&) -> FWeakCoroutine
 		{
-			AGameStateBase* GameState = co_await WaitForGameState(GetWorld());
-			const int32 TeamIndex = co_await TeamComponent->GetTeamIndex().WaitForValue();
-
-			ClientAreaMesh = NewObject<UAreaMeshComponent>(this);
-			ClientAreaMesh->RegisterComponent();
-			// ClientAreaMesh->ConfigureMaterialSet({RR->GetAreaMaterialFor(TeamIndex)});
-
-			IAreaBoundaryStream* AreaBoundaryStream = nullptr;
-			if (GetNetMode() == NM_Client)
+			for (auto AreaMaterialStream = AreaMaterial.CreateStream();;)
 			{
-				AreaBoundaryStream = co_await WaitForComponent<UReplicatedAreaBoundaryComponent>(this);
+				auto SoftAreaMaterial = co_await AreaMaterialStream.Next();
+				ClientAreaMesh->ConfigureMaterialSet({co_await RequestAsyncLoad(SoftAreaMaterial)});
 			}
-			else
-			{
-				AreaBoundaryStream = co_await WaitForComponent<UAreaBoundaryComponent>(this);
-			}
-
-			auto AreaMeshGenerator = NewObject<UAreaMeshGeneratorComponent>(this);
-			AreaMeshGenerator->SetMeshSource(AreaBoundaryStream);
-			AreaMeshGenerator->SetMeshDestination(ClientAreaMesh);
-			AreaMeshGenerator->RegisterComponent();
 		});
 	}
 };

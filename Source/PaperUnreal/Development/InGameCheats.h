@@ -19,7 +19,11 @@ private:
 	UFUNCTION(Exec, BlueprintAuthorityOnly)
 	void SpawnAreaForTeam(int32 TeamIndex)
 	{
-		GetWorld()->GetGameState<APaperUnrealGameState>()
-		          ->AreaSpawnerComponent->SpawnAreaAtRandomEmptyLocation(TeamIndex);
+		auto Spawned = GetWorld()
+		               ->GetGameState<APaperUnrealGameState>()
+		               ->AreaSpawnerComponent
+		               ->SpawnAreaAtRandomEmptyLocation();
+		
+		Spawned->TeamComponent->SetTeamIndex(TeamIndex);
 	}
 };

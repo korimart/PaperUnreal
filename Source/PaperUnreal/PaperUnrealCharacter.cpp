@@ -182,28 +182,25 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 		// 클래스 서버 코드에서 뭔가 실수한 거임 고쳐야 됨
 		check(TracerMeshSource);
 
-		auto TracerMesh = NewObject<UTracerMeshComponent>(this);
-		TracerMesh->RegisterComponent();
+		ClientTracerMesh = NewObject<UTracerMeshComponent>(this);
+		ClientTracerMesh->RegisterComponent();
 
 		auto TracerMeshGenerator = NewObject<UTracerMeshGeneratorComponent>(this);
 		TracerMeshGenerator->SetMeshSource(TracerMeshSource);
-		TracerMeshGenerator->SetMeshDestination(TracerMesh);
+		TracerMeshGenerator->SetMeshDestination(ClientTracerMesh);
 		TracerMeshGenerator->SetMeshAttachmentTarget(MyHomeArea->ClientAreaMesh);
 		TracerMeshGenerator->RegisterComponent();
 
-		
+
 		// 일단 위에까지 완료했으면 플레이는 가능한 거임 여기부터는 미적인 요소들을 준비한다
 		RunWeakCoroutine(this, [
-				this,
-				TracerMesh,
-				TracerMaterialStream = Inventory->GetTracerMaterial().CreateStream()
+				this, TracerMaterialStream = Inventory->GetTracerMaterial().CreateStream()
 			](FWeakCoroutineContext& Context) mutable -> FWeakCoroutine
 			{
-				Context.AddToWeakList(TracerMesh);
 				while (true)
 				{
 					auto SoftTracerMaterial = co_await TracerMaterialStream.Next();
-					TracerMesh->ConfigureMaterialSet({co_await RequestAsyncLoad(SoftTracerMaterial)});
+					ClientTracerMesh->ConfigureMaterialSet({co_await RequestAsyncLoad(SoftTracerMaterial)});
 				}
 			});
 	});

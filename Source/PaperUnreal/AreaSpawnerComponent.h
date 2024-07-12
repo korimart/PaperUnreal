@@ -148,7 +148,7 @@ public:
 		return CreateMulticastValueStream(GetSpawnedAreas(), OnAreaSpawned);
 	}
 
-	AAreaActor* SpawnAreaAtRandomEmptyLocation(int32 TeamIndex)
+	AAreaActor* SpawnAreaAtRandomEmptyLocation()
 	{
 		check(GetNetMode() != NM_Client);
 
@@ -164,9 +164,7 @@ public:
 			const FVector SpawnLocation{CellToSpawnAreaIn->GetCenter(), 50.f};
 			
 			AAreaActor* Ret = GetWorld()->SpawnActor<AAreaActor>(SpawnLocation, {});
-			Ret->TeamComponent->SetTeamIndex(TeamIndex);
 			RepSpawnedAreas.Add(Ret);
-
 			return Ret;
 		}
 
