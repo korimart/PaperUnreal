@@ -16,12 +16,11 @@ class UTeamComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	// TODO maybe remove
 	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(int32, TeamIndex);
 
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_TeamIndex)
-	int32 ReppedTeamIndex = -1;
+	int32 RepTeamIndex = -1;
 
 	UTeamComponent()
 	{
@@ -29,14 +28,11 @@ private:
 	}
 
 	UFUNCTION()
-	void OnRep_TeamIndex()
-	{
-		TeamIndex = ReppedTeamIndex;
-	}
+	void OnRep_TeamIndex() { TeamIndex = RepTeamIndex; }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-		DOREPLIFETIME(ThisClass, ReppedTeamIndex);
+		DOREPLIFETIME(ThisClass, RepTeamIndex);
 	}
 };

@@ -6,7 +6,6 @@
 #include "AreaMeshComponent.h"
 #include "AreaMeshGeneratorComponent.h"
 #include "ReplicatedAreaBoundaryComponent.h"
-#include "ResourceRegistryComponent.h"
 #include "TeamComponent.h"
 #include "Core/Actor2.h"
 #include "Core/ComponentRegistry.h"
@@ -21,6 +20,12 @@ class AAreaActor : public AActor2
 public:
 	UPROPERTY()
 	UTeamComponent* TeamComponent;
+	
+	UPROPERTY()
+	UAreaBoundaryComponent* ServerAreaBoundary;
+	
+	UPROPERTY()
+	UAreaMeshComponent* ClientAreaMesh;
 
 private:
 	AAreaActor()
@@ -33,14 +38,14 @@ private:
 
 	virtual void AttachServerMachineComponents() override
 	{
-		auto AreaBoundaryComponent = NewObject<UAreaBoundaryComponent>(this);
-		AreaBoundaryComponent->ResetToStartingBoundary(GetActorLocation());
-		AreaBoundaryComponent->RegisterComponent();
+		ServerAreaBoundary = NewObject<UAreaBoundaryComponent>(this);
+		ServerAreaBoundary->ResetToStartingBoundary(GetActorLocation());
+		ServerAreaBoundary->RegisterComponent();
 
 		if (GetNetMode() != NM_Standalone)
 		{
 			auto ReplicatedAreaBoundary = NewObject<UReplicatedAreaBoundaryComponent>(this);
-			ReplicatedAreaBoundary->SetAreaBoundarySource(AreaBoundaryComponent);
+			ReplicatedAreaBoundary->SetAreaBoundarySource(ServerAreaBoundary);
 			ReplicatedAreaBoundary->RegisterComponent();
 		}
 	}
@@ -50,16 +55,11 @@ private:
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
 			AGameStateBase* GameState = co_await WaitForGameState(GetWorld());
-			UResourceRegistryComponent* RR = co_await WaitForComponent<UResourceRegistryComponent>(GameState);
-
-			// TODO graceful exit
-			check(co_await RR->GetbResourcesLoaded().WaitForValue());
-
 			const int32 TeamIndex = co_await TeamComponent->GetTeamIndex().WaitForValue();
 
-			auto AreaMesh = NewObject<UAreaMeshComponent>(this);
-			AreaMesh->RegisterComponent();
-			AreaMesh->ConfigureMaterialSet({RR->GetAreaMaterialFor(TeamIndex)});
+			ClientAreaMesh = NewObject<UAreaMeshComponent>(this);
+			ClientAreaMesh->RegisterComponent();
+			// ClientAreaMesh->ConfigureMaterialSet({RR->GetAreaMaterialFor(TeamIndex)});
 
 			IAreaBoundaryStream* AreaBoundaryStream = nullptr;
 			if (GetNetMode() == NM_Client)
@@ -73,7 +73,7 @@ private:
 
 			auto AreaMeshGenerator = NewObject<UAreaMeshGeneratorComponent>(this);
 			AreaMeshGenerator->SetMeshSource(AreaBoundaryStream);
-			AreaMeshGenerator->SetMeshDestination(AreaMesh);
+			AreaMeshGenerator->SetMeshDestination(ClientAreaMesh);
 			AreaMeshGenerator->RegisterComponent();
 		});
 	}

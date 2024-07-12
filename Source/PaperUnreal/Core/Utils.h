@@ -75,6 +75,7 @@ inline TWeakAwaitable<AGameStateBase*> WaitForGameState(UWorld* World)
 }
 
 
+// TODO 바로 수령하지 않으면 garbage를 반환할 수 있음
 template <typename SoftObjectType>
 TWeakAwaitable<SoftObjectType*> RequestAsyncLoad(const TSoftObjectPtr<SoftObjectType>& SoftPointer)
 {
@@ -89,24 +90,9 @@ TWeakAwaitable<SoftObjectType*> RequestAsyncLoad(const TSoftObjectPtr<SoftObject
 }
 
 
-template <typename SoftObjectType, typename CallbackType>
-TWeakAwaitable<bool> RequestAsyncLoad(const TSoftObjectPtr<SoftObjectType>& SoftPointer, CallbackType&& Callback)
-{
-	TWeakAwaitable<bool> Ret;
-	UAssetManager::GetStreamableManager().RequestAsyncLoad(
-		SoftPointer.ToSoftObjectPath(),
-		Ret.CreateSetValueDelegate<FStreamableDelegate>([SoftPointer, Callback = Forward<CallbackType>(Callback)]()
-		{
-			Callback(SoftPointer.Get());
-			return true;
-		}));
-	return Ret;
-}
-
-
 #define DEFINE_REPPED_VAR_SETTER(VarName, NewValue)\
 	check(GetNetMode() != NM_Client);\
-	Repped##VarName = NewValue;\
+	Rep##VarName = NewValue;\
 	OnRep_##VarName();
 
 

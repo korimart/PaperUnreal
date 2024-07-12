@@ -57,5 +57,19 @@ void APaperUnrealGameMode::OnPostLogin(AController* NewPlayer)
 		                 ->AreaSpawnerComponent->SpawnAreaAtRandomEmptyLocation(ThisPlayerTeamIndex);
 	}
 
+	// 월드가 꽉차서 새 영역을 선포할 수 없음
+	if (!ThisPlayerArea)
+	{
+		return;
+	}
+
+	NewPlayer->GetPlayerState<APaperUnrealPlayerState>()->InventoryComponent->SetHomeArea(ThisPlayerArea);
+
+	const TSoftObjectPtr<UMaterialInstance> SoftSolidBlue{FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Blue.MI_Solid_Blue'")}};
+	const TSoftObjectPtr<UMaterialInstance> SoftSolidBlueLight{FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Blue_Light.MI_Solid_Blue_Light'")}};
+	const TSoftObjectPtr<UMaterialInstance> SoftSolidRed{FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Red.MI_Solid_Red'")}};
+	const TSoftObjectPtr<UMaterialInstance> SoftSolidRedLight{FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Red_Light.MI_Solid_Red_Light'")}};
+	NewPlayer->GetPlayerState<APaperUnrealPlayerState>()->InventoryComponent->SetTracerMaterial(SoftSolidBlueLight);
+
 	RestartPlayerAtTransform(NewPlayer, ThisPlayerArea->GetActorTransform());
 }

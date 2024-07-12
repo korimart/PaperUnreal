@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "InventoryComponent.h"
 #include "TeamComponent.h"
 #include "GameFramework/PlayerState.h"
 #include "PaperUnrealPlayerState.generated.h"
@@ -18,10 +19,14 @@ class APaperUnrealPlayerState : public APlayerState
 public:
 	UPROPERTY()
 	UTeamComponent* TeamComponent;
+	
+	UPROPERTY()
+	UInventoryComponent* InventoryComponent;
 
 private:
 	APaperUnrealPlayerState()
 	{
 		TeamComponent = CreateDefaultSubobject<UTeamComponent>(TEXT("TeamComponent"));
+		InventoryComponent = CreateDefaultSubobject<UInventoryComponent>(TEXT("InventoryComponent"));
 	}
 };

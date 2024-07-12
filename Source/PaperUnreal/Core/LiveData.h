@@ -6,32 +6,6 @@
 #include "UECoroutine.h"
 
 
-template <typename T>
-bool operator==(const TSet<T>& Left, const TSet<T>& Right)
-{
-	if (Left.Num() != Right.Num())
-	{
-		return false;
-	}
-
-	for (const T& Each : Left)
-	{
-		if (!Right.Contains(Each))
-		{
-			return false;
-		}
-	}
-
-	return true;
-}
-
-template <typename T>
-bool operator!=(const TSet<T>& Left, const TSet<T>& Right)
-{
-	return !(Left == Right);
-}
-
-
 template <typename ValueType>
 class TLiveDataBase
 {
@@ -51,20 +25,6 @@ public:
 		return *this;
 	}
 
-	template <typename ObserverType>
-	void ObserveValid(UObject* Lifetime, ObserverType&& Observer)
-	{
-		if (Value)
-		{
-			Observer(*Value);
-		}
-
-		OnChanged.AddWeakLambda(Lifetime, [Observer = Forward<ObserverType>(Observer)](const ValueType& NewValue)
-		{
-			Observer(NewValue);
-		});
-	}
-
 	TWeakAwaitable<ValueType> WaitForValue()
 	{
 		if (Value)
@@ -75,6 +35,15 @@ public:
 		// TODO TLiveData는 Broadcast와 달리 Value를 보관하고 있으므로
 		// 레퍼런스만 넘겨서 복사를 회피할 수 있음
 		return WaitForBroadcast(OnChanged);
+	}
+
+	TValueStream<ValueType> CreateStream()
+	{
+		if (Value)
+		{
+			return CreateMulticastValueStream(TArray<ValueType>{*Value}, OnChanged);
+		}
+		return CreateMulticastValueStream(TArray<ValueType>{}, OnChanged);
 	}
 
 	template <typename T> requires std::is_convertible_v<T, ValueType>
@@ -149,77 +118,6 @@ public:
 };
 
 
-template <typename ElementType>
-class TLiveData<TSet<ElementType>> : public TLiveDataBase<TSet<ElementType>>
-{
-public:
-	using Super = TLiveDataBase<TSet<ElementType>>;
-	using Super::Super;
-	using Super::operator=;
-
-	template <typename T> requires std::is_convertible_v<T, ElementType>
-	void Add(T&& Element)
-	{
-		check(!this->bExecutingCallbacks);
-		if (ElementType* Added = AddSilentImpl(Forward<T>(Element)))
-		{
-			this->Notify();
-
-			this->bExecutingCallbacks = true;
-			OnElementAdded.Broadcast(*Added);
-			this->bExecutingCallbacks = false;
-		}
-	}
-
-	template <typename T> requires std::is_convertible_v<T, ElementType>
-	bool AddSilent(T&& Element)
-	{
-		check(!this->bExecutingCallbacks);
-		return !!AddSilentImpl(Forward<T>(Element));
-	}
-
-	template <typename FuncType>
-	void ObserveEach(UObject* Lifetime, FuncType&& Func)
-	{
-		if (this->Value)
-		{
-			this->bExecutingCallbacks = true;
-			for (const ElementType& Each : *this->Value)
-			{
-				Func(Each);
-			}
-			this->bExecutingCallbacks = false;
-		}
-
-		OnElementAdded.AddWeakLambda(Lifetime, Forward<FuncType>(Func));
-	}
-
-private:
-	DECLARE_MULTICAST_DELEGATE_OneParam(FElementEvent, const ElementType&);
-	FElementEvent OnElementAdded;
-    
-	template <typename T> requires std::is_convertible_v<T, ElementType>
-	ElementType* AddSilentImpl(T&& Element)
-	{
-		if (!this->Value)
-		{
-			this->Value.Emplace();
-			FSetElementId ElementId = this->Value->Add(Forward<T>(Element));
-			return &this->Value->operator[](ElementId);
-		}
-
-		if (!this->Value->Contains(Element))
-		{
-			this->Value->Add(Forward<T>(Element));
-			FSetElementId ElementId = this->Value->Add(Forward<T>(Element));
-			return &this->Value->operator[](ElementId);
-		}
-
-		return nullptr;
-	}
-};
-
-
 template <typename ValueType>
 class TLiveDataView
 {
@@ -229,21 +127,14 @@ public:
 	{
 	}
 
-	template <typename ObserverType>
-	void ObserveValid(UObject* Lifetime, ObserverType&& Observer)
-	{
-		LiveData.ObserveValid(Lifetime, Forward<ObserverType>(Observer));
-	}
-	
-	template <typename ObserverType>
-	void ObserveEach(UObject* Lifetime, ObserverType&& Observer) requires TIsInstantiationOf_V<ValueType, TSet>
-	{
-		LiveData.ObserveEach(Lifetime, Forward<ObserverType>(Observer));
-	}
-
 	TWeakAwaitable<ValueType> WaitForValue()
 	{
 		return LiveData.WaitForValue();
+	}
+	
+	TValueStream<ValueType> CreateStream()
+	{
+		return LiveData.CreateStream();
 	}
 
 	decltype(auto) GetValue() const
@@ -278,4 +169,4 @@ private:
 	private: TLiveData<Type> Name;\
 	public:\
 	TLiveDataView<Type> Get##Name() { return Name; };\
-	void Set##Name(const Type& NewValue) { DEFINE_REPPED_VAR_SETTER(Name, NewValue); }
+	void Set##Name(const std::type_identity_t<Type>& NewValue) { DEFINE_REPPED_VAR_SETTER(Name, NewValue); }

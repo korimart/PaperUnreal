@@ -76,6 +76,7 @@ struct FWeakCoroutine
 {
 	struct promise_type
 	{
+		TUniquePtr<FWeakCoroutineContext> Context;
 		TSharedPtr<TUniqueFunction<FWeakCoroutine(FWeakCoroutineContext&)>> LambdaCaptures;
 		bool bCustomSuspended = false;
 		TSharedPtr<bool> bDestroyed = MakeShared<bool>(false);
@@ -154,12 +155,12 @@ struct FWeakCoroutine
 
 	void Init(
 		TSharedPtr<TUniqueFunction<FWeakCoroutine(FWeakCoroutineContext&)>> LambdaCaptures,
-		TUniquePtr<FWeakCoroutineContext> Context);
+		TUniquePtr<FWeakCoroutineContext> InContext);
 
 	void Init(
 		auto& Lifetime,
 		TSharedPtr<TUniqueFunction<FWeakCoroutine(FWeakCoroutineContext&)>> LambdaCaptures,
-		TUniquePtr<FWeakCoroutineContext> Context);
+		TUniquePtr<FWeakCoroutineContext> InContext);
 
 private:
 	std::coroutine_handle<promise_type> Handle;
@@ -175,9 +176,10 @@ class FWeakCoroutineContext
 {
 public:
 	template <typename T>
-	void AddToWeakList(T&& Weak)
+	decltype(auto) AddToWeakList(T&& Weak)
 	{
-		Handle.promise().AddToWeakList(Forward<T>(Weak));
+		Handle.promise().AddToWeakList(Weak);
+		return Forward<T>(Weak);
 	}
 
 	// TODO 필요해지면 구현
@@ -194,9 +196,10 @@ private:
 
 inline void FWeakCoroutine::Init(
 	TSharedPtr<TUniqueFunction<FWeakCoroutine(FWeakCoroutineContext&)>> LambdaCaptures,
-	TUniquePtr<FWeakCoroutineContext> Context)
+	TUniquePtr<FWeakCoroutineContext> InContext)
 {
-	Context->Handle = Handle;
+	Handle.promise().Context = MoveTemp(InContext);
+	Handle.promise().Context->Handle = Handle;
 	Handle.promise().LambdaCaptures = LambdaCaptures;
 	Handle.resume();
 }
@@ -205,9 +208,10 @@ inline void FWeakCoroutine::Init(
 void FWeakCoroutine::Init(
 	auto& Lifetime,
 	TSharedPtr<TUniqueFunction<FWeakCoroutine(FWeakCoroutineContext&)>> LambdaCaptures,
-	TUniquePtr<FWeakCoroutineContext> Context)
+	TUniquePtr<FWeakCoroutineContext> InContext)
 {
-	Context->Handle = Handle;
+	Handle.promise().Context = MoveTemp(InContext);
+	Handle.promise().Context->Handle = Handle;
 	Handle.promise().AddToWeakList(Lifetime);
 	Handle.promise().LambdaCaptures = LambdaCaptures;
 	Handle.resume();
