@@ -3,8 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "EngineUtils.h"
 #include "GameFramework/CheatManager.h"
 #include "PaperUnreal/PaperUnrealGameState.h"
+#include "PaperUnreal/Core/Character2.h"
 #include "InGameCheats.generated.h"
 
 /**
@@ -25,5 +27,14 @@ private:
 		               ->SpawnAreaAtRandomEmptyLocation();
 		
 		Spawned->TeamComponent->SetTeamIndex(TeamIndex);
+	}
+	
+	UFUNCTION(Exec, BlueprintAuthorityOnly)
+	void DestroyAllCharacters()
+	{
+		for (TActorIterator<ACharacter2> It{GetWorld()}; It; ++It)
+		{
+			It->Destroy();
+		}
 	}
 };

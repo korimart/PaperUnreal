@@ -3,8 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "PlayerController2.h"
 #include "Templates/SubclassOf.h"
-#include "GameFramework/PlayerController.h"
 #include "PaperUnrealPlayerController.generated.h"
 
 /** Forward declaration to improve compiling times */
@@ -15,7 +15,7 @@ class UInputAction;
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 UCLASS()
-class APaperUnrealPlayerController : public APlayerController
+class APaperUnrealPlayerController : public APlayerController2
 {
 	GENERATED_BODY()
 

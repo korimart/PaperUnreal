@@ -32,7 +32,19 @@ void APaperUnrealPlayerController::BeginPlay()
 	//Add Input Mapping Context
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 	{
-		Subsystem->AddMappingContext(DefaultMappingContext, 0);
+		if (GetPawn())
+		{
+			Subsystem->AddMappingContext(DefaultMappingContext, 0);
+		}
+		
+		OnPossessedPawnChanged2.AddWeakLambda(this, [this, Subsystem](APawn* InOldPawn, APawn* InNewPawn)
+		{
+			Subsystem->ClearAllMappings();
+			if (InNewPawn)
+			{
+				Subsystem->AddMappingContext(DefaultMappingContext, 0);
+			}
+		});
 	}
 
 	EnableCheats();
@@ -75,7 +87,7 @@ void APaperUnrealPlayerController::OnSetDestinationTriggered()
 {
 	// We flag that the input is being pressed
 	FollowTime += GetWorld()->GetDeltaSeconds();
-	
+
 	// We look for the location in the world where the player has pressed the input
 	FHitResult Hit;
 	bool bHitSuccessful = false;
@@ -93,7 +105,7 @@ void APaperUnrealPlayerController::OnSetDestinationTriggered()
 	{
 		CachedDestination = Hit.Location;
 	}
-	
+
 	// Move towards mouse pointer or touch
 	APawn* ControlledPawn = GetPawn();
 	if (ControlledPawn != nullptr)
