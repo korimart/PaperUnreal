@@ -13,6 +13,6 @@ class AActor2 : public AActor
 
 public:
 	virtual void BeginPlay() override;
-	virtual void AttachPlayerMachineComponents() {}
 	virtual void AttachServerMachineComponents() {}
+	virtual void AttachPlayerMachineComponents() {}
 };

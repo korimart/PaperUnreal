@@ -59,56 +59,12 @@ APaperUnrealCharacter::APaperUnrealCharacter()
 	PrimaryActorTick.bStartWithTickEnabled = true;
 }
 
-void APaperUnrealCharacter::AttachPlayerMachineComponents()
-{
-	RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
-	{
-		AGameStateBase* GameState = co_await WaitForGameState(GetWorld());
-		UTeamComponent* MyTeamComponent = co_await WaitForComponent<UTeamComponent>(co_await WaitForPlayerState());
-		const int32 MyTeamIndex = co_await MyTeamComponent->GetTeamIndex().WaitForValue();
-		UAreaSpawnerComponent* AreaSpawnerComponent = co_await WaitForComponent<UAreaSpawnerComponent>(GameState);
-
-		AAreaActor* MyTeamArea = co_await FirstInStream(
-			AreaSpawnerComponent->CreateSpawnedAreaStream(), [MyTeamIndex](AAreaActor* Area)
-			{
-				return *Area->TeamComponent->GetTeamIndex().GetValue() == MyTeamIndex;
-			});
-
-		UAreaMeshComponent* AreaMeshComponent = co_await WaitForComponent<UAreaMeshComponent>(MyTeamArea);
-
-		UResourceRegistryComponent* RR = co_await WaitForComponent<UResourceRegistryComponent>(GameState);
-		// TODO graceful exit
-		check(co_await RR->GetbResourcesLoaded().WaitForValue());
-
-		ITracerPathStream* TracerMeshSource = nullptr;
-		if (GetNetMode() == NM_Client)
-		{
-			TracerMeshSource = co_await WaitForComponent<UReplicatedTracerPathComponent>(this);
-			co_await Cast<UReplicatedTracerPathComponent>(TracerMeshSource)->WaitForClientInitComplete();
-		}
-		else
-		{
-			TracerMeshSource = co_await WaitForComponent<UTracerPathComponent>(this);
-		}
-
-		auto TracerMesh = NewObject<UTracerMeshComponent>(this);
-		TracerMesh->RegisterComponent();
-		TracerMesh->ConfigureMaterialSet({RR->GetTracerMaterialFor(MyTeamIndex)});
-
-		auto TracerMeshGenerator = NewObject<UTracerMeshGeneratorComponent>(this);
-		TracerMeshGenerator->SetMeshSource(TracerMeshSource);
-		TracerMeshGenerator->SetMeshDestination(TracerMesh);
-		TracerMeshGenerator->SetMeshAttachmentTarget(AreaMeshComponent);
-		TracerMeshGenerator->RegisterComponent();
-	});
-}
-
 void APaperUnrealCharacter::AttachServerMachineComponents()
 {
 	RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 	{
 		// TODO 서버에서는 기다리지 말자
-		AGameStateBase* GameState = co_await WaitForGameState(GetWorld());
+		AGameStateBase* GameState = GetWorld()->GetGameState();
 		UTeamComponent* MyTeamComponent = co_await WaitForComponent<UTeamComponent>(co_await WaitForPlayerState());
 		const int32 MyTeamIndex = co_await MyTeamComponent->GetTeamIndex().WaitForValue();
 		UAreaSpawnerComponent* AreaSpawnerComponent = co_await WaitForComponent<UAreaSpawnerComponent>(GameState);
@@ -188,5 +144,49 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		// 			TracerOverlapChecker->AddOverlapTarget(NewTracer);
 		// 		}
 		// 	});
+	});
+}
+
+void APaperUnrealCharacter::AttachPlayerMachineComponents()
+{
+	RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+	{
+		AGameStateBase* GameState = co_await WaitForGameState(GetWorld());
+		UTeamComponent* MyTeamComponent = co_await WaitForComponent<UTeamComponent>(co_await WaitForPlayerState());
+		const int32 MyTeamIndex = co_await MyTeamComponent->GetTeamIndex().WaitForValue();
+		UAreaSpawnerComponent* AreaSpawnerComponent = co_await WaitForComponent<UAreaSpawnerComponent>(GameState);
+
+		AAreaActor* MyTeamArea = co_await FirstInStream(
+			AreaSpawnerComponent->CreateSpawnedAreaStream(), [MyTeamIndex](AAreaActor* Area)
+			{
+				return *Area->TeamComponent->GetTeamIndex().GetValue() == MyTeamIndex;
+			});
+
+		UAreaMeshComponent* AreaMeshComponent = co_await WaitForComponent<UAreaMeshComponent>(MyTeamArea);
+
+		UResourceRegistryComponent* RR = co_await WaitForComponent<UResourceRegistryComponent>(GameState);
+		// TODO graceful exit
+		check(co_await RR->GetbResourcesLoaded().WaitForValue());
+
+		ITracerPathStream* TracerMeshSource = nullptr;
+		if (GetNetMode() == NM_Client)
+		{
+			TracerMeshSource = co_await WaitForComponent<UReplicatedTracerPathComponent>(this);
+			co_await Cast<UReplicatedTracerPathComponent>(TracerMeshSource)->WaitForClientInitComplete();
+		}
+		else
+		{
+			TracerMeshSource = co_await WaitForComponent<UTracerPathComponent>(this);
+		}
+
+		auto TracerMesh = NewObject<UTracerMeshComponent>(this);
+		TracerMesh->RegisterComponent();
+		TracerMesh->ConfigureMaterialSet({RR->GetTracerMaterialFor(MyTeamIndex)});
+
+		auto TracerMeshGenerator = NewObject<UTracerMeshGeneratorComponent>(this);
+		TracerMeshGenerator->SetMeshSource(TracerMeshSource);
+		TracerMeshGenerator->SetMeshDestination(TracerMesh);
+		TracerMeshGenerator->SetMeshAttachmentTarget(AreaMeshComponent);
+		TracerMeshGenerator->RegisterComponent();
 	});
 }

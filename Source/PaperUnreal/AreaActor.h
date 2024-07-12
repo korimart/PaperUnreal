@@ -31,6 +31,20 @@ private:
 		TeamComponent = CreateDefaultSubobject<UTeamComponent>(TEXT("TeamComponent"));
 	}
 
+	virtual void AttachServerMachineComponents() override
+	{
+		auto AreaBoundaryComponent = NewObject<UAreaBoundaryComponent>(this);
+		AreaBoundaryComponent->ResetToStartingBoundary(GetActorLocation());
+		AreaBoundaryComponent->RegisterComponent();
+
+		if (GetNetMode() != NM_Standalone)
+		{
+			auto ReplicatedAreaBoundary = NewObject<UReplicatedAreaBoundaryComponent>(this);
+			ReplicatedAreaBoundary->SetAreaBoundarySource(AreaBoundaryComponent);
+			ReplicatedAreaBoundary->RegisterComponent();
+		}
+	}
+
 	virtual void AttachPlayerMachineComponents() override
 	{
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
@@ -56,25 +70,11 @@ private:
 			{
 				AreaBoundaryStream = co_await WaitForComponent<UAreaBoundaryComponent>(this);
 			}
-			
+
 			auto AreaMeshGenerator = NewObject<UAreaMeshGeneratorComponent>(this);
 			AreaMeshGenerator->SetMeshSource(AreaBoundaryStream);
 			AreaMeshGenerator->SetMeshDestination(AreaMesh);
 			AreaMeshGenerator->RegisterComponent();
 		});
-	}
-
-	virtual void AttachServerMachineComponents() override
-	{
-		auto AreaBoundaryComponent = NewObject<UAreaBoundaryComponent>(this);
-		AreaBoundaryComponent->ResetToStartingBoundary(GetActorLocation());
-		AreaBoundaryComponent->RegisterComponent();
-
-		if (GetNetMode() != NM_Standalone)
-		{
-			auto ReplicatedAreaBoundary = NewObject<UReplicatedAreaBoundaryComponent>(this);
-			ReplicatedAreaBoundary->SetAreaBoundarySource(AreaBoundaryComponent);
-			ReplicatedAreaBoundary->RegisterComponent();
-		}
 	}
 };
