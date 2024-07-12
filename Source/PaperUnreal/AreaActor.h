@@ -27,6 +27,7 @@ public:
 	UPROPERTY()
 	UAreaMeshComponent* ClientAreaMesh;
 
+	DECLARE_LIVE_DATA_AND_GETTER(bool, bClientComponentsAttached);
 	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(TSoftObjectPtr<UMaterialInstance>, AreaMaterial);
 
 private:
@@ -89,5 +90,7 @@ private:
 				ClientAreaMesh->ConfigureMaterialSet({co_await RequestAsyncLoad(SoftAreaMaterial)});
 			}
 		});
+
+		bClientComponentsAttached = true;
 	}
 };

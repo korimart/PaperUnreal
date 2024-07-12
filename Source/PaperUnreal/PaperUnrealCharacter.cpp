@@ -82,6 +82,10 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 	RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 	{
 		APlayerState* PlayerState = co_await WaitForPlayerState();
+		if (!IsValid(PlayerState))
+		{
+			co_return;
+		}
 
 		// 디펜던시: UAreaSpawnerComponent를 가지는 GameState에 대해서만 이 클래스를 사용할 수 있음
 		UAreaSpawnerComponent* AreaSpawner = GetWorld()->GetGameState()->FindComponentByClass<UAreaSpawnerComponent>();
@@ -180,6 +184,10 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 	RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
 	{
 		APlayerState* PlayerState = co_await WaitForPlayerState();
+		if (!IsValid(PlayerState))
+		{
+			co_return;
+		}
 
 		// 디펜던시: UInventoryComponent를 가지는 PlayerState에 대해서만 이 클래스를 사용할 수 있음
 		UInventoryComponent* Inventory = Context.AddToWeakList(PlayerState->FindComponentByClass<UInventoryComponent>());
@@ -189,6 +197,7 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 		}
 
 		AAreaActor* MyHomeArea = co_await Inventory->GetHomeArea().WaitForValue();
+		co_await MyHomeArea->GetbClientComponentsAttached().WaitForValue();
 
 		ITracerPathStream* TracerMeshSource = GetNetMode() == NM_Client
 			? static_cast<ITracerPathStream*>(FindComponentByClass<UReplicatedTracerPathComponent>())

@@ -6,7 +6,6 @@
 #include "TracerPathComponent.h"
 #include "TracerPathGenerator.h"
 #include "Core/ActorComponent2.h"
-#include "Net/UnrealNetwork.h"
 #include "ReplicatedTracerPathComponent.generated.h"
 
 
@@ -33,64 +32,54 @@ public:
 private:
 	UPROPERTY()
 	UTracerPathComponent* ServerTracerPath;
-	
-	UPROPERTY(ReplicatedUsing=OnRep_Replicator)
+
+	UPROPERTY()
 	UByteStreamComponent* Replicator;
-	
+
 	TSharedPtr<TTypedStreamView<FTracerPathPoint>> TypedReplicator;
 
 	UReplicatedTracerPathComponent()
 	{
 		SetIsReplicatedByDefault(true);
-		bWantsInitializeComponent = true;
 	}
 
-	virtual void InitializeComponent() override
+	virtual void BeginPlay() override
 	{
-		Super::InitializeComponent();
+		Super::BeginPlay();
 
-		if (GetNetMode() == NM_Client)
+		if (GetNetMode() != NM_Client)
 		{
-			return;
-		}
+			check(AllValid(ServerTracerPath));
+			
+			Replicator = NewObject<UByteStreamComponent>(this);
+			Replicator->RegisterComponent();
+			TypedReplicator = MakeShared<TTypedStreamView<FTracerPathPoint>>(*Replicator);
 
-		check(AllValid(ServerTracerPath));
-
-		Replicator = NewObject<UByteStreamComponent>(this);
-		Replicator->RegisterComponent();
-		TypedReplicator = MakeShared<TTypedStreamView<FTracerPathPoint>>(*Replicator);
-
-		RunWeakCoroutine(this, [this](auto&) -> FWeakCoroutine
-		{
-			for (auto PathEvents = ServerTracerPath->CreatePathStream();;)
+			RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
 			{
-				TypedReplicator->TriggerEvent(co_await PathEvents.Next());
-			}
-		});
-	}
-
-	virtual void UninitializeComponent() override
-	{
-		Super::UninitializeComponent();
-
-		// TypedReplicator를 먼저 파괴하면Replicator의 종료 이벤트를 TypedReplicator가
-		// 전달하지 않음 전달 이후 즉시 파괴하여 내부에 Dangling Pointer가 없게 한다
-		Replicator->DestroyComponent();
-		TypedReplicator = nullptr;
-	}
-
-	UFUNCTION()
-	void OnRep_Replicator()
-	{
-		if (IsValid(Replicator))
+				Context.AddToWeakList(TypedReplicator);
+				for (auto PathEvents = ServerTracerPath->CreatePathStream();;)
+				{
+					const FTracerPathEvent Event = co_await PathEvents.Next();
+					TypedReplicator->TriggerEvent(Event);
+				}
+			});
+		}
+		else
 		{
+			// TODO find by tag
+			Replicator = GetOwner()->FindComponentByClass<UByteStreamComponent>();
 			TypedReplicator = MakeShared<TTypedStreamView<FTracerPathPoint>>(*Replicator);
 		}
 	}
 
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override
 	{
-		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-		DOREPLIFETIME_CONDITION(ThisClass, Replicator, COND_InitialOnly);
+		Super::EndPlay(EndPlayReason);
+		
+		// TypedReplicator를 먼저 파괴하면 Replicator의 종료 이벤트를 TypedReplicator가
+		// 전달하지 않음 전달 이후 즉시 파괴하여 내부에 Dangling Pointer가 없게 한다
+		Replicator->DestroyComponent();
+		TypedReplicator = nullptr;
 	}
 };
