@@ -25,6 +25,8 @@ enum class EStreamEvent
 template <typename T>
 struct TStreamEvent
 {
+	using ValueType = T;
+	
 	EStreamEvent Event;
 	TArray<T> Affected;
 
@@ -32,7 +34,49 @@ struct TStreamEvent
 	bool IsAppendedEvent() const { return Event == EStreamEvent::Appended; }
 	bool IsLastModifiedEvent() const { return Event == EStreamEvent::LastModified; }
 	bool IsClosedEvent() const { return Event == EStreamEvent::Closed; }
+
+	TStreamEvent<uint8> Serialize() const requires !std::is_same_v<T, uint8>;
+
+	template <typename TargetType>
+	TargetType Deserialize() const requires std::is_same_v<T, uint8>;
 };
+
+template <typename T>
+TStreamEvent<uint8> TStreamEvent<T>::Serialize() const requires !std::is_same_v<T, uint8>
+{
+	TArray<uint8> Serialized;
+	FMemoryWriter Writer{Serialized};
+
+	for (const T& Each : Affected)
+	{
+		Writer << const_cast<T&>(Each);
+	}
+
+	return {
+		.Event = Event,
+		.Affected = Serialized,
+	};
+}
+
+template <typename T>
+template <typename TargetType>
+TargetType TStreamEvent<T>::Deserialize() const requires std::is_same_v<T, uint8>
+{
+	FMemoryReader Reader{Affected};
+	TArray<typename TargetType::ValueType> Deserialized;
+
+	while (!Reader.AtEnd())
+	{
+		typename TargetType::ValueType NewElement;
+		Reader << NewElement;
+		Deserialized.Add(NewElement);
+	}
+
+	return {
+		.Event = Event,
+		.Affected = Deserialized,
+	};
+}
 
 
 using FByteStreamEvent = TStreamEvent<uint8>;
@@ -104,7 +148,11 @@ struct FRepByteStream
 			}
 
 			Ret.Add({.Event = EStreamEvent::Opened, .Affected = {},});
-			Ret.Add({.Event = EStreamEvent::Appended, .Affected = Array,});
+
+			if (Array.Num() > 0)
+			{
+				Ret.Add({.Event = EStreamEvent::Appended, .Affected = Array,});
+			}
 
 			if (!bOpen)
 			{
@@ -176,16 +224,7 @@ class UByteStreamComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	DECLARE_MULTICAST_DELEGATE_OneParam(FOnByteStreamEvent, const FByteStreamEvent&);
-	FOnByteStreamEvent OnByteStreamEvent;
-
-	TValueStream<FByteStreamEvent> CreateEventStream()
-	{
-		TArray<FByteStreamEvent> Init = RepStream.IsOpen()
-			? RepStream.CompareAndCreateEvents({})
-			: TArray<FByteStreamEvent>{};
-		return CreateMulticastValueStream(Init, OnByteStreamEvent);
-	}
+	DECLARE_STREAMER_AND_GETTER(FByteStreamEvent, ByteStreamer);
 
 	const TArray<uint8>& GetBytes() const
 	{
@@ -295,9 +334,11 @@ private:
 	UFUNCTION()
 	void OnRep_Stream(const FRepByteStream& OldStream)
 	{
-		for (const FByteStreamEvent& Each : RepStream.CompareAndCreateEvents(OldStream))
+		ByteStreamer.ReceiveValues(RepStream.CompareAndCreateEvents(OldStream));
+
+		if (!RepStream.IsOpen())
 		{
-			OnByteStreamEvent.Broadcast(Each);
+			ByteStreamer.EndStreams();
 		}
 	}
 
@@ -313,101 +354,7 @@ private:
 
 		if (RepStream.IsOpen())
 		{
-			OnByteStreamEvent.Broadcast({.Event = EStreamEvent::Closed});
+			ByteStreamer.ReceiveValue(FByteStreamEvent{.Event = EStreamEvent::Closed});
 		}
-	}
-};
-
-
-template <typename T, typename U>
-concept CTypedStream = std::is_convertible_v<T, TArray<U>>;
-
-
-template <typename T>
-class TTypedStreamView : public TSharedFromThis<TTypedStreamView<T>>
-{
-public:
-	TTypedStreamView(UByteStreamComponent& Stream)
-		: ByteStream(Stream)
-	{
-		Stream.SetChunkSize(T::ChunkSize);
-	}
-
-	TValueStream<TStreamEvent<T>> CreateTypedEventStream()
-	{
-		TValueStream<TStreamEvent<T>> Ret;
-		RunWeakCoroutine(this->AsShared(), [this, Receiver = Ret.GetReceiver()](FWeakCoroutineContext& Context) -> FWeakCoroutine
-		{
-			Context.AddToWeakList(Receiver);
-			for (auto ByteEvents = ByteStream.CreateEventStream();;)
-			{
-				// 여기 NewEvent를 선언 안하고 inline으로 ToTypedEvent에 넣으면 프로그램 고장남
-				// 아마도 Pin()이 co_await 보다 먼저 호출될 수도 있을 것 같음
-				// C++ order of evaluation 관련 문제로 의심되니까 순서를 명시한다
-				const FByteStreamEvent NewEvent = co_await ByteEvents.Next();
-				Receiver.Pin()->AddValue(ToTypedEvent(NewEvent));
-			}
-		});
-		return Ret;
-	}
-
-	void OpenStream()
-	{
-		ByteStream.OpenStream();
-	}
-
-	void CloseStream()
-	{
-		ByteStream.CloseStream();
-	}
-
-	void Push(const TArray<T>& TypedData)
-	{
-		ByteStream.PushBytes(Serialize(TypedData));
-	}
-
-	void ModifyLast(const TArray<T>& TypedData)
-	{
-		ByteStream.ModifyLastBytes(Serialize(TypedData));
-	}
-
-	void TriggerEvent(const TStreamEvent<T>& Event)
-	{
-		ByteStream.TriggerEvent(FByteStreamEvent{
-			.Event = Event.Event,
-			.Affected = Serialize(Event.Affected),
-		});
-	}
-
-	TStreamEvent<T> ToTypedEvent(const FByteStreamEvent& Event)
-	{
-		return {.Event = Event.Event, .Affected = Deserialize(Event.Affected),};
-	}
-
-private:
-	UByteStreamComponent& ByteStream;
-
-	TArray<uint8> Serialize(const TArray<T>& Source)
-	{
-		TArray<uint8> Serialized;
-		FMemoryWriter Writer{Serialized};
-		for (const T& Each : Source)
-		{
-			Writer << const_cast<T&>(Each);
-		}
-		return Serialized;
-	}
-
-	TArray<T> Deserialize(const TArray<uint8>& Source)
-	{
-		FMemoryReader Reader{Source};
-		TArray<T> Ret;
-		while (!Reader.AtEnd())
-		{
-			T NewElement;
-			Reader << NewElement;
-			Ret.Add(NewElement);
-		}
-		return Ret;
 	}
 };

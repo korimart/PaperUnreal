@@ -15,13 +15,7 @@ class UReplicatedTracerPathComponent : public UActorComponent2, public ITracerPa
 	GENERATED_BODY()
 
 public:
-	DECLARE_MULTICAST_DELEGATE_OneParam(FOnPathEvent, FTracerPathEvent);
-	FOnPathEvent OnPathEvent;
-
-	virtual TValueStream<FTracerPathEvent> CreatePathStream() override
-	{
-		return TypedReplicator->CreateTypedEventStream();
-	}
+	DECLARE_STREAMER_AND_GETTER(FTracerPathEvent, TracerPathStreamer);
 
 	void SetTracerPathSource(UTracerPathComponent* Source)
 	{
@@ -36,8 +30,6 @@ private:
 	UPROPERTY()
 	UByteStreamComponent* Replicator;
 
-	TSharedPtr<TTypedStreamView<FTracerPathPoint>> TypedReplicator;
-
 	UReplicatedTracerPathComponent()
 	{
 		SetIsReplicatedByDefault(true);
@@ -47,39 +39,57 @@ private:
 	{
 		Super::BeginPlay();
 
-		if (GetNetMode() != NM_Client)
-		{
-			check(AllValid(ServerTracerPath));
-			
-			Replicator = NewObject<UByteStreamComponent>(this);
-			Replicator->RegisterComponent();
-			TypedReplicator = MakeShared<TTypedStreamView<FTracerPathPoint>>(*Replicator);
-
-			RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
-			{
-				Context.AddToWeakList(TypedReplicator);
-				for (auto PathEvents = ServerTracerPath->CreatePathStream();;)
-				{
-					const FTracerPathEvent Event = co_await PathEvents.Next();
-					TypedReplicator->TriggerEvent(Event);
-				}
-			});
-		}
-		else
+		if (GetNetMode() == NM_Client)
 		{
 			// TODO find by tag
 			Replicator = GetOwner()->FindComponentByClass<UByteStreamComponent>();
-			TypedReplicator = MakeShared<TTypedStreamView<FTracerPathPoint>>(*Replicator);
+			Replicator->SetChunkSize(FTracerPathPoint::ChunkSize);
+			ClientInitiatePathRelay();
+		}
+		else
+		{
+			check(AllValid(ServerTracerPath));
+			Replicator = NewObject<UByteStreamComponent>(this);
+			Replicator->SetChunkSize(FTracerPathPoint::ChunkSize);
+			Replicator->RegisterComponent();
+			ServerInitiatePathRelay();
 		}
 	}
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override
 	{
 		Super::EndPlay(EndPlayReason);
-		
-		// TypedReplicator를 먼저 파괴하면 Replicator의 종료 이벤트를 TypedReplicator가
-		// 전달하지 않음 전달 이후 즉시 파괴하여 내부에 Dangling Pointer가 없게 한다
-		Replicator->DestroyComponent();
-		TypedReplicator = nullptr;
+
+		if (GetNetMode() != NM_Client)
+		{
+			Replicator->DestroyComponent();
+		}
+	}
+
+	void ServerInitiatePathRelay()
+	{
+		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			auto PathEvents = ServerTracerPath->GetTracerPathStreamer().CreateStream();
+			while (co_await PathEvents.NextIfNotEnd())
+			{
+				Replicator->TriggerEvent(PathEvents.Pop().Serialize());
+			}
+			ServerInitiatePathRelay();
+		});
+	}
+
+	void ClientInitiatePathRelay()
+	{
+		TracerPathStreamer.EndStreams();
+		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			auto ByteEvents = Replicator->GetByteStreamer().CreateStream();
+			while (co_await ByteEvents.NextIfNotEnd())
+			{
+				TracerPathStreamer.ReceiveValue(ByteEvents.Pop().Deserialize<FTracerPathEvent>());
+			}
+			ClientInitiatePathRelay();
+		});
 	}
 };

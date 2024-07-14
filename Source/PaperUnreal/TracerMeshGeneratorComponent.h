@@ -92,11 +92,12 @@ private:
 	{
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			auto PathStream = MeshSource->CreatePathStream();
+			auto PathStream = MeshSource->GetTracerPathStreamer().CreateStream();
 			check((co_await PathStream.Next()).IsOpenedEvent());
 
 			MeshDestination->Edit([&, FirstEvent = co_await PathStream.Next()]()
 			{
+				check(!FirstEvent.IsClosedEvent());
 				MeshDestination->Reset();
 				AppendVerticesFromTracerPath(FirstEvent.Affected);
 				AttachVerticesToAttachmentTarget(0);

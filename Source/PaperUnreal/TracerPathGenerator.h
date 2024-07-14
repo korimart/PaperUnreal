@@ -42,5 +42,5 @@ class ITracerPathStream
 	GENERATED_BODY()
 
 public:
-	virtual TValueStream<FTracerPathEvent> CreatePathStream() = 0;
+	virtual const TValueStreamer<FTracerPathEvent>& GetTracerPathStreamer() const = 0;
 };

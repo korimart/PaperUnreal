@@ -285,21 +285,21 @@ bool UECoroutineTest::RunTest(const FString& Parameters)
 		});
 
 		RETURN_IF_FALSE(TestEqual(TEXT(""), Received.Num(), 0));
-		Receiver.Pin()->AddValue(1);
-		Receiver.Pin()->AddValue(2);
-		Receiver.Pin()->AddValue(3);
+		Receiver.Pin()->ReceiveValue(1);
+		Receiver.Pin()->ReceiveValue(2);
+		Receiver.Pin()->ReceiveValue(3);
 		RETURN_IF_FALSE(TestEqual(TEXT(""), Received.Num(), 3));
 		RETURN_IF_FALSE(TestEqual(TEXT(""), Received[0], 1));
 		RETURN_IF_FALSE(TestEqual(TEXT(""), Received[1], 2));
 		RETURN_IF_FALSE(TestEqual(TEXT(""), Received[2], 3));
 
-		Receiver.Pin()->AddValue(50);
+		Receiver.Pin()->ReceiveValue(50);
 		RETURN_IF_FALSE(TestEqual(TEXT(""), Received.Num(), 4));
 
-		Receiver.Pin()->AddValue(50);
+		Receiver.Pin()->ReceiveValue(50);
 		RETURN_IF_FALSE(TestEqual(TEXT(""), Received.Num(), 5));
 
-		Receiver.Pin()->AddValue(50);
+		Receiver.Pin()->ReceiveValue(50);
 		RETURN_IF_FALSE(TestEqual(TEXT(""), Received.Num(), 6));
 
 		Receiver.Pin()->End();

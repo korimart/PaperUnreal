@@ -6,7 +6,6 @@
 #include "AreaBoundaryComponent.h"
 #include "AreaMeshComponent.h"
 #include "TracerPathGenerator.h"
-#include "Core/Utils.h"
 #include "TracerPathComponent.generated.h"
 
 
@@ -16,14 +15,8 @@ class UTracerPathComponent : public UActorComponent2, public ITracerPathStream
 	GENERATED_BODY()
 
 public:
-	DECLARE_MULTICAST_DELEGATE_OneParam(FOnPathEvent, FTracerPathEvent);
-	FOnPathEvent OnPathEvent;
-
-	virtual TValueStream<FTracerPathEvent> CreatePathStream() override
-	{
-		return CreateMulticastValueStream(TArray<FTracerPathEvent>{}, OnPathEvent);
-	}
-
+	DECLARE_STREAMER_AND_GETTER(FTracerPathEvent, TracerPathStreamer);
+	
 	// TODO maybe remove?
 	const FSegmentArray2D& GetPath() const { return Path; }
 
@@ -59,7 +52,7 @@ private:
 
 		if (bGeneratedThisFrame)
 		{
-			OnPathEvent.Broadcast(CreateEvent(EStreamEvent::Closed));
+			TracerPathStreamer.ReceiveValue(CreateEvent(EStreamEvent::Closed));
 		}
 	}
 
@@ -75,7 +68,7 @@ private:
 		if (!bGeneratedLastFrame && bWillGenerateThisFrame)
 		{
 			Path.Empty();
-			OnPathEvent.Broadcast(CreateEvent(EStreamEvent::Opened));
+			TracerPathStreamer.ReceiveValue(CreateEvent(EStreamEvent::Opened));
 		}
 
 		if (bWillGenerateThisFrame)
@@ -87,8 +80,9 @@ private:
 		if (bGeneratedLastFrame && !bGeneratedThisFrame)
 		{
 			Path.SetPoint(-1, NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint());
-			OnPathEvent.Broadcast(CreateEvent(EStreamEvent::LastModified));
-			OnPathEvent.Broadcast(CreateEvent(EStreamEvent::Closed));
+			TracerPathStreamer.ReceiveValue(CreateEvent(EStreamEvent::LastModified));
+			TracerPathStreamer.ReceiveValue(CreateEvent(EStreamEvent::Closed));
+			TracerPathStreamer.EndStreams();
 		}
 	}
 
@@ -100,7 +94,7 @@ private:
 		{
 			Path.AddPoint(ActorLocation2D);
 			Path.SetPoint(-1, NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint());
-			OnPathEvent.Broadcast(CreateEvent(EStreamEvent::Appended));
+			TracerPathStreamer.ReceiveValue(CreateEvent(EStreamEvent::Appended));
 			return;
 		}
 
@@ -112,7 +106,7 @@ private:
 		if (Path.PointCount() < 3)
 		{
 			Path.AddPoint(ActorLocation2D);
-			OnPathEvent.Broadcast(CreateEvent(EStreamEvent::Appended));
+			TracerPathStreamer.ReceiveValue(CreateEvent(EStreamEvent::Appended));
 			return;
 		}
 
@@ -145,12 +139,12 @@ private:
 		if (Curvature > 0.005f || CurrentDeviation > 10.f)
 		{
 			Path.AddPoint(ActorLocation2D);
-			OnPathEvent.Broadcast(CreateEvent(EStreamEvent::Appended));
+			TracerPathStreamer.ReceiveValue(CreateEvent(EStreamEvent::Appended));
 		}
 		else
 		{
 			Path.SetPoint(-1, ActorLocation2D);
-			OnPathEvent.Broadcast(CreateEvent(EStreamEvent::LastModified));
+			TracerPathStreamer.ReceiveValue(CreateEvent(EStreamEvent::LastModified));
 		}
 	}
 

@@ -32,11 +32,42 @@ namespace Utils_Private
 	{
 		return SmartPointer.IsValid();
 	}
-	
+
 	bool IsValid(const auto& AnyObjectThatIsNotPointer)
 	{
 		return true;
 	}
+
+
+	template <typename FuncType>
+	class TFinally
+	{
+	public:
+		TFinally(FuncType InFunc) : Func(InFunc)
+		{
+		}
+
+		TFinally(const TFinally&) = delete;
+		TFinally& operator=(const TFinally&) = delete;
+		TFinally& operator=(TFinally&&) = delete;
+
+		TFinally(TFinally&& Other)
+		{
+			Func = Other.Func;
+			Other.Func.Reset();
+		}
+
+		~TFinally()
+		{
+			if (Func)
+			{
+				(*Func)();
+			}
+		}
+
+	private:
+		TOptional<FuncType> Func;
+	};
 }
 
 
@@ -71,6 +102,13 @@ template <typename T>
 bool IsNearlyLE(T Left, T Right)
 {
 	return FMath::IsNearlyEqual(Left, Right) || Left < Right;
+}
+
+
+template <typename FuncType>
+UE_NODISCARD auto Finally(FuncType&& Func)
+{
+	return Utils_Private::TFinally<FuncType>{Forward<FuncType>(Func)};
 }
 
 

@@ -3,7 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AreaMeshComponent.h"
 #include "TracerPathComponent.h"
 #include "Core/ActorComponent2.h"
 #include "TracerToAreaConverterComponent.generated.h"
@@ -53,13 +52,7 @@ private:
 
 		check(AllValid(Tracer, ConversionDestination));
 
-		Tracer->OnPathEvent.AddWeakLambda(this, [this](const FTracerPathEvent& Event)
-		{
-			if (Event.IsClosedEvent())
-			{
-				ConvertPathToArea();
-			}
-		});
+		InitiateOnPathEndConversion();
 		
 		ConversionDestination->OnBoundaryChanged.AddWeakLambda(this, [this](auto&)
 		{
@@ -67,15 +60,30 @@ private:
 		});
 	}
 
+	void InitiateOnPathEndConversion()
+	{
+		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			auto Stream = Tracer->GetTracerPathStreamer().CreateStream();
+			while (co_await Stream.NextIfNotEnd())
+			{
+				Stream.Pop();
+			}
+			ConvertPathToArea();
+			InitiateOnPathEndConversion();
+		});
+	}
+
 	void ConvertPathToArea()
 	{
+		using FExpansionResult = UAreaBoundaryComponent::FExpansionResult;
+
 		if (bImConversionInstigator)
 		{
 			return;
 		}
-		
+
 		bImConversionInstigator = true;
-		using FExpansionResult = UAreaBoundaryComponent::FExpansionResult;
 		for (const FExpansionResult& Each : ConversionDestination->ExpandByPath(Tracer->GetPath()))
 		{
 			OnTracerToAreaConversion.Broadcast(Each.CorrectlyAlignedPath);

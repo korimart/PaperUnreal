@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include <coroutine>
-
 #include "Algo/AllOf.h"
 
 
@@ -494,7 +493,7 @@ public:
 	TValueStreamValueReceiver& operator=(const TValueStreamValueReceiver&) = delete;
 	
 	template <typename U>
-	void AddValue(U&& Value)
+	void ReceiveValue(U&& Value)
 	{
 		check(!bEnded);
 
@@ -628,8 +627,7 @@ private:
 };
 
 
-template <typename T, typename DelegateType, typename TransformFuncType>
-TValueStream<T> CreateMulticastValueStream(const TArray<T>& ReadyValues, DelegateType& MulticastDelegate, TransformFuncType&& TransformFunc);
+bool AllValid(const auto&... Check);
 
 
 template <typename T>
@@ -642,7 +640,18 @@ public:
 
 	TValueStream<T> CreateStream(bool bPutHistoryInStream = true) const
 	{
-		return CreateMulticastValueStream(bPutHistoryInStream ? History : TArray<T>{}, OnValueReceived);
+		TValueStream<T> Ret;
+		Receivers.Add(Ret.GetReceiver());
+		
+		if (bPutHistoryInStream)
+		{
+			for (const auto& Each : History)
+			{
+				Receivers.Last().Pin()->ReceiveValue(Each);
+			}
+		}
+		
+		return Ret;
 	}
 
 	const TArray<T>& GetHistory() const
@@ -655,15 +664,35 @@ public:
 		if (AllValid(NewValue))
 		{
 			History.Add(NewValue);
-			OnValueReceived.Broadcast(NewValue);
+
+			for (int32 i = Receivers.Num() - 1; i >= 0; --i)
+			{
+				if (auto Pinned = Receivers[i].Pin())
+				{
+					Pinned->ReceiveValue(NewValue);
+				}
+				else
+				{
+					Receivers.RemoveAt(i);
+				}
+			}
 		}
 	}
 	
-	void ReceiveValueIfNotInHistory(const T& NewValue)
+	void ReceiveValues(const TArray<T>& NewValues)
+	{
+		for (const T& Each : NewValues)
+		{
+			ReceiveValue(Each);
+		}
+	}
+
+	template <typename U> requires std::is_convertible_v<U, T>
+	void ReceiveValueIfNotInHistory(U&& NewValue)
 	{
 		if (!History.Contains(NewValue))
 		{
-			ReceiveValue(NewValue);
+			ReceiveValue(Forward<U>(NewValue));
 		}
 	}
 	
@@ -675,10 +704,31 @@ public:
 		}
 	}
 
+	void ClearHistory()
+	{
+		History.Empty();
+	}
+
+	void EndStreams(bool bClearHistory = true)
+	{
+		if (bClearHistory)
+		{
+			ClearHistory();
+		}
+
+		auto ReceiversCopy = MoveTemp(Receivers);
+		for (const auto& Each : ReceiversCopy)
+		{
+			if (auto Pinned = Each.Pin())
+			{
+				Pinned->End();
+			}
+		}
+	}
+
 private:
-	DECLARE_MULTICAST_DELEGATE_OneParam(FOnValueReceived, const T&);
-	mutable FOnValueReceived OnValueReceived;
 	TArray<T> History;
+	mutable TArray<TWeakPtr<TValueStreamValueReceiver<T>>> Receivers;
 };
 
 
@@ -768,13 +818,13 @@ TValueStream<T> CreateMulticastValueStream(const TArray<T>& ReadyValues, Delegat
 	auto Receiver = Ret.GetReceiver();
 	for (const T& Each : ReadyValues)
 	{
-		Receiver.Pin()->AddValue(Each);
+		Receiver.Pin()->ReceiveValue(Each);
 	}
 
 	MulticastDelegate.Add(DelegateType::FDelegate::CreateSPLambda(Receiver.Pin().ToSharedRef(),
 		[Receiver, TransformFunc = Forward<TransformFuncType>(TransformFunc)]<typename... ArgTypes>(ArgTypes&&... NewValues)
 		{
-			Receiver.Pin()->AddValue(TransformFunc(Forward<ArgTypes>(NewValues)...));
+			Receiver.Pin()->ReceiveValue(TransformFunc(Forward<ArgTypes>(NewValues)...));
 		}));
 
 	return Ret;
@@ -793,7 +843,7 @@ TWeakAwaitable<T> FirstInStream(TValueStream<T>&& Stream, PredicateType&& Predic
 			while (true)
 			{
 				auto Value = co_await Stream.Next();
-				if (Predicate(Value))
+				if (Invoke(Predicate, Value))
 				{
 					Handle.SetValue(MoveTemp(Value));
 					break;
