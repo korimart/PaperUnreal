@@ -51,7 +51,7 @@ void APaperUnrealGameMode::OnPostLogin(AController* NewPlayer)
 
 	AAreaActor* ThisPlayerArea =
 		ValidOrNull(GetGameState<APaperUnrealGameState>()
-		            ->AreaSpawnerComponent->GetSpawnedAreas().FindByPredicate([&](AAreaActor* Each)
+		            ->AreaSpawnerComponent->GetSpawnedArea().GetHistory().FindByPredicate([&](AAreaActor* Each)
 		            {
 			            return *Each->TeamComponent->GetTeamIndex().GetValue() == ThisPlayerTeamIndex;
 		            }));

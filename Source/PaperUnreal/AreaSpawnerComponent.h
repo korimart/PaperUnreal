@@ -74,7 +74,7 @@ public:
 		{
 			return {};
 		}
-		
+
 		return GetCell(EmptyCells.Array()[FMath::RandRange(0, EmptyCells.Num() - 1)]);
 	}
 
@@ -133,20 +133,7 @@ class UAreaSpawnerComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	DECLARE_MULTICAST_DELEGATE_OneParam(FOnAreaSpawned, AAreaActor*);
-	FOnAreaSpawned OnAreaSpawned;
-
-	TArray<AAreaActor*> GetSpawnedAreas() const
-	{
-		auto NonNullAreas = RepSpawnedAreas;
-		NonNullAreas.RemoveAll([](auto Each){ return !IsValid(Each); });
-		return NonNullAreas;
-	}
-
-	TValueStream<AAreaActor*> CreateSpawnedAreaStream()
-	{
-		return CreateMulticastValueStream(GetSpawnedAreas(), OnAreaSpawned);
-	}
+	DECLARE_CACHING_LIVE_DATA_GETTER_SETTER(AAreaActor*, SpawnedArea);
 
 	AAreaActor* SpawnAreaAtRandomEmptyLocation()
 	{
@@ -162,7 +149,7 @@ public:
 		if (TOptional<FBox2D> CellToSpawnAreaIn = SpawnLocationCalculator.GetRandomEmptyCell())
 		{
 			const FVector SpawnLocation{CellToSpawnAreaIn->GetCenter(), 50.f};
-			
+
 			AAreaActor* Ret = GetWorld()->SpawnActor<AAreaActor>(SpawnLocation, {});
 			RepSpawnedAreas.Add(Ret);
 			return Ret;
@@ -193,18 +180,7 @@ private:
 	}
 
 	UFUNCTION()
-	void OnRep_SpawnedAreas(const TArray<AAreaActor*>& OldAreas)
-	{
-		const TSet<AAreaActor*> UniqueOldAreas{OldAreas};
-		const TSet<AAreaActor*> UniqueNewAreas{RepSpawnedAreas};
-		for (AAreaActor* Each : UniqueNewAreas.Difference(UniqueOldAreas))
-		{
-			if (IsValid(Each))
-			{
-				OnAreaSpawned.Broadcast(Each);
-			}
-		}
-	}
+	void OnRep_SpawnedAreas() { SpawnedArea.SetValueIfNotInHistory(RepSpawnedAreas); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{

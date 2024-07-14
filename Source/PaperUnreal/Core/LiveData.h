@@ -6,20 +6,23 @@
 #include "UECoroutine.h"
 
 
-template <typename ValueType>
-class TLiveDataBase
+// TODO Object 타입에 대한 처리가 필요함 Cache 되어 있는 동안에 파괴될 수 있음
+template <typename InValueType>
+class TLiveData
 {
 public:
-	TLiveDataBase() = default;
+	using ValueType = InValueType;
+
+	TLiveData() = default;
 
 	template <typename T> requires std::is_convertible_v<T, ValueType>
-	TLiveDataBase(T&& Other)
+	TLiveData(T&& Other)
 		: Value(Forward<T>(Other))
 	{
 	}
 
 	template <typename T> requires std::is_convertible_v<T, ValueType>
-	TLiveDataBase& operator=(T&& Other)
+	TLiveData& operator=(T&& Other)
 	{
 		SetValue(Forward<T>(Other));
 		return *this;
@@ -108,51 +111,111 @@ protected:
 };
 
 
-template <typename ValueType>
-class TLiveData : public TLiveDataBase<ValueType>
+// TODO Object 타입에 대한 처리가 필요함 Cache 되어 있는 동안에 파괴될 수 있음
+template <typename InValueType>
+class TCachingLiveData
+	// 베이스 포인터 또는 레퍼런스로 캐스팅을 허용해서 베이스 함수 호출을 허용하면 클래스 고장나므로 private 상속 (캐싱이 되지 않음)
+	// 캐싱을 회피하고 싶은 상황이 생기면 explicit casting을 허용하거나 회피하는 함수를 따로 작성해야함
+	: private TLiveData<InValueType>
 {
 public:
-	using Super = TLiveDataBase<ValueType>;
+	using ValueType = InValueType;
+
+	using Super = TLiveData<ValueType>;
 	using Super::Super;
 	using Super::operator=;
+	using Super::WaitForValue;
+	using Super::SetValue;
+	using Super::Notify;
+	using Super::GetValue;
+	using Super::operator const TOptional<ValueType>&;
+	using Super::operator ValueType;
+
+	TValueStream<ValueType> CreateStream()
+	{
+		return CreateMulticastValueStream(History, this->OnChanged);
+	}
+
+	template <typename T> requires std::is_convertible_v<T, ValueType>
+	bool SetValueSilent(T&& NewValue)
+	{
+		History.Add(NewValue);
+		return Super::SetValueSilent(Forward<T>(NewValue));
+	}
+
+	template <typename T> requires std::is_convertible_v<T, ValueType>
+	void SetValueIfNotInHistory(T&& NewValue)
+	{
+		if (!History.Contains(NewValue))
+		{
+			SetValue(Forward<T>(NewValue));
+		}
+	}
+
+	template <typename T> requires std::is_convertible_v<T, ValueType>
+	void SetValueIfNotInHistory(const TArray<T>& NewValue)
+	{
+		for (const T& Each : NewValue)
+		{
+			if (AllValid(Each))
+			{
+				SetValueIfNotInHistory(Each);
+			}
+		}
+	}
+
+	const TArray<ValueType>& GetHistory() const
+	{
+		return History;
+	}
+
+private:
+	TArray<ValueType> History;
 };
 
 
-template <typename ValueType>
+template <typename LiveDataType>
+concept CLiveData = requires(LiveDataType LiveData)
+{
+	typename LiveDataType::ValueType;
+	{ LiveData.WaitForValue() } -> std::same_as<TWeakAwaitable<typename LiveDataType::ValueType>>;
+	{ LiveData.CreateStream() } -> std::same_as<TValueStream<typename LiveDataType::ValueType>>;
+	{ LiveData.GetValue() };
+};
+
+
+template <typename LiveDataType>
+concept CCachingLiveData = requires(LiveDataType LiveData)
+{
+	requires CLiveData<LiveDataType>;
+	{ LiveData.GetHistory() };
+};
+
+
+template <CLiveData LiveDataType>
 class TLiveDataView
 {
 public:
-	TLiveDataView(TLiveData<ValueType>& InLiveData)
+	TLiveDataView(LiveDataType& InLiveData)
 		: LiveData(InLiveData)
 	{
 	}
 
-	TWeakAwaitable<ValueType> WaitForValue()
-	{
-		return LiveData.WaitForValue();
-	}
-	
-	TValueStream<ValueType> CreateStream()
-	{
-		return LiveData.CreateStream();
-	}
+	TWeakAwaitable<typename LiveDataType::ValueType> WaitForValue() { return LiveData.WaitForValue(); }
+	TValueStream<typename LiveDataType::ValueType> CreateStream() { return LiveData.CreateStream(); }
+	decltype(auto) GetValue() const { return LiveData.GetValue(); }
 
-	decltype(auto) GetValue() const
+	TArray<typename LiveDataType::ValueType> GetHistory() const requires CCachingLiveData<LiveDataType>
 	{
-		return LiveData.GetValue();
-	}
-
-	template <typename T>
-	operator T()
-	{
-		return LiveData;
+		return LiveData.GetHistory();
 	}
 
 private:
-	TLiveData<ValueType>& LiveData;
+	LiveDataType& LiveData;
 };
 
 
+// TLiveData Declarations
 #define DECLARE_LIVE_DATA_AND_GETTER(Type, Name)\
 	private: TLiveData<Type> Name;\
 	public:\
@@ -168,12 +231,21 @@ private:
 #define DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(Type, Name)\
 	private: TLiveData<Type> Name;\
 	public:\
-	TLiveDataView<Type> Get##Name() { return Name; };\
+	TLiveDataView<TLiveData<Type>> Get##Name() { return Name; };\
 	void Set##Name(const std::type_identity_t<Type>& NewValue) { DEFINE_REPPED_VAR_SETTER(Name, NewValue); }
 
 
 #define DECLARE_REPPED_LIVE_DATA_GETTER_SETTER_WITH_DEFAULT(Type, Name, Default)\
 	private: TLiveData<Type> Name{Default};\
 	public:\
-	TLiveDataView<Type> Get##Name() { return Name; };\
+	TLiveDataView<TLiveData<Type>> Get##Name() { return Name; };\
 	void Set##Name(const std::type_identity_t<Type>& NewValue) { DEFINE_REPPED_VAR_SETTER(Name, NewValue); }
+// ~TLiveData Declarations
+
+
+// TCachingLiveData Declarations
+#define DECLARE_CACHING_LIVE_DATA_GETTER_SETTER(Type, Name)\
+	private: TCachingLiveData<Type> Name;\
+	public:\
+	TLiveDataView<TCachingLiveData<Type>> Get##Name() { return Name; };\
+// ~TCachingLiveData Declarations

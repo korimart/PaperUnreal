@@ -11,21 +11,31 @@
 
 namespace Utils_Private
 {
-	bool IsValid(auto Pointer)
+	inline bool IsValid(const UObject* Pointer)
 	{
 		return ::IsValid(Pointer);
 	}
 
 	template <typename T>
-	bool IsValid(const TWeakObjectPtr<T>& Pointer)
-	{
-		return Pointer.IsValid();
-	}
-
-	template <typename T>
 	bool IsValid(const TScriptInterface<T>& Pointer)
 	{
-		return IsValid(Pointer.GetObject());
+		return ::IsValid(Pointer.GetObject());
+	}
+
+	template <typename SmartPointerType>
+	concept CSmartPointer = requires(SmartPointerType SmartPointer)
+	{
+		SmartPointer.IsValid();
+	};
+
+	bool IsValid(CSmartPointer auto SmartPointer)
+	{
+		return SmartPointer.IsValid();
+	}
+	
+	bool IsValid(const auto& AnyObjectThatIsNotPointer)
+	{
+		return true;
 	}
 }
 

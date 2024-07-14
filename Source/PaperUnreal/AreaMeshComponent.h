@@ -39,6 +39,7 @@ public:
 
 	void ConfigureMaterialSet(const TArray<UMaterialInterface*>& NewMaterialSet)
 	{
+		// TODO 작동하지 않는 듯 하니 치트로 머티리얼 나중에 설정해서 확인해보자
 		DynamicMeshComponent->ConfigureMaterialSet(NewMaterialSet);
 		DynamicMeshComponent->NotifyMaterialSetUpdated();
 	}
