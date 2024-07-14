@@ -163,7 +163,7 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 				Context.AddToWeakList(MyHomeArea);
 				Context.AddToWeakList(TracerToAreaConverter);
 
-				for (auto SpawnedAreaStream = AreaSpawner->GetSpawnedArea().CreateStream();;)
+				for (auto SpawnedAreaStream = AreaSpawner->GetSpawnedAreaStreamer().CreateStream();;)
 				{
 					if (AAreaActor* Area = co_await SpawnedAreaStream.Next(); Area != MyHomeArea)
 					{

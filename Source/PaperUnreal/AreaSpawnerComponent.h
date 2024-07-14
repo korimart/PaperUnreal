@@ -133,7 +133,7 @@ class UAreaSpawnerComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	DECLARE_CACHING_LIVE_DATA_GETTER_SETTER(AAreaActor*, SpawnedArea);
+	DECLARE_STREAMER_AND_GETTER(AAreaActor*, SpawnedAreaStreamer);
 
 	AAreaActor* SpawnAreaAtRandomEmptyLocation()
 	{
@@ -180,7 +180,7 @@ private:
 	}
 
 	UFUNCTION()
-	void OnRep_SpawnedAreas() { SpawnedArea.SetValueIfNotInHistory(RepSpawnedAreas); }
+	void OnRep_SpawnedAreas() { SpawnedAreaStreamer.ReceiveValuesIfNotInHistory(RepSpawnedAreas); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{

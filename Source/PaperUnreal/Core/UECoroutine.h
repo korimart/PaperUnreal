@@ -489,6 +489,10 @@ template <typename T>
 class TValueStreamValueReceiver
 {
 public:
+	TValueStreamValueReceiver() = default;
+	TValueStreamValueReceiver(const TValueStreamValueReceiver&) = delete;
+	TValueStreamValueReceiver& operator=(const TValueStreamValueReceiver&) = delete;
+	
 	template <typename U>
 	void AddValue(U&& Value)
 	{
@@ -624,6 +628,60 @@ private:
 };
 
 
+template <typename T, typename DelegateType, typename TransformFuncType>
+TValueStream<T> CreateMulticastValueStream(const TArray<T>& ReadyValues, DelegateType& MulticastDelegate, TransformFuncType&& TransformFunc);
+
+
+template <typename T>
+class TValueStreamer
+{
+public:
+	TValueStreamer() = default;
+	TValueStreamer(const TValueStreamer&) = delete;
+	TValueStreamer& operator=(const TValueStreamer&) = delete;
+
+	TValueStream<T> CreateStream(bool bPutHistoryInStream = true) const
+	{
+		return CreateMulticastValueStream(bPutHistoryInStream ? History : TArray<T>{}, OnValueReceived);
+	}
+
+	const TArray<T>& GetHistory() const
+	{
+		return History;
+	}
+
+	void ReceiveValue(const T& NewValue)
+	{
+		if (AllValid(NewValue))
+		{
+			History.Add(NewValue);
+			OnValueReceived.Broadcast(NewValue);
+		}
+	}
+	
+	void ReceiveValueIfNotInHistory(const T& NewValue)
+	{
+		if (!History.Contains(NewValue))
+		{
+			ReceiveValue(NewValue);
+		}
+	}
+	
+	void ReceiveValuesIfNotInHistory(const TArray<T>& NewValues)
+	{
+		for (const T& Each : NewValues)
+		{
+			ReceiveValueIfNotInHistory(Each);
+		}
+	}
+
+private:
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnValueReceived, const T&);
+	mutable FOnValueReceived OnValueReceived;
+	TArray<T> History;
+};
+
+
 template <
 	typename MulticastDelegateType,
 	typename ReturnType = std::decay_t<typename TGetFirstParam<typename MulticastDelegateType::FDelegate::TFuncType>::Type>>
@@ -748,3 +806,8 @@ TWeakAwaitable<T> FirstInStream(TValueStream<T>&& Stream, PredicateType&& Predic
 
 using FWeakAwaitableInt32 = TWeakAwaitable<int32>;
 using FWeakAwaitableHandleInt32 = TWeakAwaitableHandle<int32>;
+
+
+#define DECLARE_STREAMER_AND_GETTER(Type, Name)\
+	private: TValueStreamer<Type> Name;\
+	public: const TValueStreamer<Type>& Get##Name() const { return Name; }
