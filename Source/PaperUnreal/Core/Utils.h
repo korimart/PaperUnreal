@@ -16,6 +16,16 @@ namespace Utils_Private
 		return ::IsValid(Pointer);
 	}
 
+	inline bool IsValid(const UActorComponent* ActorComponent)
+	{
+		if (!::IsValid(ActorComponent))
+		{
+			return false;
+		}
+
+		return ActorComponent->bWantsInitializeComponent ? ActorComponent->HasBeenInitialized() : true;
+	}
+
 	template <typename T>
 	bool IsValid(const TScriptInterface<T>& Pointer)
 	{
@@ -109,6 +119,19 @@ template <typename FuncType>
 UE_NODISCARD auto Finally(FuncType&& Func)
 {
 	return Utils_Private::TFinally<FuncType>{Forward<FuncType>(Func)};
+}
+
+
+template <typename FuncType>
+UE_NODISCARD auto FinallyIfValid(UObject* Object, FuncType&& Func)
+{
+	return Finally([Object = TWeakObjectPtr{Object}, Func = Forward<FuncType>(Func)]()
+	{
+		if (Object.IsValid())
+		{
+			Func();
+		}
+	});
 }
 
 

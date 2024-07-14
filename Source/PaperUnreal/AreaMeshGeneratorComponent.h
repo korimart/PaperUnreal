@@ -43,8 +43,10 @@ private:
 
 		check(AllValid(MeshSource, MeshDest));
 
-		RunWeakCoroutine(this, [this](auto&) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this](auto& Context) -> FWeakCoroutine
 		{
+			Context.AddToWeakList(MeshSource);
+			Context.AddToWeakList(MeshDest);
 			for (auto BoundaryStream = MeshSource->CreateBoundaryStream();;)
 			{
 				MeshDest->SetMeshByWorldBoundary(co_await BoundaryStream.Next());

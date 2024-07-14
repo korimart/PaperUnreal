@@ -88,6 +88,25 @@ struct FWeakCoroutine
 		}
 
 		template <typename T>
+		void AddToWeakList(TScriptInterface<T> Interface)
+		{
+			AddToWeakList(Interface.GetObject());
+		}
+
+		void AddToWeakList(UActorComponent* Object)
+		{
+			WeakList.Add([Weak = TWeakObjectPtr<UActorComponent>{Object}]()
+			{
+				if (!Weak.IsValid())
+				{
+					return false;
+				}
+				
+				return Weak->bWantsInitializeComponent ? Weak->HasBeenInitialized() : true;
+			});
+		}
+
+		template <typename T>
 		void AddToWeakList(const TSharedPtr<T>& Object)
 		{
 			WeakList.Add([Weak = TWeakPtr<T>{Object}]() { return Weak.IsValid(); });
@@ -491,7 +510,7 @@ public:
 	TValueStreamValueReceiver() = default;
 	TValueStreamValueReceiver(const TValueStreamValueReceiver&) = delete;
 	TValueStreamValueReceiver& operator=(const TValueStreamValueReceiver&) = delete;
-	
+
 	template <typename U>
 	void ReceiveValue(U&& Value)
 	{
@@ -642,7 +661,7 @@ public:
 	{
 		TValueStream<T> Ret;
 		Receivers.Add(Ret.GetReceiver());
-		
+
 		if (bPutHistoryInStream)
 		{
 			for (const auto& Each : History)
@@ -650,7 +669,7 @@ public:
 				Receivers.Last().Pin()->ReceiveValue(Each);
 			}
 		}
-		
+
 		return Ret;
 	}
 
@@ -664,21 +683,23 @@ public:
 		if (AllValid(NewValue))
 		{
 			History.Add(NewValue);
-
+			
 			for (int32 i = Receivers.Num() - 1; i >= 0; --i)
 			{
-				if (auto Pinned = Receivers[i].Pin())
-				{
-					Pinned->ReceiveValue(NewValue);
-				}
-				else
+				if (!Receivers[i].IsValid())
 				{
 					Receivers.RemoveAt(i);
 				}
 			}
+
+			auto ReceiversCopy = Receivers;
+			for (auto& Each : ReceiversCopy)
+			{
+				Each.Pin()->ReceiveValue(NewValue);
+			}
 		}
 	}
-	
+
 	void ReceiveValues(const TArray<T>& NewValues)
 	{
 		for (const T& Each : NewValues)
@@ -695,7 +716,7 @@ public:
 			ReceiveValue(Forward<U>(NewValue));
 		}
 	}
-	
+
 	void ReceiveValuesIfNotInHistory(const TArray<T>& NewValues)
 	{
 		for (const T& Each : NewValues)

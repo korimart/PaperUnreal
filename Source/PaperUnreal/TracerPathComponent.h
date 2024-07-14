@@ -49,11 +49,8 @@ private:
 	virtual void UninitializeComponent() override
 	{
 		Super::UninitializeComponent();
-
-		if (bGeneratedThisFrame)
-		{
-			TracerPathStreamer.ReceiveValue(CreateEvent(EStreamEvent::Closed));
-		}
+		
+		TracerPathStreamer.EndStreams();
 	}
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override
@@ -68,7 +65,6 @@ private:
 		if (!bGeneratedLastFrame && bWillGenerateThisFrame)
 		{
 			Path.Empty();
-			TracerPathStreamer.ReceiveValue(CreateEvent(EStreamEvent::Opened));
 		}
 
 		if (bWillGenerateThisFrame)
@@ -81,7 +77,6 @@ private:
 		{
 			Path.SetPoint(-1, NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint());
 			TracerPathStreamer.ReceiveValue(CreateEvent(EStreamEvent::LastModified));
-			TracerPathStreamer.ReceiveValue(CreateEvent(EStreamEvent::Closed));
 			TracerPathStreamer.EndStreams();
 		}
 	}
@@ -150,11 +145,6 @@ private:
 
 	FTracerPathEvent CreateEvent(EStreamEvent Event) const
 	{
-		if (Event == EStreamEvent::Opened || Event == EStreamEvent::Closed)
-		{
-			return {.Event = Event, .Affected = {}};
-		}
-
 		return {
 			.Event = Event,
 			.Affected = {

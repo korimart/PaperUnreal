@@ -15,10 +15,8 @@ concept CByteArray = std::is_convertible_v<T, TArray<uint8>>;
 
 enum class EStreamEvent
 {
-	Opened,
 	Appended,
 	LastModified,
-	Closed,
 };
 
 
@@ -30,10 +28,8 @@ struct TStreamEvent
 	EStreamEvent Event;
 	TArray<T> Affected;
 
-	bool IsOpenedEvent() const { return Event == EStreamEvent::Opened; }
 	bool IsAppendedEvent() const { return Event == EStreamEvent::Appended; }
 	bool IsLastModifiedEvent() const { return Event == EStreamEvent::LastModified; }
-	bool IsClosedEvent() const { return Event == EStreamEvent::Closed; }
 
 	TStreamEvent<uint8> Serialize() const requires !std::is_same_v<T, uint8>;
 
@@ -97,6 +93,11 @@ struct FRepByteStream
 		return bOpen;
 	}
 
+	bool IsNewStream(const FRepByteStream& OldStream) const
+	{
+		return Id != OldStream.Id;
+	}
+
 	// 클라이언트에서 Modified Event를 감지해 Affected에 바이트를 넣을 때
 	// 몇 바이트 기준으로 넣을 것인지 (즉 1바이트만 감지해도 이게 4면 주변 3바이트를 같이 넣음)
 	// TODO ByteStream이 이걸 알아야 되는게 좀 별로 같은데 다른 방법은 없는지 생각해보자
@@ -142,21 +143,9 @@ struct FRepByteStream
 
 		if (Id != OldStream.Id)
 		{
-			if (OldStream.IsOpen())
-			{
-				Ret.Add({.Event = EStreamEvent::Closed, .Affected = {},});
-			}
-
-			Ret.Add({.Event = EStreamEvent::Opened, .Affected = {},});
-
 			if (Array.Num() > 0)
 			{
 				Ret.Add({.Event = EStreamEvent::Appended, .Affected = Array,});
-			}
-
-			if (!bOpen)
-			{
-				Ret.Add({.Event = EStreamEvent::Closed, .Affected = {},});
 			}
 
 			return Ret;
@@ -194,11 +183,6 @@ struct FRepByteStream
 				.Event = EStreamEvent::Appended,
 				.Affected = TArray<uint8>{TArrayView<const uint8>{Array}.Right(AppendedByteCount)}
 			});
-		}
-
-		if (!bOpen)
-		{
-			Ret.Add({.Event = EStreamEvent::Closed, .Affected = {},});
 		}
 
 		return Ret;
@@ -264,15 +248,7 @@ public:
 	template <typename EventType> requires std::is_convertible_v<EventType, FByteStreamEvent>
 	void TriggerEvent(EventType&& Event)
 	{
-		if (Event.Event == EStreamEvent::Opened)
-		{
-			OpenStream();
-		}
-		else if (Event.Event == EStreamEvent::Closed)
-		{
-			CloseStream();
-		}
-		else if (Event.Event == EStreamEvent::Appended)
+		if (Event.Event == EStreamEvent::Appended)
 		{
 			PushBytes(Forward<EventType>(Event).Affected);
 		}
@@ -334,6 +310,11 @@ private:
 	UFUNCTION()
 	void OnRep_Stream(const FRepByteStream& OldStream)
 	{
+		if (RepStream.IsNewStream(OldStream))
+		{
+			ByteStreamer.EndStreams();
+		}
+		
 		ByteStreamer.ReceiveValues(RepStream.CompareAndCreateEvents(OldStream));
 
 		if (!RepStream.IsOpen())
@@ -351,10 +332,7 @@ private:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override
 	{
 		Super::EndPlay(EndPlayReason);
-
-		if (RepStream.IsOpen())
-		{
-			ByteStreamer.ReceiveValue(FByteStreamEvent{.Event = EStreamEvent::Closed});
-		}
+		
+		ByteStreamer.EndStreams();
 	}
 };

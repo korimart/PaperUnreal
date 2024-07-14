@@ -7,7 +7,6 @@
 #include "TracerMeshComponent.h"
 #include "TracerPathGenerator.h"
 #include "Core/ActorComponent2.h"
-#include "Core/Utils.h"
 #include "TracerMeshGeneratorComponent.generated.h"
 
 
@@ -51,9 +50,7 @@ private:
 	{
 		Super::InitializeComponent();
 
-		check(AllValid(MeshSource, MeshDestination, MeshAttachmentTarget));
-
-		ListenToNextTracerStream();
+		ListenToTracerPathStream();
 	}
 
 	static std::tuple<FVector2D, FVector2D> CreateVertexPositions(const FVector2D& Center, const FVector2D& Forward)
@@ -79,64 +76,58 @@ private:
 
 	void AttachVerticesToAttachmentTarget(int32 Index) const
 	{
-		if (MeshAttachmentTarget->IsValid())
-		{
-			auto [Left, Right] = MeshDestination->GetVertices(Index);
-			Left = MeshAttachmentTarget->FindClosestPointOnBoundary2D(Left).GetPoint();
-			Right = MeshAttachmentTarget->FindClosestPointOnBoundary2D(Right).GetPoint();
-			MeshDestination->SetVertices(Index, Left, Right);
-		}
+		auto [Left, Right] = MeshDestination->GetVertices(Index);
+		Left = MeshAttachmentTarget->FindClosestPointOnBoundary2D(Left).GetPoint();
+		Right = MeshAttachmentTarget->FindClosestPointOnBoundary2D(Right).GetPoint();
+		MeshDestination->SetVertices(Index, Left, Right);
 	}
 
-	void ListenToNextTracerStream()
+	void ListenToTracerPathStream()
 	{
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
-			auto PathStream = MeshSource->GetTracerPathStreamer().CreateStream();
-			check((co_await PathStream.Next()).IsOpenedEvent());
+			Context.AddToWeakList(CastChecked<UActorComponent>(MeshSource.GetObject()));
+			Context.AddToWeakList(MeshDestination);
+			Context.AddToWeakList(MeshAttachmentTarget);
 
-			MeshDestination->Edit([&, FirstEvent = co_await PathStream.Next()]()
-			{
-				check(!FirstEvent.IsClosedEvent());
-				MeshDestination->Reset();
-				AppendVerticesFromTracerPath(FirstEvent.Affected);
-				AttachVerticesToAttachmentTarget(0);
-			});
-
-			while (co_await PathStream.NextIfNotEnd())
-			{
-				const auto Event = PathStream.Pop();
-
-				if (Event.IsAppendedEvent())
-				{
-					MeshDestination->Edit([&]() { AppendVerticesFromTracerPath(Event.Affected); });
-				}
-				else if (Event.IsLastModifiedEvent())
-				{
-					// 현재 이 클래스의 가정: 수정은 Path의 가장 마지막 점에 대해서만 발생. 이 전제가 바뀌면 로직 수정해야 됨
-					check(Event.Affected.Num() == 1);
-					MeshDestination->Edit([&]() { ModifyLastVerticesWithTracerPoint(Event.Affected[0]); });
-				}
-				else
-				{
-					break;
-				}
-			}
-
-			MeshDestination->Edit([&]() { AttachVerticesToAttachmentTarget(-1); });
-
-			// 스트림의 종료가 MeshSource의 파괴로 인한 것인지 검사한다
-			// 스트림이 끝난 시점에서는 살아 있는 상태에서 Clean up 중인거라 MeshSource의 파괴 여부를 알 수 없음
-			// 다음 틱에 Garbage가 되었는지 검사한다
-			co_await WaitOneTick(GetWorld());
-			
-			if (AllValid(MeshSource))
-			{
-				ListenToNextTracerStream();
-			}
-			else
+			auto F = FinallyIfValid(MeshDestination, [MeshDestination = MeshDestination]()
 			{
 				MeshDestination->Edit([&]() { MeshDestination->Reset(); });
+			});
+
+			while (true)
+			{
+				auto PathStream = MeshSource->GetTracerPathStreamer().CreateStream();
+
+				if (!co_await PathStream.NextIfNotEnd())
+				{
+					continue;
+				}
+
+				MeshDestination->Edit([&, FirstEvent = PathStream.Pop()]()
+				{
+					MeshDestination->Reset();
+					AppendVerticesFromTracerPath(FirstEvent.Affected);
+					AttachVerticesToAttachmentTarget(0);
+				});
+				
+				while (co_await PathStream.NextIfNotEnd())
+				{
+					const auto Event = PathStream.Pop();
+
+					if (Event.IsAppendedEvent())
+					{
+						MeshDestination->Edit([&]() { AppendVerticesFromTracerPath(Event.Affected); });
+					}
+					else if (Event.IsLastModifiedEvent())
+					{
+						// 현재 이 클래스의 가정: 수정은 Path의 가장 마지막 점에 대해서만 발생. 이 전제가 바뀌면 로직 수정해야 됨
+						check(Event.Affected.Num() == 1);
+						MeshDestination->Edit([&]() { ModifyLastVerticesWithTracerPoint(Event.Affected[0]); });
+					}
+				}
+
+				MeshDestination->Edit([&]() { AttachVerticesToAttachmentTarget(-1); });
 			}
 		});
 	}

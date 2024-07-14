@@ -32,7 +32,22 @@ private:
 
 	UReplicatedTracerPathComponent()
 	{
+		bWantsInitializeComponent = true;
 		SetIsReplicatedByDefault(true);
+	}
+
+	virtual void InitializeComponent() override
+	{
+		Super::InitializeComponent();
+
+		if (GetNetMode() != NM_Client)
+		{
+			check(AllValid(ServerTracerPath));
+			Replicator = NewObject<UByteStreamComponent>(this);
+			Replicator->SetChunkSize(FTracerPathPoint::ChunkSize);
+			Replicator->RegisterComponent();
+			ServerInitiatePathRelay();
+		}
 	}
 
 	virtual void BeginPlay() override
@@ -43,52 +58,55 @@ private:
 		{
 			// TODO find by tag
 			Replicator = GetOwner()->FindComponentByClass<UByteStreamComponent>();
+			check(IsValid(Replicator))
 			Replicator->SetChunkSize(FTracerPathPoint::ChunkSize);
 			ClientInitiatePathRelay();
 		}
-		else
-		{
-			check(AllValid(ServerTracerPath));
-			Replicator = NewObject<UByteStreamComponent>(this);
-			Replicator->SetChunkSize(FTracerPathPoint::ChunkSize);
-			Replicator->RegisterComponent();
-			ServerInitiatePathRelay();
-		}
 	}
 
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override
+	virtual void UninitializeComponent() override
 	{
-		Super::EndPlay(EndPlayReason);
+		Super::UninitializeComponent();
 
 		if (GetNetMode() != NM_Client)
 		{
 			Replicator->DestroyComponent();
 		}
+
+		TracerPathStreamer.EndStreams();
 	}
 
 	void ServerInitiatePathRelay()
 	{
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
+			Context.AddToWeakList(ServerTracerPath);
+
+			Replicator->OpenStream();
 			auto PathEvents = ServerTracerPath->GetTracerPathStreamer().CreateStream();
 			while (co_await PathEvents.NextIfNotEnd())
 			{
 				Replicator->TriggerEvent(PathEvents.Pop().Serialize());
 			}
+			Replicator->CloseStream();
+
 			ServerInitiatePathRelay();
 		});
 	}
 
 	void ClientInitiatePathRelay()
 	{
-		TracerPathStreamer.EndStreams();
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
+			Context.AddToWeakList(Replicator);
+
 			auto ByteEvents = Replicator->GetByteStreamer().CreateStream();
 			while (co_await ByteEvents.NextIfNotEnd())
 			{
 				TracerPathStreamer.ReceiveValue(ByteEvents.Pop().Deserialize<FTracerPathEvent>());
 			}
+			TracerPathStreamer.EndStreams();
+			
 			ClientInitiatePathRelay();
 		});
 	}
