@@ -7,6 +7,7 @@
 #include "AreaSpawnerComponent.h"
 #include "InventoryComponent.h"
 #include "LifeComponent.h"
+#include "PlayerKillerComponent.h"
 #include "PlayerSpawnerComponent.h"
 #include "ReplicatedTracerPathComponent.h"
 #include "TracerMeshComponent.h"
@@ -71,6 +72,7 @@ void APaperUnrealCharacter::PostInitializeComponents()
 		co_await LifeComponent->WaitForDeath();
 
 		// 현재 얘만 파괴해주면 나머지 컴포넌트는 디펜던시가 사라짐에 따라 알아서 사라짐
+		// Path를 파괴해서 상호작용을 없애 게임에 영향을 미치지 않게 한다
 		if (GetNetMode() != NM_Client)
 		{
 			FindAndDestroyComponent<UTracerPathComponent>(this);
@@ -128,9 +130,6 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		Context.AbortIfInvalid(MyHomeArea);
 		auto HomeAreaBoundary = co_await WaitForComponent<UAreaBoundaryComponent>(MyHomeArea);
 
-		// TODO 아래 컴포넌트들은 위에 먼저 부착된 컴포넌트들에 의존함
-		// 컴포넌트를 갈아끼울 때 이러한 의존성에 대한 경고를 하는 메카니즘이 존재하지 않음
-
 		auto TracerPath = NewObject<UTracerPathComponent>(this);
 		TracerPath->SetNoPathArea(HomeAreaBoundary);
 		TracerPath->RegisterComponent();
@@ -144,15 +143,13 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 
 		auto TracerOverlapChecker = NewObject<UTracerOverlapCheckerComponent>(this);
 		TracerOverlapChecker->SetTracer(TracerPath);
-		TracerOverlapChecker->OnTracerBumpedInto.AddWeakLambda(this,
-			[this](UTracerPathComponent* Bumpee)
-			{
-				if (auto LifeComponent = Bumpee->GetOwner()->FindComponentByClass<ULifeComponent>())
-				{
-					LifeComponent->SetbAlive(false);
-				}
-			});
 		TracerOverlapChecker->RegisterComponent();
+
+		auto Killer = NewObject<UPlayerKillerComponent>(this);
+		Killer->SetTracer(TracerPath);
+		Killer->SetArea(HomeAreaBoundary);
+		Killer->SetOverlapChecker(TracerOverlapChecker);
+		Killer->RegisterComponent();
 
 		auto AreaConverter = NewObject<UTracerToAreaConverterComponent>(this);
 		AreaConverter->SetTracer(TracerPath);
@@ -166,7 +163,7 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 				RunWeakCoroutine(this, [this, NewArea, AreaConverter](FWeakCoroutineContext& Context) -> FWeakCoroutine
 				{
 					Context.AbortIfInvalid(AreaConverter);
-					
+
 					auto NewBoundary = co_await WaitForComponent<UAreaBoundaryComponent>(NewArea);
 					auto AreaSlasher = NewObject<UAreaSlasherComponent>(this);
 					AreaSlasher->SetSlashTarget(NewBoundary);
@@ -183,7 +180,7 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 				RunWeakCoroutine(this, [this, NewPlayer, TracerOverlapChecker](FWeakCoroutineContext& Context) -> FWeakCoroutine
 				{
 					Context.AbortIfInvalid(TracerOverlapChecker);
-					
+
 					auto NewTracer = co_await WaitForComponent<UTracerPathComponent>(NewPlayer);
 					TracerOverlapChecker->AddOverlapTarget(NewTracer);
 				});

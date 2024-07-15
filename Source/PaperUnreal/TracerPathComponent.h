@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "AreaBoundaryComponent.h"
-#include "AreaMeshComponent.h"
 #include "TracerPathGenerator.h"
 #include "TracerPathComponent.generated.h"
 

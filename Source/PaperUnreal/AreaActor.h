@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "AreaMeshComponent.h"
 #include "AreaMeshGeneratorComponent.h"
+#include "LifeComponent.h"
 #include "ReplicatedAreaBoundaryComponent.h"
 #include "TeamComponent.h"
 #include "Core/Actor2.h"
@@ -19,6 +20,9 @@ class AAreaActor : public AActor2
 
 public:
 	UPROPERTY()
+	ULifeComponent* LifeComponent;
+
+	UPROPERTY()
 	UTeamComponent* TeamComponent;
 
 	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(TSoftObjectPtr<UMaterialInstance>, AreaMaterial);
@@ -32,6 +36,7 @@ private:
 		bReplicates = true;
 		bAlwaysRelevant = true;
 		RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("RootComponent"));
+		LifeComponent = CreateDefaultSubobject<ULifeComponent>(TEXT("LifeComponent"));
 		TeamComponent = CreateDefaultSubobject<UTeamComponent>(TEXT("TeamComponent"));
 	}
 
@@ -44,10 +49,31 @@ private:
 		DOREPLIFETIME(ThisClass, RepAreaMaterial);
 	}
 
+	virtual void PostInitializeComponents() override
+	{
+		Super::PostInitializeComponents();
+
+		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			co_await LifeComponent->WaitForDeath();
+
+			// TODO play death animation
+
+			Destroy();
+		});
+	}
+
 	virtual void AttachServerMachineComponents() override
 	{
 		auto AreaBoundary = NewObject<UAreaBoundaryComponent>(this);
 		AreaBoundary->ResetToStartingBoundary(GetActorLocation());
+		AreaBoundary->GetBoundaryStreamer().Observe(this, [this](const FLoopedSegmentArray2D& Boundary)
+		{
+			if (!Boundary.IsValid())
+			{
+				LifeComponent->SetbAlive(false);
+			}
+		});
 		AreaBoundary->RegisterComponent();
 
 		if (GetNetMode() != NM_Standalone)
