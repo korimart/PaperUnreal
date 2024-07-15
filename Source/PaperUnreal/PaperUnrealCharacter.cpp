@@ -7,6 +7,7 @@
 #include "AreaSpawnerComponent.h"
 #include "InventoryComponent.h"
 #include "LifeComponent.h"
+#include "PlayerSpawnerComponent.h"
 #include "ReplicatedTracerPathComponent.h"
 #include "TracerMeshComponent.h"
 #include "TracerPathGenerator.h"
@@ -99,6 +100,13 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 			co_return;
 		}
 
+		// 디펜던시: UPlayerSpawnerComponent를 가지는 GameState에 대해서만 이 클래스를 사용할 수 있음
+		UPlayerSpawnerComponent* PlayerSpawner = GetWorld()->GetGameState()->FindComponentByClass<UPlayerSpawnerComponent>();
+		if (!ensureAlways(IsValid(PlayerSpawner)))
+		{
+			co_return;
+		}
+
 		// 디펜던시: UInventoryComponent를 가지는 PlayerState에 대해서만 이 클래스를 사용할 수 있음
 		UInventoryComponent* Inventory = PlayerState->FindComponentByClass<UInventoryComponent>();
 		if (!ensureAlways(IsValid(Inventory)))
@@ -115,6 +123,7 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		}
 
 		Context.AbortIfInvalid(AreaSpawner);
+		Context.AbortIfInvalid(PlayerSpawner);
 		Context.AbortIfInvalid(Inventory);
 		Context.AbortIfInvalid(MyHomeArea);
 		auto HomeAreaBoundary = co_await WaitForComponent<UAreaBoundaryComponent>(MyHomeArea);
@@ -162,20 +171,15 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 				}
 			});
 
-		// RunWeakCoroutine(this, [
-		// 		this,
-		// 		TracerOverlapChecker
-		// 	](FWeakCoroutineContext& Context) -> FWeakCoroutine
-		// 	{
-		// 		Context.AddToWeakList(TracerOverlapChecker);
-		//
-		// 		for (auto SpawnedPlayerCharacterStream = ;;)
-		// 		{
-		// 			APaperUnrealCharacter* Character = co_await SpawnedPlayerCharacterStream.Next();
-		// 			auto NewTracer = Character->FindComponentByClass<UTracerPathComponent>();
-		// 			TracerOverlapChecker->AddOverlapTarget(NewTracer);
-		// 		}
-		// 	});
+		PlayerSpawner->GetSpawnedPlayerStreamer().Observe(this,
+			[this, AS_WEAK(TracerOverlapChecker)](AActor* Player)
+			{
+				if (AllValid(TracerOverlapChecker))
+				{
+					auto NewTracer = Player->FindComponentByClass<UTracerPathComponent>();
+					TracerOverlapChecker->AddOverlapTarget(NewTracer);
+				}
+			});
 	});
 }
 

@@ -1,6 +1,8 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "PaperUnrealGameMode.h"
+
+#include "PaperUnrealCharacter.h"
 #include "PaperUnrealPlayerController.h"
 #include "PaperUnrealGameState.h"
 #include "PaperUnrealPlayerState.h"
@@ -46,7 +48,7 @@ void APaperUnrealGameMode::OnPostLogin(AController* NewPlayer)
 	const TSoftObjectPtr<UMaterialInstance> SoftSolidRed{FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Red.MI_Solid_Red'")}};
 	const TSoftObjectPtr<UMaterialInstance> SoftSolidRedLight{FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Red_Light.MI_Solid_Red_Light'")}};
 	const int32 ThisPlayerTeamIndex = NextTeamIndex++;
-	
+
 	NewPlayer->GetPlayerState<APaperUnrealPlayerState>()->TeamComponent->SetTeamIndex(ThisPlayerTeamIndex);
 
 	AAreaActor* ThisPlayerArea =
@@ -72,5 +74,9 @@ void APaperUnrealGameMode::OnPostLogin(AController* NewPlayer)
 	NewPlayer->GetPlayerState<APaperUnrealPlayerState>()->InventoryComponent->SetHomeArea(ThisPlayerArea);
 	NewPlayer->GetPlayerState<APaperUnrealPlayerState>()->InventoryComponent->SetTracerMaterial(SoftSolidBlueLight);
 
-	RestartPlayerAtTransform(NewPlayer, ThisPlayerArea->GetActorTransform());
+	AActor* Character = GetGameState<APaperUnrealGameState>()
+	                    ->PlayerSpawnerComponent
+	                    ->SpawnAtLocation(DefaultPawnClass, ThisPlayerArea->GetActorTransform().GetLocation());
+	
+	NewPlayer->Possess(CastChecked<APawn>(Character));
 }

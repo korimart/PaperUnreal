@@ -155,6 +155,7 @@ public:
 
 			AAreaActor* Ret = GetWorld()->SpawnActor<AAreaActor>(SpawnLocation, {});
 			RepSpawnedAreas.Add(Ret);
+			OnRep_SpawnedAreas();
 			return Ret;
 		}
 

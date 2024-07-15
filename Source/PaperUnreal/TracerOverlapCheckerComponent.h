@@ -25,7 +25,12 @@ public:
 
 	void AddOverlapTarget(UTracerPathComponent* Target)
 	{
-		OverlapTargets.Add(Target);
+		check(IsValid(OverlapInstigator));
+
+		if (Target != OverlapInstigator)
+		{
+			OverlapTargets.Add(Target);
+		}
 	}
 
 private:
@@ -101,7 +106,8 @@ private:
 
 		for (UTracerPathComponent* Each : OverlapTargets)
 		{
-			if (Each->GetTracerPath().FindIntersection(InstigatorHead)
+			if (IsValid(Each)
+				&& Each->GetTracerPath().FindIntersection(InstigatorHead)
 				&& !Each->GetTracerPath().FindIntersection(PrevInstigatorHead))
 			{
 				OnTracerBumpedInto.Broadcast(Each);
