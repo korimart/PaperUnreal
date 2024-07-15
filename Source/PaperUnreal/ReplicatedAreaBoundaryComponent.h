@@ -52,7 +52,7 @@ private:
 
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
-			Context.AddToWeakList(BoundarySource);
+			Context.AbortIfInvalid(BoundarySource);
 			for (auto Boundaries = BoundarySource->GetBoundaryStreamer().CreateStream();;)
 			{
 				RepPoints = (co_await Boundaries.Next()).GetPoints();

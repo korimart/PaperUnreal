@@ -77,7 +77,7 @@ private:
 
 		RunWeakCoroutine(this, [this, AreaMesh](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
-			Context.AddToWeakList(AreaMesh);
+			Context.AbortIfInvalid(AreaMesh);
 			for (auto AreaMaterialStream = AreaMaterial.CreateStream();;)
 			{
 				auto SoftAreaMaterial = co_await AreaMaterialStream.Next();

@@ -96,8 +96,8 @@ private:
 	{
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
-			Context.AddToWeakList(MeshDestination);
-			Context.AddToWeakList(MeshAttachmentTarget);
+			Context.AbortIfInvalid(MeshDestination);
+			Context.AbortIfInvalid(MeshAttachmentTarget);
 			Context.AbortIfNotInitialized(Cast<UActorComponent>(MeshSource.GetObject()));
 			auto F = FinallyIfValid(this, [this]() { DestroyComponent(); });
 

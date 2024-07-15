@@ -114,9 +114,9 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 			co_return;
 		}
 
-		Context.AddToWeakList(AreaSpawner);
-		Context.AddToWeakList(Inventory);
-		Context.AddToWeakList(MyHomeArea);
+		Context.AbortIfInvalid(AreaSpawner);
+		Context.AbortIfInvalid(Inventory);
+		Context.AbortIfInvalid(MyHomeArea);
 		auto HomeAreaBoundary = co_await WaitForComponent<UAreaBoundaryComponent>(MyHomeArea);
 
 		// TODO 아래 컴포넌트들은 위에 먼저 부착된 컴포넌트들에 의존함
@@ -190,7 +190,7 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 		}
 
 		// 디펜던시: UInventoryComponent를 가지는 PlayerState에 대해서만 이 클래스를 사용할 수 있음
-		UInventoryComponent* Inventory = Context.AddToWeakList(PlayerState->FindComponentByClass<UInventoryComponent>());
+		UInventoryComponent* Inventory = Context.AbortIfInvalid(PlayerState->FindComponentByClass<UInventoryComponent>());
 		if (!ensureAlways(IsValid(Inventory)))
 		{
 			co_return;
@@ -222,7 +222,7 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 				TracerMaterialStream = Inventory->GetTracerMaterial().CreateStream()
 			](FWeakCoroutineContext& Context) mutable -> FWeakCoroutine
 			{
-				Context.AddToWeakList(TracerMesh);
+				Context.AbortIfInvalid(TracerMesh);
 
 				while (true)
 				{

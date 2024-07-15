@@ -82,31 +82,31 @@ struct FWeakCoroutine
 			return Algo::AllOf(WeakList, [](const auto& Each) { return Each(); });
 		}
 
-		void AddToWeakList(UObject* Object)
+		void AbortIfInvalid(UObject* Object)
 		{
 			WeakList.Add([Weak = TWeakObjectPtr{Object}]() { return Weak.IsValid(); });
 		}
 
 		template <typename T>
-		void AddToWeakList(TScriptInterface<T> Interface)
+		void AbortIfInvalid(TScriptInterface<T> Interface)
 		{
-			AddToWeakList(Interface.GetObject());
+			AbortIfInvalid(Interface.GetObject());
 		}
 
 		template <typename T>
-		void AddToWeakList(const TSharedPtr<T>& Object)
-		{
-			WeakList.Add([Weak = TWeakPtr<T>{Object}]() { return Weak.IsValid(); });
-		}
-
-		template <typename T>
-		void AddToWeakList(const TSharedRef<T>& Object)
+		void AbortIfInvalid(const TSharedPtr<T>& Object)
 		{
 			WeakList.Add([Weak = TWeakPtr<T>{Object}]() { return Weak.IsValid(); });
 		}
 
 		template <typename T>
-		void AddToWeakList(const TWeakPtr<T>& Object)
+		void AbortIfInvalid(const TSharedRef<T>& Object)
+		{
+			WeakList.Add([Weak = TWeakPtr<T>{Object}]() { return Weak.IsValid(); });
+		}
+
+		template <typename T>
+		void AbortIfInvalid(const TWeakPtr<T>& Object)
 		{
 			WeakList.Add([Weak = Object]() { return Weak.IsValid(); });
 		}
@@ -185,9 +185,9 @@ class FWeakCoroutineContext
 {
 public:
 	template <typename T>
-	decltype(auto) AddToWeakList(T&& Weak)
+	decltype(auto) AbortIfInvalid(T&& Weak)
 	{
-		Handle.promise().AddToWeakList(Weak);
+		Handle.promise().AbortIfInvalid(Weak);
 		return Forward<T>(Weak);
 	}
 
@@ -226,7 +226,7 @@ void FWeakCoroutine::Init(
 {
 	Handle.promise().Context = MoveTemp(InContext);
 	Handle.promise().Context->Handle = Handle;
-	Handle.promise().AddToWeakList(Lifetime);
+	Handle.promise().AbortIfInvalid(Lifetime);
 	Handle.promise().LambdaCaptures = LambdaCaptures;
 	Handle.resume();
 }
@@ -489,7 +489,7 @@ public:
 
 			if constexpr (bObjectPtr)
 			{
-				Handle.promise().AddToWeakList(Value->GetValue());
+				Handle.promise().AbortIfInvalid(Value->GetValue());
 			}
 		}
 
