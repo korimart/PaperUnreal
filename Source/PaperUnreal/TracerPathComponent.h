@@ -64,7 +64,7 @@ private:
 		Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
 		const bool bGeneratedLastFrame = bGeneratedThisFrame;
-		const bool bWillGenerateThisFrame = !NoPathArea->IsInside(GetOwner()->GetActorLocation());
+		const bool bWillGenerateThisFrame = NoPathArea->IsValid() && !NoPathArea->IsInside(GetOwner()->GetActorLocation());
 		bGeneratedThisFrame = bWillGenerateThisFrame;
 		
 		if (bWillGenerateThisFrame)
@@ -74,7 +74,11 @@ private:
 
 		if (bGeneratedLastFrame && !bGeneratedThisFrame)
 		{
-			Path.SetPoint(-1, NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint());
+			if (NoPathArea->IsValid())
+			{
+				Path.SetPoint(-1, NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint());
+			}
+			
 			TracerPathStreamer.ReceiveValue(CreateEvent(EStreamEvent::LastModified));
 			TracerPathStreamer.EndStreams();
 			Path.Empty();

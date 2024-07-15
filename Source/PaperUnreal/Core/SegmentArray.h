@@ -350,6 +350,18 @@ public:
 
 		return IntersectingXes.Num() % 2 == 1;
 	}
+	
+	bool IsInside(const TSegmentArray2D& Other) const requires bLoop
+	{
+		for (const FVector2D& Each : Other.GetPoints())
+		{
+			if (!IsInside(Each))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
 
 	FIntersection FindClosestPointTo(const FVector2D& Point) const
 	{

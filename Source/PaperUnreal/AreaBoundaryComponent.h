@@ -20,6 +20,16 @@ public:
 		return AreaBoundary;
 	}
 
+	bool IsValid() const
+	{
+		return AreaBoundary->IsValid();
+	}
+
+	void Reset()
+	{
+		AreaBoundary.SetValueAlways(FLoopedSegmentArray2D{});
+	}
+
 	void ResetToStartingBoundary(const FVector& Location)
 	{
 		const TArray<FVector2D> VertexPositions = [&]()
@@ -76,6 +86,15 @@ public:
 	bool IsInside(const FVector& Point) const
 	{
 		return AreaBoundary->IsInside(FVector2D{Point});
+	}
+	
+	bool IsInside(UAreaBoundaryComponent* Other) const
+	{
+		if (const TOptional<FLoopedSegmentArray2D>& OtherBoundary = Other->GetBoundaryStreamer().GetValue())
+		{
+			return AreaBoundary->IsInside(*OtherBoundary);
+		}
+		return false;
 	}
 
 	struct FPointOnBoundary

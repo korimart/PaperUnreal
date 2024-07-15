@@ -34,6 +34,11 @@ public:
 		return Tracer;
 	}
 
+	UAreaBoundaryComponent* GetArea() const
+	{
+		return ConversionDestination;
+	}
+
 private:
 	UPROPERTY()
 	UTracerPathComponent* Tracer;

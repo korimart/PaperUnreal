@@ -49,8 +49,15 @@ private:
 		TracerToAreaConverter->OnTracerToAreaConversion.AddWeakLambda(
 			this, [this](FSegmentArray2D CorrectlyAlignedPath)
 			{
-				CorrectlyAlignedPath.ReverseVertexOrder();
-				SlashTarget->ReduceByPath(CorrectlyAlignedPath);
+				if (TracerToAreaConverter->GetArea()->IsInside(SlashTarget))
+				{
+					SlashTarget->Reset();
+				}
+				else
+				{
+					CorrectlyAlignedPath.ReverseVertexOrder();
+					SlashTarget->ReduceByPath(CorrectlyAlignedPath);
+				}
 			});
 	}
 };
