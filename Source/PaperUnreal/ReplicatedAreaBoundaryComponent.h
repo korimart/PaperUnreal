@@ -16,27 +16,24 @@ class UReplicatedAreaBoundaryComponent : public UActorComponent2, public IAreaBo
 	GENERATED_BODY()
 
 public:
-	DECLARE_MULTICAST_DELEGATE_OneParam(FOnBoundaryChanged, const FLoopedSegmentArray2D&);
-	FOnBoundaryChanged OnBoundaryChanged;
-	
-	virtual TValueStream<FLoopedSegmentArray2D> CreateBoundaryStream() override
+	virtual TLiveDataView<FLoopedSegmentArray2D> GetBoundaryStreamer() override
 	{
-		TArray<FLoopedSegmentArray2D> Init{{RepPoints}};
-		if (Init[0].IsValid()) { return CreateMulticastValueStream(Init, OnBoundaryChanged); }
-		return CreateMulticastValueStream(TArray<FLoopedSegmentArray2D>{}, OnBoundaryChanged);
+		return AreaBoundary;
 	}
-	
+
 	void SetAreaBoundarySource(UAreaBoundaryComponent* Source)
 	{
 		BoundarySource = Source;
 	}
-	
+
 private:
 	UPROPERTY()
 	UAreaBoundaryComponent* BoundarySource;
-	
+
 	UPROPERTY(ReplicatedUsing=OnRep_Points)
 	TArray<FVector2D> RepPoints;
+
+	TLiveData<FLoopedSegmentArray2D> AreaBoundary;
 
 	UReplicatedAreaBoundaryComponent()
 	{
@@ -53,11 +50,10 @@ private:
 			return;
 		}
 
-		check(AllValid(BoundarySource));
-
-		RunWeakCoroutine(this, [this](auto&) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
-			for (auto Boundaries = BoundarySource->CreateBoundaryStream();;)
+			Context.AddToWeakList(BoundarySource);
+			for (auto Boundaries = BoundarySource->GetBoundaryStreamer().CreateStream();;)
 			{
 				RepPoints = (co_await Boundaries.Next()).GetPoints();
 			}
@@ -65,10 +61,7 @@ private:
 	}
 
 	UFUNCTION()
-	void OnRep_Points()
-	{
-		OnBoundaryChanged.Broadcast(RepPoints);
-	}
+	void OnRep_Points() { AreaBoundary.SetValueAlways(RepPoints); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{

@@ -15,15 +15,7 @@ class UAreaBoundaryComponent : public UActorComponent2, public IAreaBoundaryStre
 	GENERATED_BODY()
 
 public:
-	DECLARE_MULTICAST_DELEGATE_OneParam(FOnBoundaryChanged, const FLoopedSegmentArray2D&);
-	FOnBoundaryChanged OnBoundaryChanged;
-
-	virtual TValueStream<FLoopedSegmentArray2D> CreateBoundaryStream() override
-	{
-		return CreateMulticastValueStream(TArray{AreaBoundary}, OnBoundaryChanged);
-	}
-
-	const FLoopedSegmentArray2D& GetBoundary() const
+	virtual TLiveDataView<FLoopedSegmentArray2D> GetBoundaryStreamer() override
 	{
 		return AreaBoundary;
 	}
@@ -41,8 +33,7 @@ public:
 			return Ret;
 		}();
 
-		AreaBoundary.ReplacePoints(0, 0, VertexPositions);
-		OnBoundaryChanged.Broadcast(AreaBoundary);
+		AreaBoundary.SetValueAlways(VertexPositions);
 	}
 
 	using FExpansionResult = FUnionResult;
@@ -56,9 +47,9 @@ public:
 		}
 		
 		if (TArray<FUnionResult> UnionResult
-			= AreaBoundary.Union(Forward<SegmentArrayType>(Path)); !UnionResult.IsEmpty())
+			= AreaBoundary->Union(Forward<SegmentArrayType>(Path)); !UnionResult.IsEmpty())
 		{
-			OnBoundaryChanged.Broadcast(AreaBoundary);
+			AreaBoundary.Notify();
 
 			TArray<FExpansionResult> Ret;
 			for (FUnionResult& Each : UnionResult)
@@ -77,14 +68,14 @@ public:
 	{
 		if (Path.IsValid())
 		{
-			AreaBoundary.Difference(Forward<SegmentArrayType>(Path));
-			OnBoundaryChanged.Broadcast(AreaBoundary);
+			AreaBoundary->Difference(Forward<SegmentArrayType>(Path));
+			AreaBoundary.Notify();
 		}
 	}
 
 	bool IsInside(const FVector& Point) const
 	{
-		return AreaBoundary.IsInside(FVector2D{Point});
+		return AreaBoundary->IsInside(FVector2D{Point});
 	}
 
 	struct FPointOnBoundary
@@ -102,10 +93,10 @@ public:
 	{
 		using FIntersection = FLoopedSegmentArray2D::FIntersection;
 
-		if (TOptional<FIntersection> Found = AreaBoundary.FindIntersection(Segment))
+		if (TOptional<FIntersection> Found = AreaBoundary->FindIntersection(Segment))
 		{
 			FPointOnBoundary Ret;
-			Ret.Segment = AreaBoundary[Found->SegmentIndex];
+			Ret.Segment = (*AreaBoundary)[Found->SegmentIndex];
 			Ret.Alpha = Found->Alpha;
 			return Ret;
 		}
@@ -116,19 +107,19 @@ public:
 	FPointOnBoundary FindClosestPointOnBoundary2D(const FVector2D& Point) const
 	{
 		using FIntersection = FLoopedSegmentArray2D::FIntersection;
-		const FIntersection Intersection = AreaBoundary.FindClosestPointTo(Point);
+		const FIntersection Intersection = AreaBoundary->FindClosestPointTo(Point);
 
 		FPointOnBoundary Ret;
-		Ret.Segment = AreaBoundary[Intersection.SegmentIndex];
+		Ret.Segment = (*AreaBoundary)[Intersection.SegmentIndex];
 		Ret.Alpha = Intersection.Alpha;
 		return Ret;
 	}
 
 	UE::Geometry::FSegment2d Clip(const UE::Geometry::FSegment2d& Segment) const
 	{
-		return AreaBoundary.Clip(Segment);
+		return AreaBoundary->Clip(Segment);
 	}
 
 private:
-	FLoopedSegmentArray2D AreaBoundary;
+	TLiveData<FLoopedSegmentArray2D> AreaBoundary;
 };

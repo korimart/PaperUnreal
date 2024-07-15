@@ -52,12 +52,12 @@ private:
 
 		check(AllValid(Tracer, ConversionDestination));
 
-		Tracer->GetTracerPathStreamer().GetOnStreamEnd().AddWeakLambda(this, [this]()
+		Tracer->GetTracerPathStreamer().OnStreamEnd(this, [this]()
 		{
 			ConvertPathToArea();
 		});
 
-		ConversionDestination->OnBoundaryChanged.AddWeakLambda(this, [this](auto&)
+		ConversionDestination->GetBoundaryStreamer().Observe(this, [this](auto&)
 		{
 			ConvertPathToArea();
 		});

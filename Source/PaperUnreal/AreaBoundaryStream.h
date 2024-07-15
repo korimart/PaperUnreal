@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/LiveData.h"
 #include "Core/SegmentArray.h"
 #include "Core/UECoroutine.h"
 #include "UObject/Interface.h"
@@ -22,5 +23,5 @@ class IAreaBoundaryStream
 	GENERATED_BODY()
 
 public:
-	virtual TValueStream<FLoopedSegmentArray2D> CreateBoundaryStream() = 0;
+	virtual TLiveDataView<FLoopedSegmentArray2D> GetBoundaryStreamer() = 0;
 };

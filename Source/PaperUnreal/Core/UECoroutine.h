@@ -680,14 +680,16 @@ public:
 		return History;
 	}
 
-	FOnValueReceived& GetOnValueReceived() const
+	template <typename FuncType>
+	void OnValueReceived(UObject* Object, FuncType&& Func) const
 	{
-		return OnValueReceived;
+		OnValueReceivedDelegate.AddWeakLambda(Object, Forward<FuncType>(Func));
 	}
-
-	FSimpleMulticastDelegate& GetOnStreamEnd() const
+	
+	template <typename FuncType>
+	void OnStreamEnd(UObject* Object, FuncType&& Func) const
 	{
-		return OnStreamEnd;
+		OnStreamEndDelegate.AddWeakLambda(Object, Forward<FuncType>(Func));
 	}
 
 	void ReceiveValue(const T& NewValue)
@@ -695,7 +697,7 @@ public:
 		if (AllValid(NewValue))
 		{
 			History.Add(NewValue);
-			OnValueReceived.Broadcast(NewValue);
+			OnValueReceivedDelegate.Broadcast(NewValue);
 
 			for (int32 i = Receivers.Num() - 1; i >= 0; --i)
 			{
@@ -759,14 +761,14 @@ public:
 			}
 		}
 
-		OnStreamEnd.Broadcast();
+		OnStreamEndDelegate.Broadcast();
 	}
 
 private:
 	TArray<T> History;
 	mutable TArray<TWeakPtr<TValueStreamValueReceiver<T>>> Receivers;
-	mutable FOnValueReceived OnValueReceived;
-	mutable FSimpleMulticastDelegate OnStreamEnd;
+	mutable FOnValueReceived OnValueReceivedDelegate;
+	mutable FSimpleMulticastDelegate OnStreamEndDelegate;
 };
 
 
