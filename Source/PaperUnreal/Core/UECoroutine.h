@@ -93,19 +93,6 @@ struct FWeakCoroutine
 			AddToWeakList(Interface.GetObject());
 		}
 
-		void AddToWeakList(UActorComponent* Object)
-		{
-			WeakList.Add([Weak = TWeakObjectPtr<UActorComponent>{Object}]()
-			{
-				if (!Weak.IsValid())
-				{
-					return false;
-				}
-
-				return Weak->bWantsInitializeComponent ? Weak->HasBeenInitialized() : true;
-			});
-		}
-
 		template <typename T>
 		void AddToWeakList(const TSharedPtr<T>& Object)
 		{
@@ -122,6 +109,15 @@ struct FWeakCoroutine
 		void AddToWeakList(const TWeakPtr<T>& Object)
 		{
 			WeakList.Add([Weak = Object]() { return Weak.IsValid(); });
+		}
+
+		void AbortIfNotInitialized(UActorComponent* ActorComponent)
+		{
+			check(ActorComponent->bWantsInitializeComponent);
+			WeakList.Add([Weak = TWeakObjectPtr<UActorComponent>{ActorComponent}]()
+			{
+				return Weak.IsValid() && Weak->HasBeenInitialized();
+			});
 		}
 
 		FWeakCoroutine get_return_object()
@@ -193,6 +189,11 @@ public:
 	{
 		Handle.promise().AddToWeakList(Weak);
 		return Forward<T>(Weak);
+	}
+
+	void AbortIfNotInitialized(UActorComponent* ActorComponent)
+	{
+		Handle.promise().AbortIfNotInitialized(ActorComponent);
 	}
 
 	// TODO 필요해지면 구현
@@ -687,10 +688,10 @@ public:
 		{
 			Func(Each);
 		}
-		
+
 		OnValueReceivedDelegate.AddWeakLambda(Object, Forward<FuncType>(Func));
 	}
-	
+
 	template <typename FuncType>
 	void OnStreamEnd(UObject* Object, FuncType&& Func) const
 	{
@@ -699,24 +700,29 @@ public:
 
 	void ReceiveValue(const T& NewValue)
 	{
-		if (AllValid(NewValue))
+		if constexpr (std::is_pointer_v<T>)
 		{
-			History.Add(NewValue);
-			OnValueReceivedDelegate.Broadcast(NewValue);
-
-			for (int32 i = Receivers.Num() - 1; i >= 0; --i)
+			if (!AllValid(NewValue))
 			{
-				if (!Receivers[i].IsValid())
-				{
-					Receivers.RemoveAt(i);
-				}
+				return;
 			}
+		}
 
-			auto ReceiversCopy = Receivers;
-			for (auto& Each : ReceiversCopy)
+		History.Add(NewValue);
+		OnValueReceivedDelegate.Broadcast(NewValue);
+
+		for (int32 i = Receivers.Num() - 1; i >= 0; --i)
+		{
+			if (!Receivers[i].IsValid())
 			{
-				Each.Pin()->ReceiveValue(NewValue);
+				Receivers.RemoveAt(i);
 			}
+		}
+
+		auto ReceiversCopy = Receivers;
+		for (auto& Each : ReceiversCopy)
+		{
+			Each.Pin()->ReceiveValue(NewValue);
 		}
 	}
 

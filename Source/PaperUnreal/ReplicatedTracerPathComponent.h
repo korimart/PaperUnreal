@@ -63,7 +63,6 @@ private:
 		{
 			// TODO find by tag
 			Replicator = GetOwner()->FindComponentByClass<UByteStreamComponent>();
-			check(IsValid(Replicator))
 			Replicator->SetChunkSize(FTracerPathPoint::ChunkSize);
 			ClientInitiatePathRelay();
 		}
@@ -85,34 +84,35 @@ private:
 	{
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
-			Context.AddToWeakList(ServerTracerPath);
+			Context.AbortIfNotInitialized(ServerTracerPath);
+			auto F = FinallyIfValid(this, [this]() { DestroyComponent(); });
 
-			Replicator->OpenStream();
-			auto PathEvents = ServerTracerPath->GetTracerPathStreamer().CreateStream();
-			while (co_await PathEvents.NextIfNotEnd())
+			while (true)
 			{
-				Replicator->TriggerEvent(PathEvents.Pop().Serialize());
+				Replicator->OpenStream();
+				auto PathEvents = ServerTracerPath->GetTracerPathStreamer().CreateStream();
+				while (co_await PathEvents.NextIfNotEnd())
+				{
+					Replicator->TriggerEvent(PathEvents.Pop().Serialize());
+				}
+				Replicator->CloseStream();
 			}
-			Replicator->CloseStream();
-
-			ServerInitiatePathRelay();
 		});
 	}
 
 	void ClientInitiatePathRelay()
 	{
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			Context.AddToWeakList(Replicator);
-
-			auto ByteEvents = Replicator->GetByteStreamer().CreateStream();
-			while (co_await ByteEvents.NextIfNotEnd())
+			while (true)
 			{
-				TracerPathStreamer.ReceiveValue(ByteEvents.Pop().Deserialize<FTracerPathEvent>());
+				auto ByteEvents = Replicator->GetByteStreamer().CreateStream();
+				while (co_await ByteEvents.NextIfNotEnd())
+				{
+					TracerPathStreamer.ReceiveValue(ByteEvents.Pop().Deserialize<FTracerPathEvent>());
+				}
+				TracerPathStreamer.EndStreams();
 			}
-			TracerPathStreamer.EndStreams();
-			
-			ClientInitiatePathRelay();
 		});
 	}
 };

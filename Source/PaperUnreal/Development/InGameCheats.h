@@ -48,11 +48,6 @@ private:
 			{
 				Tracer->DestroyComponent();
 			}
-			
-			if (UReplicatedTracerPathComponent* Tracer = It->FindComponentByClass<UReplicatedTracerPathComponent>())
-			{
-				Tracer->DestroyComponent();
-			}
 		}
 	}
 };

@@ -53,6 +53,16 @@ private:
 		ListenToTracerPathStream();
 	}
 
+	virtual void UninitializeComponent() override
+	{
+		Super::UninitializeComponent();
+
+		if (AllValid(MeshDestination))
+		{
+			MeshDestination->Edit([&]() { MeshDestination->Reset(); });
+		}
+	}
+
 	static std::tuple<FVector2D, FVector2D> CreateVertexPositions(const FVector2D& Center, const FVector2D& Forward)
 	{
 		const FVector2D Right{-Forward.Y, Forward.X};
@@ -86,14 +96,10 @@ private:
 	{
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
-			Context.AddToWeakList(CastChecked<UActorComponent>(MeshSource.GetObject()));
 			Context.AddToWeakList(MeshDestination);
 			Context.AddToWeakList(MeshAttachmentTarget);
-
-			auto F = FinallyIfValid(MeshDestination, [MeshDestination = MeshDestination]()
-			{
-				MeshDestination->Edit([&]() { MeshDestination->Reset(); });
-			});
+			Context.AbortIfNotInitialized(Cast<UActorComponent>(MeshSource.GetObject()));
+			auto F = FinallyIfValid(this, [this]() { DestroyComponent(); });
 
 			while (true)
 			{
@@ -110,7 +116,7 @@ private:
 					AppendVerticesFromTracerPath(FirstEvent.Affected);
 					AttachVerticesToAttachmentTarget(0);
 				});
-				
+
 				while (co_await PathStream.NextIfNotEnd())
 				{
 					const auto Event = PathStream.Pop();

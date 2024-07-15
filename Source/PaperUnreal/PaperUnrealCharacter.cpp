@@ -69,13 +69,10 @@ void APaperUnrealCharacter::PostInitializeComponents()
 	{
 		co_await LifeComponent->WaitForDeath();
 
-		// 현재 얘네만 파괴해주면 나머지 컴포넌트는 디펜던시가 사라짐에 따라
-		// 알아서 작동을 중지하기 때문에 사망 상태에 들어갈 때 일단 얘네만 파괴해준다
-		// (기능을 안 하는 컴포넌트들이 남아있다는 뜻임 하지만 곧 액터를 파괴할 것이므로 상관 없음)
+		// 현재 얘만 파괴해주면 나머지 컴포넌트는 디펜던시가 사라짐에 따라 알아서 사라짐
 		if (GetNetMode() != NM_Client)
 		{
 			FindAndDestroyComponent<UTracerPathComponent>(this);
-			FindAndDestroyComponent<UReplicatedTracerPathComponent>(this);
 		}
 		else
 		{

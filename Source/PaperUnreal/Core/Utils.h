@@ -16,16 +16,6 @@ namespace Utils_Private
 		return ::IsValid(Pointer);
 	}
 
-	inline bool IsValid(const UActorComponent* ActorComponent)
-	{
-		if (!::IsValid(ActorComponent))
-		{
-			return false;
-		}
-
-		return ActorComponent->bWantsInitializeComponent ? ActorComponent->HasBeenInitialized() : true;
-	}
-
 	template <typename T>
 	bool IsValid(const TScriptInterface<T>& Pointer)
 	{
@@ -43,12 +33,7 @@ namespace Utils_Private
 		return SmartPointer.IsValid();
 	}
 
-	bool IsValid(const auto& AnyObjectThatIsNotPointer)
-	{
-		return true;
-	}
-
-
+	
 	template <typename FuncType>
 	class TFinally
 	{
