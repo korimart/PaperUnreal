@@ -52,25 +52,14 @@ private:
 
 		check(AllValid(Tracer, ConversionDestination));
 
-		InitiateOnPathEndConversion();
-		
-		ConversionDestination->OnBoundaryChanged.AddWeakLambda(this, [this](auto&)
+		Tracer->GetTracerPathStreamer().GetOnStreamEnd().AddWeakLambda(this, [this]()
 		{
 			ConvertPathToArea();
 		});
-	}
 
-	void InitiateOnPathEndConversion()
-	{
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		ConversionDestination->OnBoundaryChanged.AddWeakLambda(this, [this](auto&)
 		{
-			auto Stream = Tracer->GetTracerPathStreamer().CreateStream();
-			while (co_await Stream.NextIfNotEnd())
-			{
-				Stream.Pop();
-			}
 			ConvertPathToArea();
-			InitiateOnPathEndConversion();
 		});
 	}
 

@@ -678,6 +678,11 @@ public:
 		return History;
 	}
 
+	FSimpleMulticastDelegate& GetOnStreamEnd() const
+	{
+		return OnStreamEnd;
+	}
+
 	void ReceiveValue(const T& NewValue)
 	{
 		if (AllValid(NewValue))
@@ -745,11 +750,14 @@ public:
 				Pinned->End();
 			}
 		}
+
+		OnStreamEnd.Broadcast();
 	}
 
 private:
 	TArray<T> History;
 	mutable TArray<TWeakPtr<TValueStreamValueReceiver<T>>> Receivers;
+	mutable FSimpleMulticastDelegate OnStreamEnd;
 };
 
 
