@@ -133,7 +133,10 @@ class UAreaSpawnerComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	DECLARE_STREAMER_AND_GETTER(AAreaActor*, SpawnedAreaStreamer);
+	const TValueStreamer<AAreaActor*>& GetSpawnedAreaStreamer() const
+	{
+		return SpawnedAreaStreamer;
+	}
 
 	AAreaActor* SpawnAreaAtRandomEmptyLocation()
 	{
@@ -162,6 +165,7 @@ private:
 	UPROPERTY(ReplicatedUsing=OnRep_SpawnedAreas)
 	TArray<AAreaActor*> RepSpawnedAreas;
 
+	TValueStreamer<AAreaActor*> SpawnedAreaStreamer;
 	FAreaSpawnLocationCalculator SpawnLocationCalculator;
 
 	UAreaSpawnerComponent()

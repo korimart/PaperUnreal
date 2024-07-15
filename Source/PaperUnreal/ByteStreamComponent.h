@@ -208,7 +208,10 @@ class UByteStreamComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	DECLARE_STREAMER_AND_GETTER(FByteStreamEvent, ByteStreamer);
+	const TValueStreamer<FByteStreamEvent>& GetByteStreamer() const
+	{
+		return ByteStreamer;
+	}
 
 	const TArray<uint8>& GetBytes() const
 	{
@@ -261,6 +264,8 @@ public:
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_Stream)
 	FRepByteStream RepStream;
+
+	TValueStreamer<FByteStreamEvent> ByteStreamer;
 
 	UByteStreamComponent()
 	{

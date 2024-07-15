@@ -140,18 +140,6 @@ private:
 
 
 // TLiveData Declarations
-#define DECLARE_LIVE_DATA_AND_GETTER(Type, Name)\
-	private: TLiveData<Type> Name;\
-	public:\
-	TLiveDataView<Type> Get##Name() { return Name; };
-
-
-#define DECLARE_LIVE_DATA_AND_GETTER_WITH_DEFAULT(Type, Name, Default)\
-	private: TLiveData<Type> Name{Default};\
-	public:\
-	TLiveDataView<Type> Get##Name() { return Name; };
-
-
 #define DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(Type, Name)\
 	private: TLiveData<Type> Name;\
 	public:\

@@ -885,8 +885,3 @@ TWeakAwaitable<T> FirstInStream(TValueStream<T>&& Stream, PredicateType&& Predic
 
 using FWeakAwaitableInt32 = TWeakAwaitable<int32>;
 using FWeakAwaitableHandleInt32 = TWeakAwaitableHandle<int32>;
-
-
-#define DECLARE_STREAMER_AND_GETTER(Type, Name)\
-	private: TValueStreamer<Type> Name;\
-	public: const TValueStreamer<Type>& Get##Name() const { return Name; }

@@ -15,7 +15,10 @@ class UReplicatedTracerPathComponent : public UActorComponent2, public ITracerPa
 	GENERATED_BODY()
 
 public:
-	DECLARE_STREAMER_AND_GETTER(FTracerPathEvent, TracerPathStreamer);
+	virtual const TValueStreamer<FTracerPathEvent>& GetTracerPathStreamer() const override
+	{
+		return TracerPathStreamer;
+	}
 
 	void SetTracerPathSource(UTracerPathComponent* Source)
 	{
@@ -29,6 +32,8 @@ private:
 
 	UPROPERTY()
 	UByteStreamComponent* Replicator;
+
+	TValueStreamer<FTracerPathEvent> TracerPathStreamer;
 
 	UReplicatedTracerPathComponent()
 	{

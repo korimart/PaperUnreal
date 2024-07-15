@@ -15,9 +15,15 @@ class UTracerPathComponent : public UActorComponent2, public ITracerPathStream
 	GENERATED_BODY()
 
 public:
-	DECLARE_STREAMER_AND_GETTER(FTracerPathEvent, TracerPathStreamer);
-	
-	const FSegmentArray2D& GetTracerPath() const { return Path; }
+	virtual const TValueStreamer<FTracerPathEvent>& GetTracerPathStreamer() const override
+	{
+		return TracerPathStreamer;
+	}
+
+	const FSegmentArray2D& GetTracerPath() const
+	{
+		return Path;
+	}
 
 	// TODO remove dependency
 	void SetNoPathArea(UAreaBoundaryComponent* Area)
@@ -31,6 +37,7 @@ private:
 
 	bool bGeneratedThisFrame = false;
 	FSegmentArray2D Path;
+	TValueStreamer<FTracerPathEvent> TracerPathStreamer;
 
 	UTracerPathComponent()
 	{
@@ -48,7 +55,7 @@ private:
 	virtual void UninitializeComponent() override
 	{
 		Super::UninitializeComponent();
-		
+
 		TracerPathStreamer.EndStreams();
 	}
 
