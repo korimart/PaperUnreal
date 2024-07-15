@@ -94,8 +94,12 @@ private:
 	void AttachVerticesToAttachmentTarget(int32 Index) const
 	{
 		auto [Left, Right] = MeshDestination->GetVertices(Index);
-		Left = MeshAttachmentTarget->FindClosestPointOnBoundary2D(Left).GetPoint();
-		Right = MeshAttachmentTarget->FindClosestPointOnBoundary2D(Right).GetPoint();
+		// TODO Area에 메시가 생길 때까지 기다려야 함
+		if (MeshAttachmentTarget->IsValid())
+		{
+			Left = MeshAttachmentTarget->FindClosestPointOnBoundary2D(Left).GetPoint();
+			Right = MeshAttachmentTarget->FindClosestPointOnBoundary2D(Right).GetPoint();
+		}
 		MeshDestination->SetVertices(Index, Left, Right);
 	}
 

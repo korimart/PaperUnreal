@@ -65,18 +65,11 @@ private:
 
 		const bool bGeneratedLastFrame = bGeneratedThisFrame;
 		const bool bWillGenerateThisFrame = !NoPathArea->IsInside(GetOwner()->GetActorLocation());
-
-		bGeneratedThisFrame = false;
-
-		if (!bGeneratedLastFrame && bWillGenerateThisFrame)
-		{
-			Path.Empty();
-		}
-
+		bGeneratedThisFrame = bWillGenerateThisFrame;
+		
 		if (bWillGenerateThisFrame)
 		{
 			Generate();
-			bGeneratedThisFrame = true;
 		}
 
 		if (bGeneratedLastFrame && !bGeneratedThisFrame)
@@ -84,6 +77,7 @@ private:
 			Path.SetPoint(-1, NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint());
 			TracerPathStreamer.ReceiveValue(CreateEvent(EStreamEvent::LastModified));
 			TracerPathStreamer.EndStreams();
+			Path.Empty();
 		}
 	}
 

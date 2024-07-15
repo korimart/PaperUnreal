@@ -110,6 +110,12 @@ struct FWeakCoroutine
 		{
 			WeakList.Add([Weak = Object]() { return Weak.IsValid(); });
 		}
+		
+		template <typename T>
+		void AbortIfInvalid(const TWeakObjectPtr<T>& Object)
+		{
+			WeakList.Add([Weak = Object]() { return Weak.IsValid(); });
+		}
 
 		FWeakCoroutine get_return_object()
 		{

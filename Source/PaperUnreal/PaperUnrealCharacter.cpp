@@ -159,27 +159,36 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		AreaConverter->SetConversionDestination(HomeAreaBoundary);
 		AreaConverter->RegisterComponent();
 
-		AreaSpawner->GetSpawnedAreaStreamer().Observe(this,
-			[this, AS_WEAK(MyHomeArea), AS_WEAK(AreaConverter)](AAreaActor* Area)
+		AreaSpawner->GetSpawnedAreaStreamer().Observe(this, [this, AS_WEAK(MyHomeArea), AS_WEAK(AreaConverter)](AAreaActor* NewArea)
+		{
+			if (AllValid(MyHomeArea, AreaConverter) && NewArea != MyHomeArea)
 			{
-				if (AllValid(MyHomeArea, AreaConverter) && Area != MyHomeArea)
+				RunWeakCoroutine(this, [this, NewArea, AreaConverter](FWeakCoroutineContext& Context) -> FWeakCoroutine
 				{
+					Context.AbortIfInvalid(AreaConverter);
+					
+					auto NewBoundary = co_await WaitForComponent<UAreaBoundaryComponent>(NewArea);
 					auto AreaSlasher = NewObject<UAreaSlasherComponent>(this);
-					AreaSlasher->SetSlashTarget(Area->FindComponentByClass<UAreaBoundaryComponent>());
+					AreaSlasher->SetSlashTarget(NewBoundary);
 					AreaSlasher->SetTracerToAreaConverter(AreaConverter.Get());
 					AreaSlasher->RegisterComponent();
-				}
-			});
+				});
+			}
+		});
 
-		PlayerSpawner->GetSpawnedPlayerStreamer().Observe(this,
-			[this, AS_WEAK(TracerOverlapChecker)](AActor* Player)
+		PlayerSpawner->GetSpawnedPlayerStreamer().Observe(this, [this, AS_WEAK(TracerOverlapChecker)](AActor* NewPlayer)
+		{
+			if (AllValid(TracerOverlapChecker))
 			{
-				if (AllValid(TracerOverlapChecker))
+				RunWeakCoroutine(this, [this, NewPlayer, TracerOverlapChecker](FWeakCoroutineContext& Context) -> FWeakCoroutine
 				{
-					auto NewTracer = Player->FindComponentByClass<UTracerPathComponent>();
+					Context.AbortIfInvalid(TracerOverlapChecker);
+					
+					auto NewTracer = co_await WaitForComponent<UTracerPathComponent>(NewPlayer);
 					TracerOverlapChecker->AddOverlapTarget(NewTracer);
-				}
-			});
+				});
+			}
+		});
 	});
 }
 

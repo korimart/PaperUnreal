@@ -40,11 +40,13 @@ private:
 	UPROPERTY()
 	TSet<UTracerPathComponent*> OverlapTargets;
 
-	TOptional<FVector2D> PrevInstigatorHeadEnd;
+	TOptional<FVector2D> LastCheckPoint;
+	FSegment2D MovementThisTick;
 
 	UTracerOverlapCheckerComponent()
 	{
 		bWantsInitializeComponent = true;
+		PrimaryComponentTick.bCanEverTick = true;
 	}
 
 	virtual void InitializeComponent() override
@@ -52,63 +54,48 @@ private:
 		Super::InitializeComponent();
 
 		AddLifeDependency(OverlapInstigator);
-
-		OverlapInstigator->GetTracerPathStreamer().Observe(this, [this](auto&)
-		{
-			OnInstigatorHeadMaybeSelfOverlapping();
-			OnInstigatorHeadMaybeOverlapping();
-
-			PrevInstigatorHeadEnd = OverlapInstigator->GetTracerPath().IsValid()
-				? OverlapInstigator->GetTracerPath().GetPoint(-1)
-				: TOptional<FVector2D>{};
-		});
 	}
 
-	void OnInstigatorHeadMaybeSelfOverlapping()
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override
 	{
-		const int32 SegmentCount = OverlapInstigator->GetTracerPath().SegmentCount();
-		if (SegmentCount < 2 || !PrevInstigatorHeadEnd)
+		Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+		const FVector2D ThisCheckPoint = FVector2D{GetOwner()->GetActorLocation()};
+		
+		if (!LastCheckPoint)
 		{
+			LastCheckPoint = ThisCheckPoint;
 			return;
 		}
-
-		const FSegment2D InstigatorHead = OverlapInstigator->GetTracerPath().GetLastSegment();
-
-		const FSegment2D InstigatorHeadShort
+		
+		MovementThisTick = FSegment2D{*LastCheckPoint, ThisCheckPoint};
+		
+		if (MovementThisTick.Length() > UE_KINDA_SMALL_NUMBER)
 		{
-			*PrevInstigatorHeadEnd + InstigatorHead.Direction * UE_KINDA_SMALL_NUMBER,
-			InstigatorHead.EndPoint()
-		};
+			OnMaybeOverlappingSelf();
+			OnMaybeOverlappingTarget();
+			LastCheckPoint = ThisCheckPoint;
+		}
+	}
 
-		if (OverlapInstigator->GetTracerPath()
-		                     .SubArray(0, SegmentCount - 2)
-		                     .FindIntersection(InstigatorHeadShort))
+	void OnMaybeOverlappingSelf()
+	{
+		const int32 SegmentCount = OverlapInstigator->GetTracerPath().SegmentCount();
+
+		if (SegmentCount >= 3
+			&& OverlapInstigator->GetTracerPath()
+			                    .SubArray(0, SegmentCount - 3)
+			                    .FindIntersection(MovementThisTick))
 		{
 			OnTracerBumpedInto.Broadcast(OverlapInstigator);
 		}
 	}
 
-	void OnInstigatorHeadMaybeOverlapping()
+	void OnMaybeOverlappingTarget()
 	{
-		if (!OverlapInstigator->GetTracerPath().IsValid() || !PrevInstigatorHeadEnd)
-		{
-			return;
-		}
-
-		const FSegment2D InstigatorHead = OverlapInstigator->GetTracerPath().GetLastSegment();
-
-		const FSegment2D PrevInstigatorHead = [&]()
-		{
-			auto Ret = InstigatorHead;
-			Ret.SetEndPoint(*PrevInstigatorHeadEnd);
-			return Ret;
-		}();
-
 		for (UTracerPathComponent* Each : OverlapTargets)
 		{
-			if (IsValid(Each)
-				&& Each->GetTracerPath().FindIntersection(InstigatorHead)
-				&& !Each->GetTracerPath().FindIntersection(PrevInstigatorHead))
+			if (IsValid(Each) && Each->GetTracerPath().FindIntersection(MovementThisTick))
 			{
 				OnTracerBumpedInto.Broadcast(Each);
 			}
