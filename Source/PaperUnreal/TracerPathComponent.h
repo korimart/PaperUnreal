@@ -17,8 +17,7 @@ class UTracerPathComponent : public UActorComponent2, public ITracerPathStream
 public:
 	DECLARE_STREAMER_AND_GETTER(FTracerPathEvent, TracerPathStreamer);
 	
-	// TODO maybe remove?
-	const FSegmentArray2D& GetPath() const { return Path; }
+	const FSegmentArray2D& GetTracerPath() const { return Path; }
 
 	// TODO remove dependency
 	void SetNoPathArea(UAreaBoundaryComponent* Area)

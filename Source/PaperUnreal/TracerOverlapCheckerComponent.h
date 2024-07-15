@@ -56,8 +56,8 @@ private:
 				OnInstigatorHeadMaybeSelfOverlapping();
 				OnInstigatorHeadMaybeOverlapping();
 
-				PrevInstigatorHeadEnd = OverlapInstigator->GetPath().IsValid()
-					? OverlapInstigator->GetPath().GetPoint(-1)
+				PrevInstigatorHeadEnd = OverlapInstigator->GetTracerPath().IsValid()
+					? OverlapInstigator->GetTracerPath().GetPoint(-1)
 					: TOptional<FVector2D>{};
 			}
 		});
@@ -65,13 +65,13 @@ private:
 
 	void OnInstigatorHeadMaybeSelfOverlapping()
 	{
-		const int32 SegmentCount = OverlapInstigator->GetPath().SegmentCount();
+		const int32 SegmentCount = OverlapInstigator->GetTracerPath().SegmentCount();
 		if (SegmentCount < 2 || !PrevInstigatorHeadEnd)
 		{
 			return;
 		}
 
-		const FSegment2D InstigatorHead = OverlapInstigator->GetPath().GetLastSegment();
+		const FSegment2D InstigatorHead = OverlapInstigator->GetTracerPath().GetLastSegment();
 
 		const FSegment2D InstigatorHeadShort
 		{
@@ -79,7 +79,7 @@ private:
 			InstigatorHead.EndPoint()
 		};
 
-		if (OverlapInstigator->GetPath()
+		if (OverlapInstigator->GetTracerPath()
 		                     .SubArray(0, SegmentCount - 2)
 		                     .FindIntersection(InstigatorHeadShort))
 		{
@@ -89,12 +89,12 @@ private:
 
 	void OnInstigatorHeadMaybeOverlapping()
 	{
-		if (!OverlapInstigator->GetPath().IsValid() || !PrevInstigatorHeadEnd)
+		if (!OverlapInstigator->GetTracerPath().IsValid() || !PrevInstigatorHeadEnd)
 		{
 			return;
 		}
 
-		const FSegment2D InstigatorHead = OverlapInstigator->GetPath().GetLastSegment();
+		const FSegment2D InstigatorHead = OverlapInstigator->GetTracerPath().GetLastSegment();
 
 		const FSegment2D PrevInstigatorHead = [&]()
 		{
@@ -105,8 +105,8 @@ private:
 
 		for (UTracerPathComponent* Each : OverlapTargets)
 		{
-			if (Each->GetPath().FindIntersection(InstigatorHead)
-				&& !Each->GetPath().FindIntersection(PrevInstigatorHead))
+			if (Each->GetTracerPath().FindIntersection(InstigatorHead)
+				&& !Each->GetTracerPath().FindIntersection(PrevInstigatorHead))
 			{
 				OnTracerBumpedInto.Broadcast(Each);
 			}

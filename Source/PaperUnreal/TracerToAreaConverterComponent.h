@@ -73,7 +73,7 @@ private:
 		}
 
 		bImConversionInstigator = true;
-		for (const FExpansionResult& Each : ConversionDestination->ExpandByPath(Tracer->GetPath()))
+		for (const FExpansionResult& Each : ConversionDestination->ExpandByPath(Tracer->GetTracerPath()))
 		{
 			OnTracerToAreaConversion.Broadcast(Each.CorrectlyAlignedPath);
 		}
