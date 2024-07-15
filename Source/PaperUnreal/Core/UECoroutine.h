@@ -681,8 +681,13 @@ public:
 	}
 
 	template <typename FuncType>
-	void OnValueReceived(UObject* Object, FuncType&& Func) const
+	void Observe(UObject* Object, FuncType&& Func) const
 	{
+		for (const T& Each : History)
+		{
+			Func(Each);
+		}
+		
 		OnValueReceivedDelegate.AddWeakLambda(Object, Forward<FuncType>(Func));
 	}
 	

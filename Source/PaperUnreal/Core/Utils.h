@@ -183,6 +183,9 @@ TWeakAwaitable<SoftObjectType*> RequestAsyncLoad(const TSoftObjectPtr<SoftObject
 }
 
 
+#define AS_WEAK(name) name = ToWeak(name)
+
+
 #define DEFINE_REPPED_VAR_SETTER(VarName, NewValue)\
 	check(GetNetMode() != NM_Client);\
 	Rep##VarName = NewValue;\

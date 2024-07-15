@@ -14,7 +14,7 @@ class APaperUnrealCharacter : public ACharacter2
 public:
 	UPROPERTY()
 	class ULifeComponent* LifeComponent;
-	
+
 	APaperUnrealCharacter();
 
 	/** Returns TopDownCameraComponent subobject **/
@@ -30,7 +30,7 @@ private:
 	/** Camera boom positioning the camera above the character */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	class USpringArmComponent* CameraBoom;
-	
+
 	virtual void PostInitializeComponents() override;
 	virtual void AttachServerMachineComponents() override;
 	virtual void AttachPlayerMachineComponents() override;

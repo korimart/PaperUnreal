@@ -47,7 +47,7 @@ private:
 
 		check(AllValid(OverlapInstigator));
 
-		OverlapInstigator->GetTracerPathStreamer().OnValueReceived(this, [this](auto&)
+		OverlapInstigator->GetTracerPathStreamer().Observe(this, [this](auto&)
 		{
 			OnInstigatorHeadMaybeSelfOverlapping();
 			OnInstigatorHeadMaybeOverlapping();
