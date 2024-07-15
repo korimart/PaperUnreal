@@ -101,7 +101,7 @@ struct FWeakCoroutine
 				{
 					return false;
 				}
-				
+
 				return Weak->bWantsInitializeComponent ? Weak->HasBeenInitialized() : true;
 			});
 		}
@@ -653,6 +653,8 @@ template <typename T>
 class TValueStreamer
 {
 public:
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnValueReceived, const T&);
+
 	TValueStreamer() = default;
 	TValueStreamer(const TValueStreamer&) = delete;
 	TValueStreamer& operator=(const TValueStreamer&) = delete;
@@ -678,6 +680,11 @@ public:
 		return History;
 	}
 
+	FOnValueReceived& GetOnValueReceived() const
+	{
+		return OnValueReceived;
+	}
+
 	FSimpleMulticastDelegate& GetOnStreamEnd() const
 	{
 		return OnStreamEnd;
@@ -688,7 +695,8 @@ public:
 		if (AllValid(NewValue))
 		{
 			History.Add(NewValue);
-			
+			OnValueReceived.Broadcast(NewValue);
+
 			for (int32 i = Receivers.Num() - 1; i >= 0; --i)
 			{
 				if (!Receivers[i].IsValid())
@@ -757,6 +765,7 @@ public:
 private:
 	TArray<T> History;
 	mutable TArray<TWeakPtr<TValueStreamValueReceiver<T>>> Receivers;
+	mutable FOnValueReceived OnValueReceived;
 	mutable FSimpleMulticastDelegate OnStreamEnd;
 };
 

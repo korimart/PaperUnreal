@@ -47,19 +47,14 @@ private:
 
 		check(AllValid(OverlapInstigator));
 
-		RunWeakCoroutine(this, [this](auto&) -> FWeakCoroutine
+		OverlapInstigator->GetTracerPathStreamer().GetOnValueReceived().AddWeakLambda(this, [this](auto&)
 		{
-			for (auto PathStream = OverlapInstigator->GetTracerPathStreamer().CreateStream();;)
-			{
-				co_await PathStream.Next();
+			OnInstigatorHeadMaybeSelfOverlapping();
+			OnInstigatorHeadMaybeOverlapping();
 
-				OnInstigatorHeadMaybeSelfOverlapping();
-				OnInstigatorHeadMaybeOverlapping();
-
-				PrevInstigatorHeadEnd = OverlapInstigator->GetTracerPath().IsValid()
-					? OverlapInstigator->GetTracerPath().GetPoint(-1)
-					: TOptional<FVector2D>{};
-			}
+			PrevInstigatorHeadEnd = OverlapInstigator->GetTracerPath().IsValid()
+				? OverlapInstigator->GetTracerPath().GetPoint(-1)
+				: TOptional<FVector2D>{};
 		});
 	}
 
