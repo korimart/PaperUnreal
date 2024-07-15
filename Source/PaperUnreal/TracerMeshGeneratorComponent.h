@@ -18,16 +18,19 @@ class UTracerMeshGeneratorComponent : public UActorComponent2
 public:
 	void SetMeshSource(ITracerPathStream* Source)
 	{
+		check(!HasBeenInitialized());
 		MeshSource = Cast<UObject>(Source);
 	}
 
 	void SetMeshDestination(UTracerMeshComponent* Destination)
 	{
+		check(!HasBeenInitialized());
 		MeshDestination = Destination;
 	}
 
 	void SetMeshAttachmentTarget(UAreaMeshComponent* Target)
 	{
+		check(!HasBeenInitialized());
 		MeshAttachmentTarget = Target;
 	}
 
@@ -50,6 +53,10 @@ private:
 	{
 		Super::InitializeComponent();
 
+		AddLifeDependency(CastChecked<UActorComponent2>(MeshSource.GetObject()));
+		AddLifeDependency(MeshDestination);
+		AddLifeDependency(MeshAttachmentTarget);
+		
 		ListenToTracerPathStream();
 	}
 
@@ -94,13 +101,8 @@ private:
 
 	void ListenToTracerPathStream()
 	{
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			Context.AbortIfInvalid(MeshDestination);
-			Context.AbortIfInvalid(MeshAttachmentTarget);
-			Context.AbortIfNotInitialized(Cast<UActorComponent>(MeshSource.GetObject()));
-			auto F = FinallyIfValid(this, [this]() { DestroyComponent(); });
-
 			while (true)
 			{
 				auto PathStream = MeshSource->GetTracerPathStreamer().CreateStream();

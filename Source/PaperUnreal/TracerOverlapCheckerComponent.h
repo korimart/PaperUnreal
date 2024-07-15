@@ -19,6 +19,7 @@ public:
 
 	void SetTracer(UTracerPathComponent* Tracer)
 	{
+		check(!HasBeenInitialized());
 		OverlapInstigator = Tracer;
 	}
 
@@ -45,7 +46,7 @@ private:
 	{
 		Super::InitializeComponent();
 
-		check(AllValid(OverlapInstigator));
+		AddLifeDependency(OverlapInstigator);
 
 		OverlapInstigator->GetTracerPathStreamer().Observe(this, [this](auto&)
 		{

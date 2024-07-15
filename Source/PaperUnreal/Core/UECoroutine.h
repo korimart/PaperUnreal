@@ -111,15 +111,6 @@ struct FWeakCoroutine
 			WeakList.Add([Weak = Object]() { return Weak.IsValid(); });
 		}
 
-		void AbortIfNotInitialized(UActorComponent* ActorComponent)
-		{
-			check(ActorComponent->bWantsInitializeComponent);
-			WeakList.Add([Weak = TWeakObjectPtr<UActorComponent>{ActorComponent}]()
-			{
-				return Weak.IsValid() && Weak->HasBeenInitialized();
-			});
-		}
-
 		FWeakCoroutine get_return_object()
 		{
 			return std::coroutine_handle<promise_type>::from_promise(*this);
@@ -189,11 +180,6 @@ public:
 	{
 		Handle.promise().AbortIfInvalid(Weak);
 		return Forward<T>(Weak);
-	}
-
-	void AbortIfNotInitialized(UActorComponent* ActorComponent)
-	{
-		Handle.promise().AbortIfNotInitialized(ActorComponent);
 	}
 
 	// TODO 필요해지면 구현

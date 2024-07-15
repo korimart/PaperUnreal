@@ -13,5 +13,10 @@ class UActorComponent2 : public UActorComponent
 	GENERATED_BODY()
 
 public:
+	FSimpleMulticastDelegate OnEndPlay;
+	
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	void AddLifeDependency(UActorComponent2* Dependency);
 };

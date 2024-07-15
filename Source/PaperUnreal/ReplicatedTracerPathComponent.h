@@ -23,6 +23,7 @@ public:
 	void SetTracerPathSource(UTracerPathComponent* Source)
 	{
 		check(GetNetMode() != NM_Client);
+		check(!HasBeenInitialized());
 		ServerTracerPath = Source;
 	}
 
@@ -47,10 +48,12 @@ private:
 
 		if (GetNetMode() != NM_Client)
 		{
-			check(AllValid(ServerTracerPath));
+			AddLifeDependency(ServerTracerPath);
+			
 			Replicator = NewObject<UByteStreamComponent>(this);
 			Replicator->SetChunkSize(FTracerPathPoint::ChunkSize);
 			Replicator->RegisterComponent();
+			
 			ServerInitiatePathRelay();
 		}
 	}
@@ -82,11 +85,8 @@ private:
 
 	void ServerInitiatePathRelay()
 	{
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			Context.AbortIfNotInitialized(ServerTracerPath);
-			auto F = FinallyIfValid(this, [this]() { DestroyComponent(); });
-
 			while (true)
 			{
 				Replicator->OpenStream();

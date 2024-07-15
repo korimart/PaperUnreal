@@ -19,11 +19,13 @@ public:
 
 	void SetTracer(UTracerPathComponent* InTracer)
 	{
+		check(!HasBeenInitialized())
 		Tracer = InTracer;
 	}
 
 	void SetConversionDestination(UAreaBoundaryComponent* Destination)
 	{
+		check(!HasBeenInitialized())
 		ConversionDestination = Destination;
 	}
 
@@ -50,7 +52,8 @@ private:
 	{
 		Super::InitializeComponent();
 
-		check(AllValid(Tracer, ConversionDestination));
+		AddLifeDependency(Tracer);
+		AddLifeDependency(ConversionDestination);
 
 		Tracer->GetTracerPathStreamer().OnStreamEnd(this, [this]()
 		{

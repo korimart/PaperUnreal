@@ -17,11 +17,13 @@ class UAreaSlasherComponent : public UActorComponent2
 public:
 	void SetSlashTarget(UAreaBoundaryComponent* Target)
 	{
+		check(!HasBeenInitialized())
 		SlashTarget = Target;
 	}
 
 	void SetTracerToAreaConverter(UTracerToAreaConverterComponent* Converter)
 	{
+		check(!HasBeenInitialized())
 		TracerToAreaConverter = Converter;
 	}
 
@@ -41,7 +43,8 @@ private:
 	{
 		Super::InitializeComponent();
 
-		check(AllValid(SlashTarget, TracerToAreaConverter));
+		AddLifeDependency(SlashTarget);
+		AddLifeDependency(TracerToAreaConverter);
 
 		TracerToAreaConverter->OnTracerToAreaConversion.AddWeakLambda(
 			this, [this](FSegmentArray2D CorrectlyAlignedPath)
