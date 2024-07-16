@@ -50,4 +50,10 @@ private:
 			}
 		}
 	}
+	
+	UFUNCTION(Exec)
+	void SetReady(bool bReady)
+	{
+		GetPlayerController()->PlayerState->FindComponentByClass<UReadyStateComponent>()->ServerSetReady(bReady);
+	}
 };

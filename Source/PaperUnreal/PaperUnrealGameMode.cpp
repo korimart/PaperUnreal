@@ -37,6 +37,18 @@ APaperUnrealGameMode::APaperUnrealGameMode()
 void APaperUnrealGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+
+	RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+	{
+		// TODO 자유 행동 game mode 설정
+		
+		// TODO 방설정 완료될 때까지 대기
+		
+		co_await GetGameState<APaperUnrealGameState>()->ReadyStateTrackerComponent->WaitForCountGE(2);
+
+		// TODO 실제 game mode 설정
+		UE_LOG(LogTemp, Warning, TEXT("Game Started"));
+	});
 }
 
 void APaperUnrealGameMode::OnPostLogin(AController* NewPlayer)

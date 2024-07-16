@@ -6,6 +6,7 @@
 #include "Core/ActorComponent2.h"
 #include "Core/LiveData.h"
 #include "Core/Utils.h"
+#include "Net/UnrealNetwork.h"
 #include "ReadyStateComponent.generated.h"
 
 
@@ -35,5 +36,16 @@ private:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+		DOREPLIFETIME(ThisClass, RepbReady);
+	}
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override
+	{
+		Super::EndPlay(EndPlayReason);
+
+		if (GetNetMode() != NM_Client)
+		{
+			SetbReady(false);
+		}
 	}
 };
