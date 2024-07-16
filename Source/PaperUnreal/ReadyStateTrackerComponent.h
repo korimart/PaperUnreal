@@ -17,10 +17,10 @@ class UReadyStateTrackerComponent : public UActorComponent2
 
 public:
 	TLiveDataView<int32> GetReadyCount() { return ReadyCount; }
-	
-	TWeakAwaitable<int32> WaitForCountGE(int32 GE)
+
+	TWeakAwaitable<int32> WaitUntilCountIsAtLeast(int32 Least)
 	{
-		return FirstInStream(GetReadyCount().CreateStream(), [GE](int32 Count){ return Count >= GE; });
+		return GetReadyCount().WaitForValue([Least](int32 Count) { return Count >= Least; });
 	}
 
 private:
@@ -28,7 +28,7 @@ private:
 
 	UPROPERTY()
 	TSet<APlayerState*> ReadyPlayerStates;
-	
+
 	UReadyStateTrackerComponent()
 	{
 		bWantsInitializeComponent = true;
@@ -55,7 +55,7 @@ private:
 					{
 						ReadyPlayerStates.Remove(NewPlayerState);
 					}
-					
+
 					ReadyCount.SetValue(ReadyPlayerStates.Num());
 				});
 			}

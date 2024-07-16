@@ -2,6 +2,7 @@
 
 #include "PaperUnrealGameMode.h"
 
+#include "BattleGameModeComponent.h"
 #include "PaperUnrealCharacter.h"
 #include "PaperUnrealPlayerController.h"
 #include "PaperUnrealGameState.h"
@@ -44,51 +45,17 @@ void APaperUnrealGameMode::BeginPlay()
 		
 		// TODO 방설정 완료될 때까지 대기
 		
-		co_await GetGameState<APaperUnrealGameState>()->ReadyStateTrackerComponent->WaitForCountGE(2);
+		co_await GetGameState<APaperUnrealGameState>()->ReadyStateTrackerComponent->WaitUntilCountIsAtLeast(2);
 
 		// TODO 실제 game mode 설정
-		UE_LOG(LogTemp, Warning, TEXT("Game Started"));
+		auto BattleMode = NewObject<UBattleGameModeComponent>(this);
+		BattleMode->SetPawnClass(DefaultPawnClass);
+		BattleMode->RegisterComponent();
+		
+		const FBattleModeGameResult GameResult = co_await BattleMode->Start(2, 2);
+
+		// TODO replicate game result
+
+		// TODO repeat
 	});
-}
-
-void APaperUnrealGameMode::OnPostLogin(AController* NewPlayer)
-{
-	Super::OnPostLogin(NewPlayer);
-
-	const TSoftObjectPtr<UMaterialInstance> SoftSolidBlue{FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Blue.MI_Solid_Blue'")}};
-	const TSoftObjectPtr<UMaterialInstance> SoftSolidBlueLight{FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Blue_Light.MI_Solid_Blue_Light'")}};
-	const TSoftObjectPtr<UMaterialInstance> SoftSolidRed{FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Red.MI_Solid_Red'")}};
-	const TSoftObjectPtr<UMaterialInstance> SoftSolidRedLight{FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Red_Light.MI_Solid_Red_Light'")}};
-	const int32 ThisPlayerTeamIndex = NextTeamIndex++;
-
-	NewPlayer->GetPlayerState<APaperUnrealPlayerState>()->TeamComponent->SetTeamIndex(ThisPlayerTeamIndex);
-
-	AAreaActor* ThisPlayerArea =
-		ValidOrNull(GetGameState<APaperUnrealGameState>()
-		            ->AreaSpawnerComponent->GetSpawnedAreaStreamer().GetHistory().FindByPredicate([&](AAreaActor* Each)
-		            {
-			            return *Each->TeamComponent->GetTeamIndex().GetValue() == ThisPlayerTeamIndex;
-		            }));
-
-	if (!ThisPlayerArea)
-	{
-		ThisPlayerArea = GetGameState<APaperUnrealGameState>()->AreaSpawnerComponent->SpawnAreaAtRandomEmptyLocation();
-		ThisPlayerArea->TeamComponent->SetTeamIndex(ThisPlayerTeamIndex);
-		ThisPlayerArea->SetAreaMaterial(SoftSolidBlue);
-	}
-
-	// 월드가 꽉차서 새 영역을 선포할 수 없음
-	if (!ThisPlayerArea)
-	{
-		return;
-	}
-
-	NewPlayer->GetPlayerState<APaperUnrealPlayerState>()->InventoryComponent->SetHomeArea(ThisPlayerArea);
-	NewPlayer->GetPlayerState<APaperUnrealPlayerState>()->InventoryComponent->SetTracerMaterial(SoftSolidBlueLight);
-
-	AActor* Character = GetGameState<APaperUnrealGameState>()
-	                    ->PlayerSpawnerComponent
-	                    ->SpawnAtLocation(DefaultPawnClass, ThisPlayerArea->GetActorTransform().GetLocation());
-	
-	NewPlayer->Possess(CastChecked<APawn>(Character));
 }

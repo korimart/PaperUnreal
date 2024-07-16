@@ -34,7 +34,7 @@ public:
 		SetValue(Forward<T>(Other));
 		return *this;
 	}
-	
+
 	template <typename FuncType>
 	void Observe(UObject* Lifetime, FuncType&& Func)
 	{
@@ -136,7 +136,7 @@ public:
 	{
 		return *Value;
 	}
-	
+
 	operator const TOptional<ValueType>&() const requires !std::is_pointer_v<ValueType>
 	{
 		return GetValue();
@@ -161,6 +161,20 @@ protected:
 };
 
 
+template <typename PredicateType, typename ValueType>
+concept CPredicate = requires(PredicateType Predicate, ValueType Value)
+{
+	{ Predicate(Value) } -> std::same_as<bool>;
+};
+
+
+template <typename T, typename U>
+concept CEqualityComparable = requires(T Arg0, U Arg1)
+{
+	Arg0 == Arg1;
+};
+
+
 template <typename ValueType>
 class TLiveDataView
 {
@@ -171,8 +185,25 @@ public:
 	}
 
 	TWeakAwaitable<ValueType> WaitForValue() { return LiveData.WaitForValue(); }
+
+	template <CEqualityComparable<ValueType> ArgType>
+	TWeakAwaitable<ValueType> WaitForValue(ArgType&& OfThis)
+	{
+		return FirstInStream(CreateStream(), [OfThis = Forward<ArgType>(OfThis)](const ValueType& Value){ return Value == OfThis; });
+	}
+	
+	template <CPredicate<ValueType> PredicateType>
+	TWeakAwaitable<ValueType> WaitForValue(PredicateType&& Predicate)
+	{
+		return FirstInStream(CreateStream(), [Predicate = Forward<PredicateType>(Predicate)](const ValueType& Value){ return Predicate(Value); });
+	}
+
 	TValueStream<ValueType> CreateStream() { return LiveData.CreateStream(); }
+
+	decltype(auto) GetValue() { return LiveData.GetValue(); }
 	decltype(auto) GetValue() const { return LiveData.GetValue(); }
+	decltype(auto) operator*() { return *LiveData; }
+	decltype(auto) operator*() const { return *LiveData; }
 
 	template <typename FuncType>
 	void Observe(UObject* Lifetime, FuncType&& Func)
