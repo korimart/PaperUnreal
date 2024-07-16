@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "InventoryComponent.h"
+#include "ReadyStateComponent.h"
 #include "TeamComponent.h"
 #include "GameFramework/PlayerState.h"
 #include "PaperUnrealPlayerState.generated.h"
@@ -18,6 +19,9 @@ class APaperUnrealPlayerState : public APlayerState
 
 public:
 	UPROPERTY()
+	UReadyStateComponent* ReadyStateComponent;
+	
+	UPROPERTY()
 	UTeamComponent* TeamComponent;
 	
 	UPROPERTY()
@@ -26,6 +30,7 @@ public:
 private:
 	APaperUnrealPlayerState()
 	{
+		ReadyStateComponent = CreateDefaultSubobject<UReadyStateComponent>(TEXT("ReadyStateComponent"));
 		TeamComponent = CreateDefaultSubobject<UTeamComponent>(TEXT("TeamComponent"));
 		InventoryComponent = CreateDefaultSubobject<UInventoryComponent>(TEXT("InventoryComponent"));
 	}
