@@ -646,6 +646,8 @@ template <typename T>
 class TValueStreamer
 {
 public:
+	using ValueType = T;
+	
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnValueReceived, const T&);
 
 	TValueStreamer() = default;

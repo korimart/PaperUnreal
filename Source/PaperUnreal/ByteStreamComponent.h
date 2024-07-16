@@ -261,6 +261,42 @@ public:
 		}
 	}
 
+	template <typename StreamerType>
+	void SetInputStream(UE_LIFETIMEBOUND StreamerType& Streamer)
+	{
+		RunWeakCoroutine(this, [this, &Streamer](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			while (true)
+			{
+				OpenStream();
+				auto PathEvents = Streamer.CreateStream();
+				while (co_await PathEvents.NextIfNotEnd())
+				{
+					TriggerEvent(PathEvents.Pop().Serialize());
+				}
+				CloseStream();
+			}
+		});
+	}
+	
+	template <typename StreamerType>
+	void SetOutputStream(UE_LIFETIMEBOUND StreamerType& Streamer)
+	{
+		RunWeakCoroutine(this, [this, &Streamer](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			auto F = Finally([&](){ Streamer.EndStreams(); });
+			while (true)
+			{
+				auto ByteEvents = GetByteStreamer().CreateStream();
+				while (co_await ByteEvents.NextIfNotEnd())
+				{
+					Streamer.ReceiveValue(ByteEvents.Pop().Deserialize<typename StreamerType::ValueType>());
+				}
+				Streamer.EndStreams();
+			}
+		});
+	}
+
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_Stream)
 	FRepByteStream RepStream;

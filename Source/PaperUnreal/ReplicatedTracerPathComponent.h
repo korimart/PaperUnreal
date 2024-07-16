@@ -49,12 +49,10 @@ private:
 		if (GetNetMode() != NM_Client)
 		{
 			AddLifeDependency(ServerTracerPath);
-			
 			Replicator = NewObject<UByteStreamComponent>(this);
 			Replicator->SetChunkSize(FTracerPathPoint::ChunkSize);
+			Replicator->SetInputStream(ServerTracerPath->GetTracerPathStreamer());
 			Replicator->RegisterComponent();
-			
-			ServerInitiatePathRelay();
 		}
 	}
 
@@ -67,7 +65,7 @@ private:
 			// TODO find by tag
 			Replicator = GetOwner()->FindComponentByClass<UByteStreamComponent>();
 			Replicator->SetChunkSize(FTracerPathPoint::ChunkSize);
-			ClientInitiatePathRelay();
+			Replicator->SetOutputStream(TracerPathStreamer);
 		}
 	}
 
@@ -79,40 +77,5 @@ private:
 		{
 			Replicator->DestroyComponent();
 		}
-
-		TracerPathStreamer.EndStreams();
-	}
-
-	void ServerInitiatePathRelay()
-	{
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
-		{
-			while (true)
-			{
-				Replicator->OpenStream();
-				auto PathEvents = ServerTracerPath->GetTracerPathStreamer().CreateStream();
-				while (co_await PathEvents.NextIfNotEnd())
-				{
-					Replicator->TriggerEvent(PathEvents.Pop().Serialize());
-				}
-				Replicator->CloseStream();
-			}
-		});
-	}
-
-	void ClientInitiatePathRelay()
-	{
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
-		{
-			while (true)
-			{
-				auto ByteEvents = Replicator->GetByteStreamer().CreateStream();
-				while (co_await ByteEvents.NextIfNotEnd())
-				{
-					TracerPathStreamer.ReceiveValue(ByteEvents.Pop().Deserialize<FTracerPathEvent>());
-				}
-				TracerPathStreamer.EndStreams();
-			}
-		});
 	}
 };
