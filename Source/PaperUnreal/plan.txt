@@ -148,3 +148,4 @@ ReplicatedAreaExpander
     f. 제한 시간이 지나거나 더 이상 에리어를 스폰할 자리가 없으면 게임 종료
     g. 결과창
     h. 처음부터 반복
+2. Coroutine 리팩토링

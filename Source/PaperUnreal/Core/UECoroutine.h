@@ -110,7 +110,7 @@ struct FWeakCoroutine
 		{
 			WeakList.Add([Weak = Object]() { return Weak.IsValid(); });
 		}
-		
+
 		template <typename T>
 		void AbortIfInvalid(const TWeakObjectPtr<T>& Object)
 		{
@@ -274,6 +274,10 @@ template <typename ValueType>
 class TWeakAwaitableHandleImpl
 {
 public:
+	static constexpr bool bVoid = std::is_same_v<ValueType, void>;
+
+	using BoolOrOptional = std::conditional_t<bVoid, bool, TOptional<ValueType>>;
+
 	TWeakAwaitableHandleImpl() = default;
 	TWeakAwaitableHandleImpl(const TWeakAwaitableHandleImpl&&) = delete;
 	TWeakAwaitableHandleImpl& operator=(const TWeakAwaitableHandleImpl&&) = delete;
@@ -283,8 +287,23 @@ public:
 		Handle.Init(InHandle);
 	}
 
+	void SetValue() requires bVoid
+	{
+		check(!Value);
+		Value = true;
+		Handle.Resume();
+	}
+
+	void SetValueIfNotSet() requires bVoid
+	{
+		if (!Value)
+		{
+			SetValue();
+		}
+	}
+
 	template <typename ArgType>
-	void SetValue(ArgType&& Arg)
+	void SetValue(ArgType&& Arg) requires !bVoid
 	{
 		check(!Value.IsSet());
 		Value.Emplace(Forward<ArgType>(Arg));
@@ -306,13 +325,12 @@ public:
 	}
 
 	bool IsValueSet() const { return !!Value; }
-
-	const ValueType& GetValue() const { return *Value; }
-
 	explicit operator bool() const { return !!Value; }
 
+	const auto& GetValue() const requires !bVoid { return *Value; }
+
 private:
-	TOptional<ValueType> Value;
+	BoolOrOptional Value;
 	FWeakCoroutineHandle Handle;
 };
 
@@ -321,6 +339,8 @@ template <typename ValueType>
 class TWeakAwaitableHandle
 {
 public:
+	static constexpr bool bVoid = std::is_same_v<ValueType, void>;
+
 	TWeakAwaitableHandle(TSharedPtr<TWeakAwaitableHandleImpl<ValueType>> InImpl)
 		: Impl(InImpl)
 	{
@@ -340,8 +360,16 @@ public:
 		}
 	}
 
+	void SetValue() requires bVoid
+	{
+		check(!bSetValue);
+		bSetValue = true;
+		Impl->SetValue();
+		Impl = nullptr;
+	}
+
 	template <typename ArgType>
-	void SetValue(ArgType&& Arg)
+	void SetValue(ArgType&& Arg) requires !bVoid
 	{
 		check(!bSetValue);
 		bSetValue = true;
@@ -355,7 +383,7 @@ public:
 		Impl->Destroy();
 	}
 
-	const ValueType& GetValue() const { return Impl->GetValue(); }
+	const auto& GetValue() const requires !bVoid { return Impl->GetValue(); }
 
 private:
 	bool bSetValue = false;
@@ -368,6 +396,7 @@ private:
 template <typename ValueType>
 class TWeakAwaitable
 {
+	static constexpr bool bVoid = std::is_same_v<ValueType, void>;
 	static constexpr bool bObjectPtr = std::is_base_of_v<UObject, std::remove_pointer_t<std::decay_t<ValueType>>>;
 
 public:
@@ -389,11 +418,20 @@ public:
 	template <typename DelegateType>
 	DelegateType CreateSetValueDelegate()
 	{
-		return CreateSetValueDelegate<DelegateType>(
-			[]<typename ArgType>(ArgType&& Pass) -> decltype(auto)
+		if constexpr (bVoid)
+		{
+			return CreateSetValueDelegate<DelegateType>([]()
 			{
-				return Forward<ArgType>(Pass);
 			});
+		}
+		else
+		{
+			return CreateSetValueDelegate<DelegateType>(
+				[]<typename ArgType>(ArgType&& Pass) -> decltype(auto)
+				{
+					return Forward<ArgType>(Pass);
+				});
+		}
 	}
 
 	template <typename DelegateType, typename TransformFuncType>
@@ -427,7 +465,15 @@ public:
 			{
 				if (auto Alive = Canceler->WeakAwaitable.Pin())
 				{
-					Alive->SetValueIfNotSet(TransformFunc(Forward<ArgTypes>(Args)...));
+					if constexpr (bVoid)
+					{
+						TransformFunc();
+						Alive->SetValueIfNotSet();
+					}
+					else
+					{
+						Alive->SetValueIfNotSet(TransformFunc(Forward<ArgTypes>(Args)...));
+					}
 				}
 				FireDelegateOnce = nullptr;
 			}
@@ -485,7 +531,10 @@ public:
 			}
 		}
 
-		return Value->GetValue();
+		if constexpr (!bVoid)
+		{
+			return Value->GetValue();
+		}
 	}
 
 private:
@@ -647,7 +696,7 @@ class TValueStreamer
 {
 public:
 	using ValueType = T;
-	
+
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnValueReceived, const T&);
 
 	TValueStreamer() = default;

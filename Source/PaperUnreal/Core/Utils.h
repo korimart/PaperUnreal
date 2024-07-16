@@ -130,14 +130,10 @@ void FindAndDestroyComponent(AActor* Actor)
 }
 
 
-inline TWeakAwaitable<bool> WaitOneTick(UWorld* World)
+inline TWeakAwaitable<void> WaitOneTick(UWorld* World)
 {
-	TWeakAwaitable<bool> Ret;
-	World->GetTimerManager().SetTimerForNextTick(
-		Ret.CreateSetValueDelegate<FTimerDelegate>([]()
-		{
-			return true;
-		}));
+	TWeakAwaitable<void> Ret;
+	World->GetTimerManager().SetTimerForNextTick(Ret.CreateSetValueDelegate<FTimerDelegate>());
 	return Ret;
 }
 

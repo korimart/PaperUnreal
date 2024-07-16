@@ -18,6 +18,7 @@ class ULifeComponent : public UActorComponent2
 public:
 	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER_WITH_DEFAULT(bool, bAlive, true);
 
+	// TODO TWeakAwaitable<void>를 반환할 방법이 없는지 고민해본다
 	TWeakAwaitable<bool> WaitForDeath()
 	{
 		return FirstInStream(GetbAlive().CreateStream(), [](bool bAlive) { return !bAlive; });

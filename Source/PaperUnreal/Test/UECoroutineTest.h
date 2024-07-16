@@ -41,6 +41,13 @@ class UUECoroutineTestValueProvider : public UObject
 	GENERATED_BODY()
 
 public:
+	TWeakAwaitable<void> FetchVoid()
+	{
+		TWeakAwaitable<void> Ret;
+		VoidHandles.Add(Ret.GetHandle());
+		return Ret;
+	}
+	
 	FWeakAwaitableInt32 FetchInt()
 	{
 		FWeakAwaitableInt32 Ret;
@@ -53,6 +60,16 @@ public:
 		TWeakAwaitable<UObject*> Ret;
 		ObjectHandles.Add(Ret.GetHandle());
 		return Ret;
+	}
+
+	void IssueValue()
+	{
+		if (!VoidHandles.IsEmpty())
+		{
+			auto Handle = MoveTemp(VoidHandles[0]);
+			VoidHandles.RemoveAt(0);
+			Handle.SetValue();
+		}
 	}
 
 	void IssueValue(int32 Value)
@@ -77,11 +94,13 @@ public:
 
 	void ClearRequests()
 	{
+		VoidHandles.Empty();
 		Handles.Empty();
 		ObjectHandles.Empty();
 	}
 
 private:
+	TArray<TWeakAwaitableHandle<void>> VoidHandles;
 	TArray<FWeakAwaitableHandleInt32> Handles;
 	TArray<TWeakAwaitableHandle<UObject*>> ObjectHandles;
 };
