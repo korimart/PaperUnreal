@@ -7,8 +7,89 @@
 #include "CoreMinimal.h"
 
 
-template <typename FromType, typename... ToTypes>
-constexpr bool IsConvertibleV = (std::is_convertible_v<FromType, ToTypes> || ...);
+namespace FutureDetails
+{
+	template <typename, template <typename...> typename>
+	struct TIsInstantiationOf : std::false_type
+	{
+	};
+
+	template <typename... Args, template <typename...> typename T>
+	struct TIsInstantiationOf<T<Args...>, T> : std::true_type
+	{
+	};
+
+	template <typename T, template <typename...> typename Template>
+	inline constexpr bool TIsInstantiationOf_V = TIsInstantiationOf<std::decay_t<T>, Template>::value;
+
+	
+	template <typename FromType, typename... ToTypes>
+	constexpr bool IsConvertibleV = (std::is_convertible_v<FromType, ToTypes> || ...);
+
+	
+	template <template <typename...> typename TypeList, typename SignatureType>
+	struct TFuncParamTypesToTypeList;
+
+	template <template <typename...> typename TypeList, typename RetType, typename... ParamTypes>
+	struct TFuncParamTypesToTypeList<TypeList, RetType(ParamTypes...)>
+	{
+		using Type = TypeList<ParamTypes...>;
+	};
+
+
+	template <typename TypeList>
+	struct TFirstInTypeList;
+
+	template <template <typename...> typename TypeList, typename First, typename... Types>
+	struct TFirstInTypeList<TypeList<First, Types...>>
+	{
+		using Type = First;
+	};
+
+	
+	template <typename SrcTypeList, template <typename...> typename DestTypeList>
+	struct TSwapTypeList;
+
+	template <template <typename...> typename SrcTypeList, template <typename...> typename DestTypeList, typename... Types>
+	struct TSwapTypeList<SrcTypeList<Types...>, DestTypeList>
+	{
+		using Type = DestTypeList<Types...>;
+	};
+
+
+	template <typename TypeList>
+	constexpr int32 TTypeListCount_V = 0;
+
+	template <template <typename...> typename TypeList, typename... Types>
+	constexpr int32 TTypeListCount_V<TypeList<Types...>> = sizeof...(Types);
+
+
+	template <typename T>
+	concept CDelegate = TIsInstantiationOf_V<T, TDelegate>;
+
+	template <typename T>
+	concept CMulticastDelegate = TIsInstantiationOf_V<T, TMulticastDelegate>;
+
+
+	template <typename FuncType>
+	void BindOneOff(CDelegate auto& Delegate, FuncType&& Func)
+	{
+		TSharedRef<bool> Life = MakeShared<bool>(false);
+		Delegate.BindSPLambda(Life, [Life = Life.ToSharedPtr(), Func = Forward<FuncType>(Func)]<typename... ArgTypes>(ArgTypes&&... Args) mutable
+		{
+			Func(Forward<ArgTypes>(Args)...);
+			Life = nullptr;
+		});
+	}
+
+	template <CMulticastDelegate MulticastDelegateType, typename FuncType>
+	void BindOneOff(MulticastDelegateType& MulticastDelegate, FuncType&& Func)
+	{
+		typename MulticastDelegateType::FDelegate Delegate;
+		BindOneOff(Delegate, Forward<FuncType>(Func));
+		MulticastDelegate.Add(Delegate);
+	}
+}
 
 
 template <typename T, typename... ErrorTypes>
@@ -23,7 +104,7 @@ public:
 	TCancellableFutureState& operator=(const TCancellableFutureState&) = delete;
 
 	template <typename U>
-	void SetValue(U&& Value) requires IsConvertibleV<U, ResultType, ErrorTypes...>
+	void SetValue(U&& Value) requires FutureDetails::IsConvertibleV<U, ResultType, ErrorTypes...>
 	{
 		Result.Emplace(ResultVariantType{TInPlaceType<U>{}, Forward<U>(Value)});
 		InvokeResultCallback();
@@ -76,6 +157,7 @@ class TCancellableFuture
 public:
 	static constexpr bool bVoidResult = std::is_same_v<T, void>;
 	using StateType = TCancellableFutureState<T, EDefaultFutureError, ErrorTypes...>;
+	using ResultType = typename StateType::ResultType;
 	using ReturnType = typename StateType::ResultVariantType;
 
 	TCancellableFuture(const TSharedRef<StateType>& InState)
@@ -138,8 +220,12 @@ public:
 	using StateType = TCancellableFutureState<T, EDefaultFutureError, ErrorTypes...>;
 
 	TCancellablePromise() = default;
+	
 	TCancellablePromise(const TCancellablePromise&) = delete;
 	TCancellablePromise& operator=(const TCancellablePromise&) = delete;
+	
+	TCancellablePromise(TCancellablePromise&&) = default;
+	TCancellablePromise& operator=(TCancellablePromise&&) = default;
 
 	~TCancellablePromise()
 	{
@@ -162,7 +248,7 @@ public:
 	}
 
 	template <typename U>
-	void SetValue(U&& Value) requires IsConvertibleV<U, T, ErrorTypes...>
+	void SetValue(U&& Value) requires FutureDetails::IsConvertibleV<U, T, ErrorTypes...>
 	{
 		check(!IsSet());
 		State->SetValue(Forward<U>(Value));
@@ -212,7 +298,7 @@ public:
 	}
 
 	template <typename U>
-	void SetValue(U&& Value) requires IsConvertibleV<U, T, ErrorTypes...>
+	void SetValue(U&& Value) requires FutureDetails::IsConvertibleV<U, T, ErrorTypes...>
 	{
 		check(!HasThisInstanceSet());
 
@@ -257,6 +343,8 @@ class TCancellableFutureAwaitable
 {
 public:
 	using FutureType = TCancellableFuture<T, ErrorTypes...>;
+	using ResultType = typename FutureType::ResultType;
+	using ReturnType = typename FutureType::ReturnType;
 
 	TCancellableFutureAwaitable(FutureType&& InFuture)
 		: Future(MoveTemp(InFuture))
@@ -265,29 +353,40 @@ public:
 
 	TCancellableFutureAwaitable(const TCancellableFutureAwaitable&) = delete;
 	TCancellableFutureAwaitable& operator=(const TCancellableFutureAwaitable&) = delete;
+	
+	TCancellableFutureAwaitable(TCancellableFutureAwaitable&& Other) noexcept = default;
+	TCancellableFutureAwaitable& operator=(TCancellableFutureAwaitable&& Other) = delete;
 
 	bool await_ready() const
 	{
+		// 이미 co_await을 끝낸 Future를 또 co_wait한 경우 여기 들어올 수 있음
+		check(!Future.IsConsumed());
 		return Future.IsReady();
 	}
 
-	void await_suspend(std::coroutine_handle<> Handle)
+	template <typename HandleType>
+	void await_suspend(HandleType&& Handle)
 	{
-		Future.Then([this, Handle](typename FutureType::ReturnType&& Arg)
+		Future.Then([this, Handle = Forward<HandleType>(Handle)](typename FutureType::ReturnType&& Arg)
 		{
 			Ret.Emplace(MoveTemp(Arg));
 			Handle.resume();
 		});
 	}
 
-	typename FutureType::ReturnType await_resume()
+	ReturnType await_resume()
 	{
 		return Ret ? MoveTemp(*Ret) : Future.ConsumeValue();
 	}
 
+	const ReturnType& Peek() const
+	{
+		return *Ret;
+	}
+
 private:
 	FutureType Future;
-	TOptional<typename FutureType::ReturnType> Ret;
+	TOptional<ReturnType> Ret;
 };
 
 
@@ -295,77 +394,6 @@ template <typename... Types>
 TCancellableFutureAwaitable<Types...> operator co_await(TCancellableFuture<Types...>&& Future)
 {
 	return { MoveTemp(Future) };
-}
-
-
-namespace FutureDetails
-{
-	template <typename, template <typename...> typename>
-	struct TIsInstantiationOf : std::false_type
-	{
-	};
-
-	template <typename... Args, template <typename...> typename T>
-	struct TIsInstantiationOf<T<Args...>, T> : std::true_type
-	{
-	};
-
-	template <typename T, template <typename...> typename Template>
-	inline constexpr bool TIsInstantiationOf_V = TIsInstantiationOf<T, Template>::value;
-
-
-	template <template <typename...> typename TypeList, typename SignatureType>
-	struct TFuncParamTypesToTypeList;
-
-	template <template <typename...> typename TypeList, typename RetType, typename... ParamTypes>
-	struct TFuncParamTypesToTypeList<TypeList, RetType(ParamTypes...)>
-	{
-		using Type = TypeList<ParamTypes...>;
-	};
-
-
-	template <typename TypeList>
-	struct TFirstInTypeList;
-
-	template <template <typename...> typename TypeList, typename First, typename... Types>
-	struct TFirstInTypeList<TypeList<First, Types...>>
-	{
-		using Type = First;
-	};
-
-
-	template <typename TypeList>
-	constexpr int32 TTypeListCount_V = 0;
-
-	template <template <typename...> typename TypeList, typename... Types>
-	constexpr int32 TTypeListCount_V<TypeList<Types...>> = sizeof...(Types);
-
-
-	template <typename T>
-	concept CDelegate = TIsInstantiationOf_V<T, TDelegate>;
-
-	template <typename T>
-	concept CMulticastDelegate = TIsInstantiationOf_V<T, TMulticastDelegate>;
-
-
-	template <typename FuncType>
-	void BindOneOff(CDelegate auto& Delegate, FuncType&& Func)
-	{
-		TSharedRef<bool> Life = MakeShared<bool>(false);
-		Delegate.BindSPLambda(Life, [Life = Life.ToSharedPtr(), Func = Forward<FuncType>(Func)]<typename... ArgTypes>(ArgTypes&&... Args) mutable
-		{
-			Func(Forward<ArgTypes>(Args)...);
-			Life = nullptr;
-		});
-	}
-
-	template <CMulticastDelegate MulticastDelegateType, typename FuncType>
-	void BindOneOff(MulticastDelegateType& MulticastDelegate, FuncType&& Func)
-	{
-		typename MulticastDelegateType::FDelegate Delegate;
-		BindOneOff(Delegate, Forward<FuncType>(Func));
-		MulticastDelegate.Add(Delegate);
-	}
 }
 
 
