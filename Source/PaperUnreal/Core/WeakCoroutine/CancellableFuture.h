@@ -29,6 +29,23 @@ namespace FutureDetails
 }
 
 
+// TODO State의 현재 구현은 레퍼런스를 지원하지 않음 즉 const reference 타입을 가지고 SetValue를 호출하면
+// 무조건 복사가 한 번 일어난 다음에 콜백이 호출이 됨 언뜻 생각하기에 콜백이 곧바로 값을 받을 수 있도록 대기 중이 아니었으면
+// 어차피 복사가 일어나야 되니까 worst case가 똑같아서 아무 문제 없다고 생각할 수 있지만
+// const reference 파라미터인 델리게이트에 Future가 묶인 경우 등 콜백이 미리 기다리고 있는 경우가 압도적으로 많음
+// 따라서 델리게이트를 쓰면 복사가 없을 것도 Future를 쓰면 무조건 한 번은 복사가 일어나기 때문에 델리게이트 보다 열등해짐
+// 이것에 대한 해결 방안은 Result 콜백과 Error 콜백을 따로 둬서 Variant 사용을 피하는 것임 (Variant는 복사가 빠른 Error Type에만 사용)
+// 그리고 T의 타입으로 reference를 허가한다.
+//
+// 기본적으로 콜백이 대기 중인 경우 바로 넘기지만 대기 중이 아니면 다음과 같이 처리 필요
+//
+// & -> reference wrapper로 레퍼런스 그대로 저장 (생명주기 관리 책임은 caller에게 있음)
+// const& -> 복사해서 저장
+// && -> move해서 저장
+// const&& -> 아마도 실수이므로 그냥 막음
+//
+// raw 포인터의 경우 그냥 Value라고 판단하고 아무 처리 하지 않음 (생명주기 관리 책임은 caller에게 있음)
+// 다만 UObject의 경우 WeakObjectPtr로 저장해서 dangling이 되지 않게 한다
 template <typename T, typename... ErrorTypes>
 class TCancellableFutureState
 {
