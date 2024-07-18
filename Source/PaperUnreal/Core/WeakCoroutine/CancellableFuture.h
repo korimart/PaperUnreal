@@ -2,75 +2,12 @@
 
 #pragma once
 
-#include <coroutine>
-
 #include "CoreMinimal.h"
+#include "PaperUnreal/Core/TypeTraits.h"
 
 
 namespace FutureDetails
 {
-	template <typename, template <typename...> typename>
-	struct TIsInstantiationOf : std::false_type
-	{
-	};
-
-	template <typename... Args, template <typename...> typename T>
-	struct TIsInstantiationOf<T<Args...>, T> : std::true_type
-	{
-	};
-
-	template <typename T, template <typename...> typename Template>
-	inline constexpr bool TIsInstantiationOf_V = TIsInstantiationOf<std::decay_t<T>, Template>::value;
-
-	
-	template <typename FromType, typename... ToTypes>
-	constexpr bool IsConvertibleV = (std::is_convertible_v<FromType, ToTypes> || ...);
-
-	
-	template <template <typename...> typename TypeList, typename SignatureType>
-	struct TFuncParamTypesToTypeList;
-
-	template <template <typename...> typename TypeList, typename RetType, typename... ParamTypes>
-	struct TFuncParamTypesToTypeList<TypeList, RetType(ParamTypes...)>
-	{
-		using Type = TypeList<ParamTypes...>;
-	};
-
-
-	template <typename TypeList>
-	struct TFirstInTypeList;
-
-	template <template <typename...> typename TypeList, typename First, typename... Types>
-	struct TFirstInTypeList<TypeList<First, Types...>>
-	{
-		using Type = First;
-	};
-
-	
-	template <typename SrcTypeList, template <typename...> typename DestTypeList>
-	struct TSwapTypeList;
-
-	template <template <typename...> typename SrcTypeList, template <typename...> typename DestTypeList, typename... Types>
-	struct TSwapTypeList<SrcTypeList<Types...>, DestTypeList>
-	{
-		using Type = DestTypeList<Types...>;
-	};
-
-
-	template <typename TypeList>
-	constexpr int32 TTypeListCount_V = 0;
-
-	template <template <typename...> typename TypeList, typename... Types>
-	constexpr int32 TTypeListCount_V<TypeList<Types...>> = sizeof...(Types);
-
-
-	template <typename T>
-	concept CDelegate = TIsInstantiationOf_V<T, TDelegate>;
-
-	template <typename T>
-	concept CMulticastDelegate = TIsInstantiationOf_V<T, TMulticastDelegate>;
-
-
 	template <typename FuncType>
 	void BindOneOff(CDelegate auto& Delegate, FuncType&& Func)
 	{
@@ -104,7 +41,7 @@ public:
 	TCancellableFutureState& operator=(const TCancellableFutureState&) = delete;
 
 	template <typename U>
-	void SetValue(U&& Value) requires FutureDetails::IsConvertibleV<U, ResultType, ErrorTypes...>
+	void SetValue(U&& Value) requires IsConvertibleV<U, ResultType, ErrorTypes...>
 	{
 		Result.Emplace(ResultVariantType{TInPlaceType<U>{}, Forward<U>(Value)});
 		InvokeResultCallback();
@@ -248,7 +185,7 @@ public:
 	}
 
 	template <typename U>
-	void SetValue(U&& Value) requires FutureDetails::IsConvertibleV<U, T, ErrorTypes...>
+	void SetValue(U&& Value) requires IsConvertibleV<U, T, ErrorTypes...>
 	{
 		check(!IsSet());
 		State->SetValue(Forward<U>(Value));
@@ -298,7 +235,7 @@ public:
 	}
 
 	template <typename U>
-	void SetValue(U&& Value) requires FutureDetails::IsConvertibleV<U, T, ErrorTypes...>
+	void SetValue(U&& Value) requires IsConvertibleV<U, T, ErrorTypes...>
 	{
 		check(!HasThisInstanceSet());
 
@@ -414,12 +351,12 @@ TTuple<TShareableCancellablePromise<Types...>, TCancellableFuture<Types...>> Mak
 }
 
 
-template <FutureDetails::CDelegate DelegateType>
+template <CDelegate DelegateType>
 auto MakeFutureFromDelegate(DelegateType& Delegate)
 {
-	using ParamTypeTuple = typename FutureDetails::TFuncParamTypesToTypeList<TTuple, typename DelegateType::TFuncType>::Type;
+	using ParamTypeTuple = typename TFuncParamTypesToTypeList<TTuple, typename DelegateType::TFuncType>::Type;
 
-	constexpr int32 ParamCount = FutureDetails::TTypeListCount_V<ParamTypeTuple>;
+	constexpr int32 ParamCount = TTypeListCount_V<ParamTypeTuple>;
 
 	if constexpr (ParamCount == 0)
 	{
@@ -429,7 +366,7 @@ auto MakeFutureFromDelegate(DelegateType& Delegate)
 	}
 	else if constexpr (ParamCount == 1)
 	{
-		using ResultType = typename FutureDetails::TFirstInTypeList<ParamTypeTuple>::Type;
+		using ResultType = typename TFirstInTypeList<ParamTypeTuple>::Type;
 		auto [Promise, Future] = MakeShareablePromise<ResultType>();
 		FutureDetails::BindOneOff(Delegate, [Promise]<typename ArgType>(ArgType&& Arg) mutable { Promise.SetValue(Forward<ArgType>(Arg)); });
 		return MoveTemp(Future);
@@ -446,7 +383,7 @@ auto MakeFutureFromDelegate(DelegateType& Delegate)
 }
 
 
-template <FutureDetails::CMulticastDelegate MulticastDelegateType>
+template <CMulticastDelegate MulticastDelegateType>
 auto MakeFutureFromDelegate(MulticastDelegateType& MulticastDelegate)
 {
 	typename MulticastDelegateType::FDelegate Delegate;

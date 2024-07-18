@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include <coroutine>
+
+#include "TypeTraits.h"
 #include "Algo/AllOf.h"
 
 
@@ -12,20 +14,6 @@ struct TFalse
 {
 	static constexpr bool Value = false;
 };
-
-
-template <typename, template <typename...> typename>
-struct TIsInstantiationOf : std::false_type
-{
-};
-
-template <typename... Args, template <typename...> typename T>
-struct TIsInstantiationOf<T<Args...>, T> : std::true_type
-{
-};
-
-template <typename T, template <typename...> typename Template>
-inline constexpr bool TIsInstantiationOf_V = TIsInstantiationOf<T, Template>::value;
 
 
 template <typename SignatureType>

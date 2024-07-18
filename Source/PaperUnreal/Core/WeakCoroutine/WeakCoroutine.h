@@ -5,17 +5,12 @@
 #include <coroutine>
 
 #include "CoreMinimal.h"
+#include "PaperUnreal/Core/TypeTraits.h"
 #include "Algo/AllOf.h"
 
 
 namespace WeakCoroutineDetails
 {
-	template <typename AwaitableType>
-	concept CAwaitable = requires(AwaitableType Awaitable)
-	{
-		Awaitable.await_resume();
-	};
-
 	template <typename T, typename WeakListContainerType>
 	concept CWeakListAddable = requires(T Arg, WeakListContainerType Container)
 	{
@@ -158,7 +153,7 @@ public:
 		return await_transform(operator co_await(Forward<AnyType>(Any)));
 	}
 
-	template <WeakCoroutineDetails::CAwaitable AwaitableType>
+	template <CAwaitable AwaitableType>
 	auto await_transform(AwaitableType&& Awaitable);
 
 	bool IsValid() const
@@ -299,10 +294,10 @@ inline void FWeakCoroutine2::Resume()
 }
 
 
-template <WeakCoroutineDetails::CAwaitable AwaitableType>
+template <CAwaitable AwaitableType>
 auto FWeakCoroutinePromiseType::await_transform(AwaitableType&& Awaitable)
 {
-	if constexpr (FutureDetails::TIsInstantiationOf_V<AwaitableType, TCancellableFutureAwaitable>)
+	if constexpr (TIsInstantiationOf_V<AwaitableType, TCancellableFutureAwaitable>)
 	{
 		using NoErrorAwaitableType = WeakCoroutineDetails::TErrorRemovedCancellableFutureAwaitable<std::decay_t<AwaitableType>>;
 		return TWeakAwaitable2<NoErrorAwaitableType>{NoErrorAwaitableType{Forward<AwaitableType>(Awaitable)}};
