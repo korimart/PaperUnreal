@@ -181,6 +181,67 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		Array.Empty();
 		TestTrue(TEXT("WithError 함수로 Error를 받을 수 있는지 테스트"), bError);
 	}
+
+	{
+		int32 Received = 0;
+		RunWeakCoroutine2([&](FWeakCoroutineContext2& Context) -> FWeakCoroutine2
+		{
+			Received = co_await RunWeakCoroutine2([](TWeakCoroutineContext<int32>&) -> TWeakCoroutine<int32>
+			{
+				co_return 42;
+			});
+		});
+		
+		TestEqual(TEXT("값을 반환하는 TWeakCoroutine 테스트"), Received, 42);
+	}
+	
+	{
+		TArray<TTuple<TCancellablePromise<int32>, TCancellableFuture<int32>>> Array;
+		Array.Add(MakePromise<int32>());
+		Array.Add(MakePromise<int32>());
+		Array.Add(MakePromise<int32>());
+		Array.Add(MakePromise<int32>());
+		Array.Add(MakePromise<int32>());
+		
+		int32 Received = 0;
+		RunWeakCoroutine2([&](FWeakCoroutineContext2&) -> FWeakCoroutine2
+		{
+			auto Int0 = RunWeakCoroutine2([&](TWeakCoroutineContext<int32>&) -> TWeakCoroutine<int32>
+			{
+				co_return co_await MoveTemp(Array[0].Get<1>());
+			});
+			
+			auto Int1 = RunWeakCoroutine2([&](TWeakCoroutineContext<int32>&) -> TWeakCoroutine<int32>
+			{
+				int32 Sum = 0;
+				Sum += co_await MoveTemp(Array[1].Get<1>());
+				co_return Sum + co_await MoveTemp(Array[2].Get<1>());
+			});
+			
+			auto Int2 = RunWeakCoroutine2([&](TWeakCoroutineContext<int32>&) -> TWeakCoroutine<int32>
+			{
+				int32 Sum = 0;
+				Sum += co_await MoveTemp(Array[4].Get<1>());
+				co_return Sum + co_await MoveTemp(Array[3].Get<1>());
+			});
+
+			Received += co_await Int1;
+			Received += co_await Int2;
+			Received += co_await Int0;
+		});
+		
+		TestEqual(TEXT("값을 반환하는 TWeakCoroutine 테스트"), Received, 0);
+		Array[2].Get<0>().SetValue(10);
+		TestEqual(TEXT("값을 반환하는 TWeakCoroutine 테스트"), Received, 0);
+		Array[1].Get<0>().SetValue(20);
+		TestEqual(TEXT("값을 반환하는 TWeakCoroutine 테스트"), Received, 30);
+		Array[0].Get<0>().SetValue(30);
+		TestEqual(TEXT("값을 반환하는 TWeakCoroutine 테스트"), Received, 30);
+		Array[4].Get<0>().SetValue(40);
+		TestEqual(TEXT("값을 반환하는 TWeakCoroutine 테스트"), Received, 30);
+		Array[3].Get<0>().SetValue(50);
+		TestEqual(TEXT("값을 반환하는 TWeakCoroutine 테스트"), Received, 150);
+	}
 	
 	return true;
 }

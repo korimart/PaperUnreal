@@ -20,37 +20,52 @@ namespace WeakCoroutineDetails
 }
 
 
-class FWeakCoroutineContext2;
-class FWeakCoroutinePromiseType;
+template <typename, typename...>
+class TWeakCoroutineContext;
+
+template <typename, typename...>
+class TWeakCoroutinePromiseType;
 
 
-class FWeakCoroutine2
+template <typename T, typename... ErrorTypes>
+class TWeakCoroutine
 {
 public:
-	using promise_type = FWeakCoroutinePromiseType;
+	using promise_type = TWeakCoroutinePromiseType<T, ErrorTypes...>;
+	using ContextType = TWeakCoroutineContext<T, ErrorTypes...>;
 
-	FWeakCoroutine2(std::coroutine_handle<FWeakCoroutinePromiseType> InHandle)
+	TWeakCoroutine(std::coroutine_handle<promise_type> InHandle)
 		: Handle(InHandle)
 	{
 	}
 
 	void Init(
-		TUniquePtr<TUniqueFunction<FWeakCoroutine2(FWeakCoroutineContext2&)>> Captures,
-		TUniquePtr<FWeakCoroutineContext2> Context);
+		TUniquePtr<TUniqueFunction<TWeakCoroutine(TWeakCoroutineContext<T, ErrorTypes...>&)>> Captures,
+		TUniquePtr<TWeakCoroutineContext<T, ErrorTypes...>> Context);
 
 	void Resume();
 
+	template <typename U> requires std::is_convertible_v<U, TWeakCoroutine>
+	friend auto operator co_await(U&& Coroutine)
+	{
+		return operator co_await(MoveTemp(*Coroutine.Future));
+	}
+
 private:
-	std::coroutine_handle<FWeakCoroutinePromiseType> Handle;
+	std::coroutine_handle<promise_type> Handle;
+	TOptional<TCancellableFuture<T, ErrorTypes...>> Future;
 };
 
 
-class FWeakCoroutinePromiseType
+template <typename Derived, typename T, typename... ErrorTypes>
+class TWeakCoroutinePromiseTypeBase
 {
 public:
-	FWeakCoroutine2 get_return_object()
+	using ReturnObjectType = TWeakCoroutine<T, ErrorTypes...>;
+
+	ReturnObjectType get_return_object()
 	{
-		return std::coroutine_handle<FWeakCoroutinePromiseType>::from_promise(*this);
+		return std::coroutine_handle<Derived>::from_promise(*static_cast<Derived*>(this));
 	}
 
 	std::suspend_always initial_suspend() const
@@ -61,10 +76,6 @@ public:
 	std::suspend_never final_suspend() const noexcept
 	{
 		return {};
-	}
-
-	void return_void() const
-	{
 	}
 
 	void unhandled_exception() const
@@ -120,31 +131,58 @@ public:
 		WeakList.Add([Weak = Object]() { return Weak.IsValid(); });
 	}
 
-private:
-	friend class FWeakCoroutine2;
+protected:
+	friend class TWeakCoroutine<T, ErrorTypes...>;
+
 	TArray<TFunction<bool()>> WeakList;
-	TUniquePtr<FWeakCoroutineContext2> Context;
-	TUniquePtr<TUniqueFunction<FWeakCoroutine2(FWeakCoroutineContext2&)>> Captures;
+	TUniquePtr<TWeakCoroutineContext<T, ErrorTypes...>> Context;
+	TUniquePtr<TUniqueFunction<ReturnObjectType(TWeakCoroutineContext<T, ErrorTypes...>&)>> Captures;
+	TOptional<TCancellablePromise<T, ErrorTypes...>> Promise;
 };
 
 
-class FWeakCoroutineContext2
+template <typename T, typename... ErrorTypes>
+class TWeakCoroutinePromiseType
+	: public TWeakCoroutinePromiseTypeBase<TWeakCoroutinePromiseType<T, ErrorTypes...>, T, ErrorTypes...>
 {
 public:
-	template <typename T>
-	decltype(auto) AbortIfNotValid(T&& Weak)
+	template <typename U>
+	void return_value(U&& Value)
+	{
+		this->Promise->SetValue(Forward<U>(Value));
+	}
+};
+
+template <typename... ErrorTypes>
+class TWeakCoroutinePromiseType<void, ErrorTypes...>
+	: public TWeakCoroutinePromiseTypeBase<TWeakCoroutinePromiseType<void, ErrorTypes...>, void, ErrorTypes...>
+{
+public:
+	void return_void()
+	{
+		this->Promise->SetValue();
+	}
+};
+
+
+template <typename T, typename... ErrorTypes>
+class TWeakCoroutineContext
+{
+public:
+	template <typename U>
+	decltype(auto) AbortIfNotValid(U&& Weak)
 	{
 		Handle.promise().AddToWeakList(Weak);
-		return Forward<T>(Weak);
+		return Forward<U>(Weak);
 	}
 
 private:
-	friend class FWeakCoroutine2;
-	std::coroutine_handle<FWeakCoroutinePromiseType> Handle;
+	friend class TWeakCoroutine<T, ErrorTypes...>;
+	std::coroutine_handle<TWeakCoroutinePromiseType<T, ErrorTypes...>> Handle;
 };
 
 
-template <typename WrappedAwaitableType>
+template <typename PromiseType, typename WrappedAwaitableType>
 class TWeakAwaitable2
 {
 public:
@@ -161,13 +199,13 @@ public:
 		return WrappedAwaitable.await_ready();
 	}
 
-	void await_suspend(std::coroutine_handle<FWeakCoroutinePromiseType> InHandle)
+	void await_suspend(std::coroutine_handle<PromiseType> InHandle)
 	{
 		Handle = InHandle;
 
 		struct FWeakCheckingHandle
 		{
-			std::coroutine_handle<FWeakCoroutinePromiseType> Handle;
+			std::coroutine_handle<PromiseType> Handle;
 
 			void resume() const
 			{
@@ -185,7 +223,7 @@ public:
 
 	ReturnType await_resume()
 	{
-		if constexpr (WeakCoroutineDetails::CWeakListAddable<ReturnType, FWeakCoroutinePromiseType>)
+		if constexpr (WeakCoroutineDetails::CWeakListAddable<ReturnType, PromiseType>)
 		{
 			ReturnType Ret = WrappedAwaitable.await_resume();
 			Handle.promise().AddToWeakList(Ret);
@@ -199,36 +237,43 @@ public:
 
 private:
 	WrappedAwaitableType WrappedAwaitable;
-	std::coroutine_handle<FWeakCoroutinePromiseType> Handle;
+	std::coroutine_handle<PromiseType> Handle;
 };
 
 
-inline void FWeakCoroutine2::Init(
-	TUniquePtr<TUniqueFunction<FWeakCoroutine2(FWeakCoroutineContext2&)>> Captures,
-	TUniquePtr<FWeakCoroutineContext2> Context)
+template <typename T, typename... ErrorTypes>
+void TWeakCoroutine<T, ErrorTypes...>::Init(
+	TUniquePtr<TUniqueFunction<TWeakCoroutine(TWeakCoroutineContext<T, ErrorTypes...>&)>> Captures,
+	TUniquePtr<TWeakCoroutineContext<T, ErrorTypes...>> Context)
 {
 	Handle.promise().Captures = MoveTemp(Captures);
 	Handle.promise().Context = MoveTemp(Context);
 	Handle.promise().Context->Handle = Handle;
+
+	auto [NewPromise, NewFuture] = MakePromise<T, ErrorTypes...>();
+	Handle.promise().Promise.Emplace(MoveTemp(NewPromise));
+	Future.Emplace(MoveTemp(NewFuture));
 }
 
-inline void FWeakCoroutine2::Resume()
+template <typename T, typename... ErrorTypes>
+void TWeakCoroutine<T, ErrorTypes...>::Resume()
 {
 	Handle.resume();
 }
 
 
+template <typename Derived, typename T, typename... ErrorTypes>
 template <CAwaitable AwaitableType>
-auto FWeakCoroutinePromiseType::await_transform(AwaitableType&& Awaitable)
+auto TWeakCoroutinePromiseTypeBase<Derived, T, ErrorTypes...>::await_transform(AwaitableType&& Awaitable)
 {
 	if constexpr (TIsInstantiationOf_V<AwaitableType, TCancellableFutureAwaitable>)
 	{
 		using NoErrorAwaitableType = TErrorRemovedCancellableFutureAwaitable<std::decay_t<AwaitableType>>;
-		return TWeakAwaitable2<NoErrorAwaitableType>{NoErrorAwaitableType{Forward<AwaitableType>(Awaitable)}};
+		return TWeakAwaitable2<Derived, NoErrorAwaitableType>{NoErrorAwaitableType{Forward<AwaitableType>(Awaitable)}};
 	}
 	else
 	{
-		return TWeakAwaitable2<std::decay_t<AwaitableType>>{Forward<AwaitableType>(Awaitable)};
+		return TWeakAwaitable2<Derived, std::decay_t<AwaitableType>>{Forward<AwaitableType>(Awaitable)};
 	}
 }
 
@@ -241,28 +286,40 @@ auto WithError(TCancellableFuture<Types...>&& Future)
 
 
 template <typename FuncType>
-void RunWeakCoroutine2(FuncType&& Func)
+auto RunWeakCoroutine2(FuncType&& Func)
 {
-	// TUniqueFunction 구현 보면 32바이트 이하는 힙에 할당하지 않고 inline 할당하기 때문에 항상 UniquePtr 써줘야 함
-	auto LambdaCaptures = MakeUnique<TUniqueFunction<FWeakCoroutine2(FWeakCoroutineContext2&)>>(Forward<FuncType>(Func));
-	auto Context = MakeUnique<FWeakCoroutineContext2>();
+	using CoroutineType = typename TGetReturnType<FuncType>::Type;
+	using ContextType = typename CoroutineType::ContextType;
 
-	FWeakCoroutine2 WeakCoroutine = (*LambdaCaptures)(*Context);
+	// TUniqueFunction 구현 보면 32바이트 이하는 힙에 할당하지 않고 inline 할당하기 때문에 항상 UniquePtr 써줘야 함
+	auto LambdaCaptures = MakeUnique<TUniqueFunction<CoroutineType(ContextType&)>>(Forward<FuncType>(Func));
+	auto Context = MakeUnique<ContextType>();
+
+	CoroutineType WeakCoroutine = (*LambdaCaptures)(*Context);
 	WeakCoroutine.Init(MoveTemp(LambdaCaptures), MoveTemp(Context));
 	WeakCoroutine.Resume();
+	return WeakCoroutine;
 }
 
 
 template <typename FuncType>
-void RunWeakCoroutine2(const auto& Lifetime, FuncType&& Func)
+auto RunWeakCoroutine2(const auto& Lifetime, FuncType&& Func)
 {
+	using CoroutineType = typename TGetReturnType<FuncType>::Type;
+	using ContextType = typename CoroutineType::ContextType;
+
 	// TUniqueFunction 구현 보면 32바이트 이하는 힙에 할당하지 않고 inline 할당하기 때문에 항상 UniquePtr 써줘야 함
-	auto LambdaCaptures = MakeUnique<TUniqueFunction<FWeakCoroutine2(FWeakCoroutineContext2&)>>(Forward<FuncType>(Func));
-	auto Context = MakeUnique<FWeakCoroutineContext2>();
+	auto LambdaCaptures = MakeUnique<TUniqueFunction<CoroutineType(ContextType&)>>(Forward<FuncType>(Func));
+	auto Context = MakeUnique<ContextType>();
 	auto ContextPtr = Context.Get();
 
-	FWeakCoroutine2 WeakCoroutine = (*LambdaCaptures)(*Context);
+	CoroutineType WeakCoroutine = (*LambdaCaptures)(*Context);
 	WeakCoroutine.Init(MoveTemp(LambdaCaptures), MoveTemp(Context));
 	ContextPtr->AbortIfNotValid(Lifetime);
 	WeakCoroutine.Resume();
+	return WeakCoroutine;
 }
+
+
+using FWeakCoroutine2 = TWeakCoroutine<void>;
+using FWeakCoroutineContext2 = TWeakCoroutineContext<void>;

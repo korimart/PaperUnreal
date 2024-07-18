@@ -80,6 +80,23 @@ struct TFirstConvertibleType<FromType, ToType, ToTypes...>
 };
 
 
+template <typename FunctorType>
+struct TGetReturnType
+{
+private:
+	using FuncType = typename TDecay<FunctorType>::Type;
+
+	template <typename F, typename Ret, typename... ArgTypes>
+	static Ret Helper(Ret (F::*)(ArgTypes...));
+
+	template <typename F, typename Ret, typename... ArgTypes>
+	static Ret Helper(Ret (F::*)(ArgTypes...) const);
+	
+public:
+	using Type = decltype(Helper(&FuncType::operator()));
+};
+
+
 template <typename T>
 concept CDelegate = TIsInstantiationOf_V<T, TDelegate>;
 
