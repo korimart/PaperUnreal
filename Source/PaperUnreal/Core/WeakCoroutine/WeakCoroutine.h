@@ -5,6 +5,7 @@
 #include <coroutine>
 
 #include "CoreMinimal.h"
+#include "AwaitableWrappers.h"
 #include "PaperUnreal/Core/WeakCoroutine/TypeTraits.h"
 #include "Algo/AllOf.h"
 
@@ -16,120 +17,7 @@ namespace WeakCoroutineDetails
 	{
 		Container.AddToWeakList(Arg);
 	};
-
-
-	template <typename FutureAwaitableType>
-	class TErrorRemovedCancellableFutureAwaitable
-	{
-	public:
-		TErrorRemovedCancellableFutureAwaitable(FutureAwaitableType&& Awaitable)
-			: FutureAwaitable(MoveTemp(Awaitable))
-		{
-		}
-
-		TErrorRemovedCancellableFutureAwaitable(const TErrorRemovedCancellableFutureAwaitable&) = delete;
-		TErrorRemovedCancellableFutureAwaitable& operator=(const TErrorRemovedCancellableFutureAwaitable&) = delete;
-
-		TErrorRemovedCancellableFutureAwaitable(TErrorRemovedCancellableFutureAwaitable&& Other) = default;
-		TErrorRemovedCancellableFutureAwaitable& operator=(TErrorRemovedCancellableFutureAwaitable&&) = delete;
-
-		bool await_ready() const
-		{
-			return FutureAwaitable.await_ready();
-		}
-
-		template <typename HandleType>
-		void await_suspend(HandleType&& Handle)
-		{
-			struct FErrorCheckingHandle
-			{
-				TErrorRemovedCancellableFutureAwaitable* This;
-				std::decay_t<HandleType> Handle;
-
-				void resume() const
-				{
-					This->FutureAwaitable.Peek().GetIndex() == 0 ? Handle.resume() : Handle.destroy();
-				}
-			};
-
-			FutureAwaitable.await_suspend(FErrorCheckingHandle{this, Forward<HandleType>(Handle)});
-		}
-
-		auto await_resume()
-		{
-			return FutureAwaitable.await_resume().template Get<typename FutureAwaitableType::ResultType>();
-		}
-
-	private:
-		FutureAwaitableType FutureAwaitable;
-	};
-
-
-	template <CAwaitable AwaitableType>
-	class TIdentityAwaitable
-	{
-	public:
-		TIdentityAwaitable(AwaitableType&& InAwaitable)
-			: Awaitable(MoveTemp(InAwaitable))
-		{
-		}
-
-		TIdentityAwaitable(const TIdentityAwaitable&) = delete;
-		TIdentityAwaitable& operator=(const TIdentityAwaitable&) = delete;
-
-		TIdentityAwaitable(TIdentityAwaitable&& Other) = default;
-		TIdentityAwaitable& operator=(TIdentityAwaitable&&) = delete;
-
-		bool await_ready() const
-		{
-			return Awaitable.await_ready();
-		}
-
-		template <typename HandleType>
-		void await_suspend(HandleType&& Handle)
-		{
-			Awaitable.await_suspend(Forward<HandleType>(Handle));
-		}
-
-		auto await_resume()
-		{
-			return Awaitable.await_resume();
-		}
-
-	private:
-		AwaitableType Awaitable;
-	};
 }
-
-
-struct FMinimalCoroutine
-{
-	struct promise_type
-	{
-		FMinimalCoroutine get_return_object()
-		{
-			return {};
-		}
-
-		std::suspend_never initial_suspend() const
-		{
-			return {};
-		}
-
-		std::suspend_never final_suspend() const noexcept
-		{
-			return {};
-		}
-
-		void return_void() const
-		{
-		}
-
-		void unhandled_exception() const
-		{
-		}
-	};
-};
 
 
 class FWeakCoroutineContext2;
@@ -335,7 +223,7 @@ auto FWeakCoroutinePromiseType::await_transform(AwaitableType&& Awaitable)
 {
 	if constexpr (TIsInstantiationOf_V<AwaitableType, TCancellableFutureAwaitable>)
 	{
-		using NoErrorAwaitableType = WeakCoroutineDetails::TErrorRemovedCancellableFutureAwaitable<std::decay_t<AwaitableType>>;
+		using NoErrorAwaitableType = TErrorRemovedCancellableFutureAwaitable<std::decay_t<AwaitableType>>;
 		return TWeakAwaitable2<NoErrorAwaitableType>{NoErrorAwaitableType{Forward<AwaitableType>(Awaitable)}};
 	}
 	else
@@ -348,7 +236,7 @@ auto FWeakCoroutinePromiseType::await_transform(AwaitableType&& Awaitable)
 template <typename... Types>
 auto WithError(TCancellableFuture<Types...>&& Future)
 {
-	return WeakCoroutineDetails::TIdentityAwaitable<TCancellableFutureAwaitable<Types...>>{operator co_await(MoveTemp(Future))};
+	return TIdentityAwaitable<TCancellableFutureAwaitable<Types...>>{operator co_await(MoveTemp(Future))};
 }
 
 
