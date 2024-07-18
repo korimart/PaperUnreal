@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "PaperUnreal/Core/TypeTraits.h"
+#include "PaperUnreal/Core/WeakCoroutine/TypeTraits.h"
 
 
 namespace FutureDetails

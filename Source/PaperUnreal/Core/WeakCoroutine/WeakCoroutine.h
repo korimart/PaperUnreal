@@ -5,7 +5,7 @@
 #include <coroutine>
 
 #include "CoreMinimal.h"
-#include "PaperUnreal/Core/TypeTraits.h"
+#include "PaperUnreal/Core/WeakCoroutine/TypeTraits.h"
 #include "Algo/AllOf.h"
 
 
