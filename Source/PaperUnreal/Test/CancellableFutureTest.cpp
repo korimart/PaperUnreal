@@ -230,7 +230,7 @@ bool FCancellableFutureTest::RunTest(const FString& Parameters)
 		bool bReceived = false;
 		Future.Then([&](const TVariant<UDummy*, EDefaultFutureError>& Result)
 		{
-			bReceived = Result.Get<UDummy*>() == nullptr;
+			bReceived = Result.Get<EDefaultFutureError>() == EDefaultFutureError::InvalidObject;
 		});
 
 		TestTrue(TEXT("이미 파괴된 UObject가 Future에서 dangling pointer가 되지 않고 잘 받아지는지 테스트"), bReceived);

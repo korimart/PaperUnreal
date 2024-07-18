@@ -29,6 +29,14 @@ namespace FutureDetails
 }
 
 
+enum class EDefaultFutureError
+{
+	PromiseNotFulfilled,
+	Cancelled,
+	InvalidObject,
+};
+
+
 // TODO State의 현재 구현은 레퍼런스를 지원하지 않음 즉 const reference 타입을 가지고 SetValue를 호출하면
 // 무조건 복사가 한 번 일어난 다음에 콜백이 호출이 됨 언뜻 생각하기에 콜백이 곧바로 값을 받을 수 있도록 대기 중이 아니었으면
 // 어차피 복사가 일어나야 되니까 worst case가 똑같아서 아무 문제 없다고 생각할 수 있지만
@@ -67,7 +75,7 @@ public:
 	}
 
 	template <typename U>
-	void SetValue(U&& Value) requires IsConvertibleV<U, ResultType, ErrorTypes...>
+	void SetValue(U&& Value) requires !bUObject && IsConvertibleV<U, ResultType, ErrorTypes...>
 	{
 		using TargetType = typename TFirstConvertibleType<U, ResultType, ErrorTypes...>::Type;
 
@@ -77,7 +85,31 @@ public:
 		}
 		else
 		{
-			if constexpr (bUObject && std::is_same_v<TargetType, ResultType>)
+			Ret.Emplace(ReturnStorageType{TInPlaceType<TargetType>{}, Forward<U>(Value)});
+		}
+	}
+	
+	template <typename U>
+	void SetValue(U&& Value) requires bUObject && IsConvertibleV<U, ResultType, ErrorTypes...>
+	{
+		using TargetType = typename TFirstConvertibleType<U, ResultType, ErrorTypes...>::Type;
+
+		if constexpr (std::is_same_v<TargetType, ResultType>)
+		{
+			if (!IsValid(Value))
+			{
+				SetValue(EDefaultFutureError::InvalidObject);
+				return;
+			}
+		}
+
+		if (Callback)
+		{
+			Callback(ReturnType{TInPlaceType<TargetType>{}, Forward<U>(Value)});
+		}
+		else
+		{
+			if constexpr (std::is_same_v<TargetType, ResultType>)
 			{
 				Ret.Emplace(ReturnStorageType{TInPlaceType<WeakResultType>{}, Forward<U>(Value)});
 			}
@@ -126,7 +158,14 @@ private:
 	{
 		if (auto* WeakPtr = Storage.template TryGet<WeakResultType>())
 		{
-			return ReturnType{TInPlaceType<ResultType>{}, WeakPtr->Get()};
+			if (WeakPtr->IsValid())
+			{
+				return ReturnType{TInPlaceType<ResultType>{}, WeakPtr->Get()};
+			}
+			else
+			{
+				return ReturnType{TInPlaceType<EDefaultFutureError>{}, EDefaultFutureError::InvalidObject};
+			}
 		}
 		return CreateReturnTypeFromStorageType<ErrorTypes...>(MoveTemp(Storage));
 	}
@@ -149,13 +188,6 @@ private:
 			return {};
 		}
 	}
-};
-
-
-enum class EDefaultFutureError
-{
-	PromiseNotFulfilled,
-	Cancelled,
 };
 
 
