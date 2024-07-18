@@ -166,5 +166,21 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("약속이 지켜지지 않으면 종료하는지 테스트"), *bLifeDestroyed);
 	}
 	
+	{
+		TArray<TTuple<TCancellablePromise<int32>, TCancellableFuture<int32>>> Array;
+		Array.Add(MakePromise<int32>());
+		
+		bool bError = false;
+		RunWeakCoroutine2([&Array, &bError](FWeakCoroutineContext2& Context) -> FWeakCoroutine2
+		{
+			auto ResultOrError = co_await WithError(MoveTemp(Array[0].Get<1>()));
+			bError = ResultOrError.Get<EDefaultFutureError>() == EDefaultFutureError::PromiseNotFulfilled;
+		});
+
+		TestFalse(TEXT("WithError 함수로 Error를 받을 수 있는지 테스트"), bError);
+		Array.Empty();
+		TestTrue(TEXT("WithError 함수로 Error를 받을 수 있는지 테스트"), bError);
+	}
+	
 	return true;
 }

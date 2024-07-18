@@ -63,6 +63,42 @@ namespace WeakCoroutineDetails
 	private:
 		FutureAwaitableType FutureAwaitable;
 	};
+
+
+	template <CAwaitable AwaitableType>
+	class TIdentityAwaitable
+	{
+	public:
+		TIdentityAwaitable(AwaitableType&& InAwaitable)
+			: Awaitable(MoveTemp(InAwaitable))
+		{
+		}
+
+		TIdentityAwaitable(const TIdentityAwaitable&) = delete;
+		TIdentityAwaitable& operator=(const TIdentityAwaitable&) = delete;
+
+		TIdentityAwaitable(TIdentityAwaitable&& Other) = default;
+		TIdentityAwaitable& operator=(TIdentityAwaitable&&) = delete;
+
+		bool await_ready() const
+		{
+			return Awaitable.await_ready();
+		}
+
+		template <typename HandleType>
+		void await_suspend(HandleType&& Handle)
+		{
+			Awaitable.await_suspend(Forward<HandleType>(Handle));
+		}
+
+		auto await_resume()
+		{
+			return Awaitable.await_resume();
+		}
+
+	private:
+		AwaitableType Awaitable;
+	};
 }
 
 
@@ -306,6 +342,13 @@ auto FWeakCoroutinePromiseType::await_transform(AwaitableType&& Awaitable)
 	{
 		return TWeakAwaitable2<std::decay_t<AwaitableType>>{Forward<AwaitableType>(Awaitable)};
 	}
+}
+
+
+template <typename... Types>
+auto WithError(TCancellableFuture<Types...>&& Future)
+{
+	return WeakCoroutineDetails::TIdentityAwaitable<TCancellableFutureAwaitable<Types...>>{operator co_await(MoveTemp(Future))};
 }
 
 
