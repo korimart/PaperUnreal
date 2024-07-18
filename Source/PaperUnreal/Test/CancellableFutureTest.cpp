@@ -168,7 +168,7 @@ bool FCancellableFutureTest::RunTest(const FString& Parameters)
 		MulticastDelegate.Broadcast();
 		TestEqual(TEXT("FSimpleMulticastDelegate에서 Future 만들기 테스트"), Count, 1);
 	}
-	
+
 	{
 		DECLARE_MULTICAST_DELEGATE_OneParam(FIntMulticastDelegate, int32);
 		FIntMulticastDelegate MulticastDelegate;
@@ -189,58 +189,20 @@ bool FCancellableFutureTest::RunTest(const FString& Parameters)
 		MulticastDelegate.Broadcast(99);
 		TestEqual(TEXT("파라미터가 하나인 멀티캐스트 델리게이트에서 Future 만들기 테스트"), Sum, 42);
 	}
-	
-	{
-		DECLARE_MULTICAST_DELEGATE_TwoParams(FManyMulticastDelegate, int32, float);
-		FManyMulticastDelegate MulticastDelegate;
 
-		int32 Sum = 0;
-		float FSum = 0.f;
-		MakeFutureFromDelegate(MulticastDelegate).Then([&](const TVariant<TTuple<int32, float>, EDefaultFutureError>& Result)
+	{
+		DECLARE_MULTICAST_DELEGATE_OneParam(FIntMulticastDelegate, const int32&);
+		FIntMulticastDelegate MulticastDelegate;
+
+		int32 Received = 0;
+		MakeFutureFromDelegate(MulticastDelegate).Then([&](const TVariant<int32, EDefaultFutureError>& Result)
 		{
-			Sum += Result.Get<TTuple<int32, float>>().Get<0>();
-			FSum += Result.Get<TTuple<int32, float>>().Get<1>();
+			Received = Result.Get<int32>();
 		});
 
-		TestEqual(TEXT("파라미터가 두 개인 멀티캐스트 델리게이트에서 Future 만들기 테스트"), Sum, 0);
-		TestEqual(TEXT("파라미터가 두 개인 멀티캐스트 델리게이트에서 Future 만들기 테스트"), FSum, 0.f);
-		MulticastDelegate.Broadcast(42, 42.f);
-		TestEqual(TEXT("파라미터가 하나인 멀티캐스트 델리게이트에서 Future 만들기 테스트"), Sum, 42);
-		TestEqual(TEXT("파라미터가 하나인 멀티캐스트 델리게이트에서 Future 만들기 테스트"), FSum, 42.f);
-		MulticastDelegate.Broadcast(99, 99.f);
-		TestEqual(TEXT("파라미터가 하나인 멀티캐스트 델리게이트에서 Future 만들기 테스트"), Sum, 42);
-		TestEqual(TEXT("파라미터가 하나인 멀티캐스트 델리게이트에서 Future 만들기 테스트"), FSum, 42.f);
-		MulticastDelegate.Broadcast(99, 99.f);
-		MulticastDelegate.Broadcast(99, 99.f);
-		MulticastDelegate.Broadcast(99, 99.f);
-		TestEqual(TEXT("파라미터가 하나인 멀티캐스트 델리게이트에서 Future 만들기 테스트"), Sum, 42);
-		TestEqual(TEXT("파라미터가 하나인 멀티캐스트 델리게이트에서 Future 만들기 테스트"), FSum, 42.f);
-	}
-	
-	{
-		DECLARE_MULTICAST_DELEGATE_TwoParams(FManyMulticastDelegate, const int32&, const float&);
-		FManyMulticastDelegate MulticastDelegate;
-
-		const int32* First = nullptr;
-		const float* Second = nullptr;
-		MakeFutureFromDelegate(MulticastDelegate).Then([&](const TVariant<TTuple<const int32&, const float&>, EDefaultFutureError>& Result)
-		{
-			First = &Result.Get<TTuple<const int32&, const float&>>().Get<0>();
-			Second = &Result.Get<TTuple<const int32&, const float&>>().Get<1>();
-		});
-
-		int32 IntVal = 0;
-		float FloatVal = 0.f;
-		
-		TestTrue(TEXT("파라미터가 레퍼런스인 멀티캐스트 델리게이트에서 Future 만들기 테스트"), First == nullptr);
-		TestTrue(TEXT("파라미터가 레퍼런스인 멀티캐스트 델리게이트에서 Future 만들기 테스트"), Second == nullptr);
-		MulticastDelegate.Broadcast(IntVal, FloatVal);
-		TestEqual(TEXT("파라미터가 레퍼런스인 멀티캐스트 델리게이트에서 Future 만들기 테스트"), *First, 0);
-		TestEqual(TEXT("파라미터가 레퍼런스인 멀티캐스트 델리게이트에서 Future 만들기 테스트"), *Second, 0.f);
-		IntVal = 42;
-		FloatVal = 42.f;
-		TestEqual(TEXT("파라미터가 레퍼런스인 멀티캐스트 델리게이트에서 Future 만들기 테스트"), *First, 42);
-		TestEqual(TEXT("파라미터가 레퍼런스인 멀티캐스트 델리게이트에서 Future 만들기 테스트"), *Second, 42.f);
+		TestEqual(TEXT("파라미터가 레퍼런스인 멀티캐스트 델리게이트에서 Future 만들기 테스트"), Received, 0);
+		MulticastDelegate.Broadcast(42);
+		TestEqual(TEXT("파라미터가 레퍼런스인 멀티캐스트 델리게이트에서 Future 만들기 테스트"), Received, 42);
 	}
 	
 	{
@@ -257,7 +219,7 @@ bool FCancellableFutureTest::RunTest(const FString& Parameters)
 
 		TestTrue(TEXT("UObject 타입에 대해 값이 Future에서 잘 받아지는지 테스트"), bReceived);
 	}
-	
+
 	{
 		UDummy* Dummy = NewObject<UDummy>();
 

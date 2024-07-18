@@ -9,13 +9,6 @@
 #include "Algo/AllOf.h"
 
 
-template <typename...>
-struct TFalse
-{
-	static constexpr bool Value = false;
-};
-
-
 template <typename SignatureType>
 struct TGetFirstParam;
 

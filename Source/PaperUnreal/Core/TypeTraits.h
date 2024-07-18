@@ -5,6 +5,13 @@
 #include "CoreMinimal.h"
 
 
+template <typename...>
+struct TFalse
+{
+	static constexpr bool Value = false;
+};
+
+
 template <typename, template <typename...> typename>
 struct TIsInstantiationOf : std::false_type
 {

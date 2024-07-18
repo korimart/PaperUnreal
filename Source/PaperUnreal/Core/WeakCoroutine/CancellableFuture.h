@@ -420,19 +420,15 @@ auto MakeFutureFromDelegate(DelegateType& Delegate)
 	}
 	else if constexpr (ParamCount == 1)
 	{
-		using ResultType = typename TFirstInTypeList<ParamTypeTuple>::Type;
+		using ResultType = std::decay_t<typename TFirstInTypeList<ParamTypeTuple>::Type>;
 		auto [Promise, Future] = MakeShareablePromise<ResultType>();
 		FutureDetails::BindOneOff(Delegate, [Promise]<typename ArgType>(ArgType&& Arg) mutable { Promise.SetValue(Forward<ArgType>(Arg)); });
 		return MoveTemp(Future);
 	}
 	else
 	{
-		auto [Promise, Future] = MakeShareablePromise<ParamTypeTuple>();
-		FutureDetails::BindOneOff(Delegate, [Promise]<typename... ArgTypes>(ArgTypes&&... Args) mutable
-		{
-			Promise.SetValue(ParamTypeTuple{Forward<ArgTypes>(Args)...});
-		});
-		return MoveTemp(Future);
+		// 파라미터가 여러 개인 델리게이트는 지원하지 않음
+		static_assert(TFalse<DelegateType>::Value);
 	}
 }
 
