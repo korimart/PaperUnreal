@@ -32,50 +32,104 @@ namespace FutureDetails
 template <typename T, typename... ErrorTypes>
 class TCancellableFutureState
 {
+	static constexpr bool bVoid = std::is_same_v<T, void>;
+	static constexpr bool bUObject = std::is_base_of_v<UObject, std::remove_pointer_t<std::decay_t<T>>>;
+	using WeakResultType = TWeakObjectPtr<std::remove_pointer_t<T>>;
+
 public:
-	using ResultType = std::conditional_t<std::is_same_v<T, void>, std::monostate, T>;
-	using ResultVariantType = TVariant<ResultType, ErrorTypes...>;
+	using ResultType = std::conditional_t<bVoid, std::monostate, T>;
+	using ReturnType = TVariant<ResultType, ErrorTypes...>;
 
 	TCancellableFutureState() = default;
 	TCancellableFutureState(const TCancellableFutureState&) = delete;
 	TCancellableFutureState& operator=(const TCancellableFutureState&) = delete;
 
+	void SetValue() requires bVoid
+	{
+		SetValue(std::monostate{});
+	}
+
 	template <typename U>
 	void SetValue(U&& Value) requires IsConvertibleV<U, ResultType, ErrorTypes...>
 	{
-		Result.Emplace(ResultVariantType{TInPlaceType<U>{}, Forward<U>(Value)});
-		InvokeResultCallback();
+		using TargetType = typename TFirstConvertibleType<U, ResultType, ErrorTypes...>::Type;
+
+		if (Callback)
+		{
+			Callback(ReturnType{TInPlaceType<TargetType>{}, Forward<U>(Value)});
+		}
+		else
+		{
+			if constexpr (bUObject && std::is_same_v<TargetType, ResultType>)
+			{
+				Ret.Emplace(ReturnStorageType{TInPlaceType<WeakResultType>{}, Forward<U>(Value)});
+			}
+			else
+			{
+				Ret.Emplace(ReturnStorageType{TInPlaceType<TargetType>{}, Forward<U>(Value)});
+			}
+		}
 	}
 
 	bool HasValue() const
 	{
-		return Result.IsSet();
+		return Ret.IsSet();
 	}
 
-	ResultVariantType&& ConsumeValue() UE_LIFETIMEBOUND
+	ReturnType&& ConsumeValue() UE_LIFETIMEBOUND requires !bUObject
 	{
 		check(!bResultConsumed);
 		bResultConsumed = true;
-		return MoveTemp(*Result);
+		return MoveTemp(*Ret);
+	}
+
+	ReturnType ConsumeValue() requires bUObject
+	{
+		check(!bResultConsumed);
+		bResultConsumed = true;
+		return CreateReturnTypeFromStorageType(MoveTemp(*Ret));
 	}
 
 	template <typename FuncType>
 	void ConsumeValueOnArrival(FuncType&& Func)
 	{
 		check(!bResultConsumed && !Callback);
+		bResultConsumed = true;
 		Callback = Forward<FuncType>(Func);
 	}
 
 private:
-	bool bResultConsumed = false;
-	TOptional<ResultVariantType> Result;
-	TUniqueFunction<void(ResultVariantType&&)> Callback;
+	using ReturnStorageType = std::conditional_t<bUObject, TVariant<WeakResultType, ErrorTypes...>, ReturnType>;
 
-	void InvokeResultCallback()
+	bool bResultConsumed = false;
+	TOptional<ReturnStorageType> Ret;
+	TUniqueFunction<void(ReturnType&&)> Callback;
+
+	static ReturnType CreateReturnTypeFromStorageType(ReturnStorageType&& Storage)
 	{
-		if (Callback)
+		if (auto* WeakPtr = Storage.template TryGet<WeakResultType>())
 		{
-			Callback(ConsumeValue());
+			return ReturnType{TInPlaceType<ResultType>{}, WeakPtr->Get()};
+		}
+		return CreateReturnTypeFromStorageType<ErrorTypes...>(MoveTemp(Storage));
+	}
+
+	template <typename CheckTarget, typename... RemainingTypes>
+	static ReturnType CreateReturnTypeFromStorageType(ReturnStorageType&& Storage)
+	{
+		if (auto* Found = Storage.template TryGet<CheckTarget>())
+		{
+			return ReturnType{TInPlaceType<CheckTarget>{}, MoveTemp(*Found)};
+		}
+
+		if constexpr (sizeof...(RemainingTypes) > 0)
+		{
+			return CreateReturnTypeFromStorageType<RemainingTypes...>(MoveTemp(Storage));
+		}
+		else
+		{
+			check(false);
+			return {};
 		}
 	}
 };
@@ -92,10 +146,9 @@ template <typename T, typename... ErrorTypes>
 class TCancellableFuture
 {
 public:
-	static constexpr bool bVoidResult = std::is_same_v<T, void>;
 	using StateType = TCancellableFutureState<T, EDefaultFutureError, ErrorTypes...>;
 	using ResultType = typename StateType::ResultType;
-	using ReturnType = typename StateType::ResultVariantType;
+	using ReturnType = typename StateType::ReturnType;
 
 	TCancellableFuture(const TSharedRef<StateType>& InState)
 		: State(InState)
@@ -152,15 +205,16 @@ private:
 template <typename T, typename... ErrorTypes>
 class TCancellablePromise
 {
-public:
 	static constexpr bool bVoidResult = std::is_same_v<T, void>;
+
+public:
 	using StateType = TCancellableFutureState<T, EDefaultFutureError, ErrorTypes...>;
 
 	TCancellablePromise() = default;
-	
+
 	TCancellablePromise(const TCancellablePromise&) = delete;
 	TCancellablePromise& operator=(const TCancellablePromise&) = delete;
-	
+
 	TCancellablePromise(TCancellablePromise&&) = default;
 	TCancellablePromise& operator=(TCancellablePromise&&) = default;
 
@@ -180,7 +234,7 @@ public:
 	void SetValue() requires bVoidResult
 	{
 		check(!IsSet());
-		State->SetValue(std::monostate{});
+		State->SetValue();
 		State = nullptr;
 	}
 
@@ -290,7 +344,7 @@ public:
 
 	TCancellableFutureAwaitable(const TCancellableFutureAwaitable&) = delete;
 	TCancellableFutureAwaitable& operator=(const TCancellableFutureAwaitable&) = delete;
-	
+
 	TCancellableFutureAwaitable(TCancellableFutureAwaitable&& Other) noexcept = default;
 	TCancellableFutureAwaitable& operator=(TCancellableFutureAwaitable&& Other) = delete;
 
@@ -330,7 +384,7 @@ private:
 template <typename... Types>
 TCancellableFutureAwaitable<Types...> operator co_await(TCancellableFuture<Types...>&& Future)
 {
-	return { MoveTemp(Future) };
+	return {MoveTemp(Future)};
 }
 
 

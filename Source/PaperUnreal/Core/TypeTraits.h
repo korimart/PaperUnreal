@@ -60,6 +60,19 @@ template <template <typename...> typename TypeList, typename... Types>
 constexpr int32 TTypeListCount_V<TypeList<Types...>> = sizeof...(Types);
 
 
+template <typename FromType, typename... ToTypes>
+struct TFirstConvertibleType;
+
+template <typename FromType, typename ToType, typename... ToTypes>
+struct TFirstConvertibleType<FromType, ToType, ToTypes...>
+{
+	using Type = typename std::conditional_t<
+		std::is_convertible_v<FromType, ToType>,
+		TIdentity<ToType>,
+		TFirstConvertibleType<FromType, ToTypes...>>::Type;
+};
+
+
 template <typename T>
 concept CDelegate = TIsInstantiationOf_V<T, TDelegate>;
 

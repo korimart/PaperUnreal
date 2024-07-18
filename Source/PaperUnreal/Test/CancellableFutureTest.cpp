@@ -1,4 +1,6 @@
-﻿#include "Misc/AutomationTest.h"
+﻿#include "CancellableFutureTest.h"
+
+#include "Misc/AutomationTest.h"
 #include "PaperUnreal/Core/WeakCoroutine/CancellableFuture.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCancellableFutureTest, "PaperUnreal.PaperUnreal.Test.CancellableFutureTest", EAutomationTestFlags::EditorContext | EAutomationTestFlags::SmokeFilter)
@@ -239,6 +241,37 @@ bool FCancellableFutureTest::RunTest(const FString& Parameters)
 		FloatVal = 42.f;
 		TestEqual(TEXT("파라미터가 레퍼런스인 멀티캐스트 델리게이트에서 Future 만들기 테스트"), *First, 42);
 		TestEqual(TEXT("파라미터가 레퍼런스인 멀티캐스트 델리게이트에서 Future 만들기 테스트"), *Second, 42.f);
+	}
+	
+	{
+		UDummy* Dummy = NewObject<UDummy>();
+
+		auto [Promise, Future] = MakePromise<UDummy*>();
+		Promise.SetValue(Dummy);
+
+		bool bReceived = false;
+		Future.Then([&](const TVariant<UDummy*, EDefaultFutureError>& Result)
+		{
+			bReceived = IsValid(Result.Get<UDummy*>());
+		});
+
+		TestTrue(TEXT("UObject 타입에 대해 값이 Future에서 잘 받아지는지 테스트"), bReceived);
+	}
+	
+	{
+		UDummy* Dummy = NewObject<UDummy>();
+
+		auto [Promise, Future] = MakePromise<UDummy*>();
+		Promise.SetValue(Dummy);
+		Dummy->MarkAsGarbage();
+
+		bool bReceived = false;
+		Future.Then([&](const TVariant<UDummy*, EDefaultFutureError>& Result)
+		{
+			bReceived = Result.Get<UDummy*>() == nullptr;
+		});
+
+		TestTrue(TEXT("이미 파괴된 UObject가 Future에서 dangling pointer가 되지 않고 잘 받아지는지 테스트"), bReceived);
 	}
 
 	return true;
