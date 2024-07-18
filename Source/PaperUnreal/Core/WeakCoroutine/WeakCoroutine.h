@@ -169,6 +169,10 @@ template <typename T, typename... ErrorTypes>
 class TWeakCoroutineContext
 {
 public:
+	TWeakCoroutineContext() = default;
+	TWeakCoroutineContext(const TWeakCoroutineContext&) = delete;
+	TWeakCoroutineContext& operator=(const TWeakCoroutineContext&) = delete;
+	
 	template <typename U>
 	decltype(auto) AbortIfNotValid(U&& Weak)
 	{
