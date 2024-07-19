@@ -12,7 +12,7 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 		Array.Add(MakePromise<void>());
 
 		bool bOver = false;
-		RunWeakCoroutine2([&](FWeakCoroutineContext2&) -> FWeakCoroutine2
+		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
 			co_await AnyOf(MoveTemp(Array[0].Get<1>()), MoveTemp(Array[1].Get<1>()));
 			bOver = true;
@@ -29,7 +29,7 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 		Array.Add(MakePromise<void>());
 
 		bool bOver = false;
-		RunWeakCoroutine2([&](FWeakCoroutineContext2&) -> FWeakCoroutine2
+		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
 			co_await AnyOf(MoveTemp(Array[0].Get<1>()), MoveTemp(Array[1].Get<1>()));
 			bOver = true;

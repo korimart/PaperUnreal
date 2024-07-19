@@ -6,7 +6,8 @@
 
 #include "CoreMinimal.h"
 #include "AwaitableWrappers.h"
-#include "PaperUnreal/Core/WeakCoroutine/TypeTraits.h"
+#include "CancellableFuture.h"
+#include "TypeTraits.h"
 #include "Algo/AllOf.h"
 
 
@@ -290,7 +291,7 @@ auto WithError(TCancellableFuture<Types...>&& Future)
 
 
 template <typename FuncType>
-auto RunWeakCoroutine2(FuncType&& Func)
+auto RunWeakCoroutine(FuncType&& Func)
 {
 	using CoroutineType = typename TGetReturnType<FuncType>::Type;
 	using ContextType = typename CoroutineType::ContextType;
@@ -307,7 +308,7 @@ auto RunWeakCoroutine2(FuncType&& Func)
 
 
 template <typename FuncType>
-auto RunWeakCoroutine2(const auto& Lifetime, FuncType&& Func)
+auto RunWeakCoroutine(const auto& Lifetime, FuncType&& Func)
 {
 	using CoroutineType = typename TGetReturnType<FuncType>::Type;
 	using ContextType = typename CoroutineType::ContextType;
@@ -325,5 +326,5 @@ auto RunWeakCoroutine2(const auto& Lifetime, FuncType&& Func)
 }
 
 
-using FWeakCoroutine2 = TWeakCoroutine<void>;
-using FWeakCoroutineContext2 = TWeakCoroutineContext<void>;
+using FWeakCoroutine = TWeakCoroutine<void>;
+using FWeakCoroutineContext = TWeakCoroutineContext<void>;

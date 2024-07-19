@@ -4,8 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "ActorComponent2.h"
-#include "UECoroutine.h"
 #include "Subsystems/WorldSubsystem.h"
+#include "WeakCoroutine/CancellableFuture.h"
 #include "ComponentRegistry.generated.h"
 
 /**
@@ -58,7 +58,7 @@ private:
 template <typename ComponentType>
 	// 현재 UActorComponentEx만 Registry를 사용하므로 실수 다른 컴포넌트를 넣지 않도록 체크
 	requires std::is_base_of_v<UActorComponent2, ComponentType>
-TWeakAwaitable<ComponentType*> WaitForComponent(AActor* Owner)
+TCancellableFuture<ComponentType*> WaitForComponent(AActor* Owner)
 {
 	if (!IsValid(Owner))
 	{
@@ -72,10 +72,12 @@ TWeakAwaitable<ComponentType*> WaitForComponent(AActor* Owner)
 	}
 	
 	UComponentRegistry* Registry = Owner->GetWorld()->GetSubsystem<UComponentRegistry>();
-	return WaitForBroadcast(
-		Registry->GetComponentMulticastDelegate(ComponentType::StaticClass(), Owner),
-		[](UActorComponent* BeforeCast)
-		{
-			return Cast<ComponentType>(BeforeCast);
-		});
+	// TODO await
+	// return MakeFutureFromDelegate(
+	// 	Registry->GetComponentMulticastDelegate(ComponentType::StaticClass(), Owner),
+	// 	[](UActorComponent* BeforeCast)
+	// 	{
+	// 		return Cast<ComponentType>(BeforeCast);
+	// 	});
+	return nullptr;
 }

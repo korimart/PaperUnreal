@@ -29,7 +29,7 @@ public:
 	{
 		if (bEnded)
 		{
-			return MakeReadyFuture<T, EValueStreamError, ErrorTypes...>(EValueStreamError::StreamEnded);
+			return EValueStreamError::StreamEnded;
 		}
 		
 		if (UnclaimedFutures.Num() > 0)
@@ -39,7 +39,7 @@ public:
 
 		auto [Promise, Future] = MakePromise<T, EValueStreamError, ErrorTypes...>();
 		Promises.Add(MoveTemp(Promise));
-		return Future;
+		return MoveTemp(Future);
 	}
 
 	template <typename U>
@@ -78,7 +78,7 @@ template <typename T, typename... ErrorTypes>
 class TValueStream
 {
 public:
-	using ReceiverType = TValueStreamValueReceiver<T, EValueStreamError, ErrorTypes...>;
+	using ReceiverType = TValueStreamValueReceiver<T, ErrorTypes...>;
 	
 	TValueStream() = default;
 
@@ -276,24 +276,25 @@ TValueStream<T> CreateMulticastValueStream(const TArray<T>& ReadyValues, Delegat
 }
 
 
-template <typename T, typename PredicateType>
-TWeakAwaitable<T> FirstInStream(TValueStream<T>&& Stream, PredicateType&& Predicate)
-{
-	TWeakAwaitable<T> Ret;
-	RunCoroutine([
-			Handle = Ret.GetHandle(),
-			Stream = MoveTemp(Stream),
-			Predicate = Forward<PredicateType>(Predicate)](auto&) mutable -> FWeakCoroutine
-		{
-			while (true)
-			{
-				auto Value = co_await Stream.Next();
-				if (Invoke(Predicate, Value))
-				{
-					Handle.SetValue(MoveTemp(Value));
-					break;
-				}
-			}
-		});
-	return Ret;
-}
+// TODO await
+// template <typename T, typename PredicateType>
+// TCancellableFuture<T> FirstInStream(TValueStream<T>&& Stream, PredicateType&& Predicate)
+// {
+// 	TWeakAwaitable<T> Ret;
+// 	RunCoroutine([
+// 			Handle = Ret.GetHandle(),
+// 			Stream = MoveTemp(Stream),
+// 			Predicate = Forward<PredicateType>(Predicate)](auto&) mutable -> FWeakCoroutine
+// 		{
+// 			while (true)
+// 			{
+// 				auto Value = co_await Stream.Next();
+// 				if (Invoke(Predicate, Value))
+// 				{
+// 					Handle.SetValue(MoveTemp(Value));
+// 					break;
+// 				}
+// 			}
+// 		});
+// 	return Ret;
+// }

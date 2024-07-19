@@ -3,7 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UECoroutine.h"
 #include "WeakCoroutine/ValueStream.h"
 
 
@@ -47,16 +46,19 @@ public:
 		OnChanged.AddWeakLambda(Lifetime, Forward<FuncType>(Func));
 	}
 
-	TWeakAwaitable<ValueType> WaitForValue()
+	TCancellableFuture<ValueType> WaitForValue()
 	{
 		if (Value)
 		{
 			return *Value;
 		}
 
-		// TODO TLiveData는 Broadcast와 달리 Value를 보관하고 있으므로
-		// 레퍼런스만 넘겨서 복사를 회피할 수 있음
-		return WaitForBroadcast(OnChanged);
+		return MakeFutureFromDelegate(OnChanged);
+	}
+
+	friend TCancellableFuture<ValueType> operator co_await(TLiveData& LiveData)
+	{
+		return LiveData.WaitForValue();
 	}
 
 	TValueStream<ValueType> CreateStream()
@@ -185,18 +187,19 @@ public:
 	{
 	}
 
-	TWeakAwaitable<ValueType> WaitForValue() { return LiveData.WaitForValue(); }
+	TCancellableFuture<ValueType> WaitForValue() { return LiveData.WaitForValue(); }
 
+	// TODO await
 	template <CEqualityComparable<ValueType> ArgType>
-	TWeakAwaitable<ValueType> WaitForValue(ArgType&& OfThis)
+	TCancellableFuture<ValueType> WaitForValue(ArgType&& OfThis)
 	{
-		return FirstInStream(CreateStream(), [OfThis = Forward<ArgType>(OfThis)](const ValueType& Value){ return Value == OfThis; });
+		// return FirstInStream(CreateStream(), [OfThis = Forward<ArgType>(OfThis)](const ValueType& Value){ return Value == OfThis; });
 	}
 	
 	template <CPredicate<ValueType> PredicateType>
-	TWeakAwaitable<ValueType> WaitForValue(PredicateType&& Predicate)
+	TCancellableFuture<ValueType> WaitForValue(PredicateType&& Predicate)
 	{
-		return FirstInStream(CreateStream(), [Predicate = Forward<PredicateType>(Predicate)](const ValueType& Value){ return Predicate(Value); });
+		// return FirstInStream(CreateStream(), [Predicate = Forward<PredicateType>(Predicate)](const ValueType& Value){ return Predicate(Value); });
 	}
 
 	TValueStream<ValueType> CreateStream() { return LiveData.CreateStream(); }

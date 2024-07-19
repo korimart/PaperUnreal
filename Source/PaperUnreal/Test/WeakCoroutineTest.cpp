@@ -28,7 +28,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		auto bLifeDestroyed = Life->bDestroyed;
 
 		TArray<int32> Received;
-		RunWeakCoroutine2([&Array, &Received, Life = MoveTemp(Life)](FWeakCoroutineContext2& Context) -> FWeakCoroutine2
+		RunWeakCoroutine([&Array, &Received, Life = MoveTemp(Life)](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
 			co_await MoveTemp(Array[0].Get<1>());
 			Received.Add(0);
@@ -73,7 +73,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		auto bLifeDestroyed = Life->bDestroyed;
 
 		TArray<int32> Received;
-		RunWeakCoroutine2([&Array, &Received, Life = MoveTemp(Life)](FWeakCoroutineContext2& Context) -> FWeakCoroutine2
+		RunWeakCoroutine([&Array, &Received, Life = MoveTemp(Life)](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
 			Received.Add(co_await MoveTemp(Array[0].Get<1>()));
 			Received.Add(co_await MoveTemp(Array[1].Get<1>()));
@@ -114,7 +114,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		auto AbortIfNotValid = MakeShared<bool>().ToSharedPtr();
 
 		TArray<int32> Received;
-		RunWeakCoroutine2([&Array, &AbortIfNotValid, &Received, Life = MoveTemp(Life)](FWeakCoroutineContext2& Context) -> FWeakCoroutine2
+		RunWeakCoroutine([&Array, &AbortIfNotValid, &Received, Life = MoveTemp(Life)](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
 			Context.AbortIfNotValid(AbortIfNotValid);
 			
@@ -154,7 +154,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		auto bLifeDestroyed = Life->bDestroyed;
 		
 		TArray<int32> Received;
-		RunWeakCoroutine2([&Array, &Received, Life = MoveTemp(Life)](FWeakCoroutineContext2& Context) -> FWeakCoroutine2
+		RunWeakCoroutine([&Array, &Received, Life = MoveTemp(Life)](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
 			Received.Add(co_await MoveTemp(Array[0].Get<1>()));
 		});
@@ -171,7 +171,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		Array.Add(MakePromise<int32>());
 		
 		bool bError = false;
-		RunWeakCoroutine2([&Array, &bError](FWeakCoroutineContext2& Context) -> FWeakCoroutine2
+		RunWeakCoroutine([&Array, &bError](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
 			auto ResultOrError = co_await WithError(MoveTemp(Array[0].Get<1>()));
 			bError = ResultOrError.Get<EDefaultFutureError>() == EDefaultFutureError::PromiseNotFulfilled;
@@ -184,9 +184,9 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 
 	{
 		int32 Received = 0;
-		RunWeakCoroutine2([&](FWeakCoroutineContext2& Context) -> FWeakCoroutine2
+		RunWeakCoroutine([&](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
-			Received = co_await RunWeakCoroutine2([](TWeakCoroutineContext<int32>&) -> TWeakCoroutine<int32>
+			Received = co_await RunWeakCoroutine([](TWeakCoroutineContext<int32>&) -> TWeakCoroutine<int32>
 			{
 				co_return 42;
 			});
@@ -204,21 +204,21 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		Array.Add(MakePromise<int32>());
 		
 		int32 Received = 0;
-		RunWeakCoroutine2([&](FWeakCoroutineContext2&) -> FWeakCoroutine2
+		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			auto Int0 = RunWeakCoroutine2([&](TWeakCoroutineContext<int32>&) -> TWeakCoroutine<int32>
+			auto Int0 = RunWeakCoroutine([&](TWeakCoroutineContext<int32>&) -> TWeakCoroutine<int32>
 			{
 				co_return co_await MoveTemp(Array[0].Get<1>());
 			});
 			
-			auto Int1 = RunWeakCoroutine2([&](TWeakCoroutineContext<int32>&) -> TWeakCoroutine<int32>
+			auto Int1 = RunWeakCoroutine([&](TWeakCoroutineContext<int32>&) -> TWeakCoroutine<int32>
 			{
 				int32 Sum = 0;
 				Sum += co_await MoveTemp(Array[1].Get<1>());
 				co_return Sum + co_await MoveTemp(Array[2].Get<1>());
 			});
 			
-			auto Int2 = RunWeakCoroutine2([&](TWeakCoroutineContext<int32>&) -> TWeakCoroutine<int32>
+			auto Int2 = RunWeakCoroutine([&](TWeakCoroutineContext<int32>&) -> TWeakCoroutine<int32>
 			{
 				int32 Sum = 0;
 				Sum += co_await MoveTemp(Array[4].Get<1>());

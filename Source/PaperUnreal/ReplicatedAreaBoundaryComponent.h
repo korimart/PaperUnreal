@@ -6,6 +6,7 @@
 #include "AreaBoundaryComponent.h"
 #include "AreaBoundaryStream.h"
 #include "Core/ActorComponent2.h"
+#include "Core/WeakCoroutine/WeakCoroutine.h"
 #include "Net/UnrealNetwork.h"
 #include "ReplicatedAreaBoundaryComponent.generated.h"
 
@@ -52,7 +53,7 @@ private:
 
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
-			Context.AbortIfInvalid(BoundarySource);
+			Context.AbortIfNotValid(BoundarySource);
 			for (auto Boundaries = BoundarySource->GetBoundaryStreamer().CreateStream();;)
 			{
 				RepPoints = (co_await Boundaries.Next()).GetPoints();

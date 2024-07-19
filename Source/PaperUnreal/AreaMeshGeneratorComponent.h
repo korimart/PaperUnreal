@@ -6,6 +6,7 @@
 #include "AreaBoundaryStream.h"
 #include "AreaMeshComponent.h"
 #include "Core/ActorComponent2.h"
+#include "Core/WeakCoroutine/WeakCoroutine.h"
 #include "AreaMeshGeneratorComponent.generated.h"
 
 
@@ -45,8 +46,8 @@ private:
 
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
-			Context.AbortIfInvalid(MeshSource);
-			Context.AbortIfInvalid(MeshDest);
+			Context.AbortIfNotValid(MeshSource);
+			Context.AbortIfNotValid(MeshDest);
 			for (auto BoundaryStream = MeshSource->GetBoundaryStreamer().CreateStream();;)
 			{
 				MeshDest->SetMeshByWorldBoundary(co_await BoundaryStream.Next());

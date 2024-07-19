@@ -6,6 +6,7 @@
 #include "ReadyStateComponent.h"
 #include "Core/ActorComponent2.h"
 #include "Core/GameStateBase2.h"
+#include "Core/WeakCoroutine/CancellableFuture.h"
 #include "GameFramework/PlayerState.h"
 #include "ReadyStateTrackerComponent.generated.h"
 
@@ -18,7 +19,7 @@ class UReadyStateTrackerComponent : public UActorComponent2
 public:
 	TLiveDataView<int32> GetReadyCount() { return ReadyCount; }
 
-	TWeakAwaitable<int32> WaitUntilCountIsAtLeast(int32 Least)
+	TCancellableFuture<int32> WaitUntilCountIsAtLeast(int32 Least)
 	{
 		return GetReadyCount().WaitForValue([Least](int32 Count) { return Count >= Least; });
 	}

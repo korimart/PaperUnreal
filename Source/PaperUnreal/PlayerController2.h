@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Core/UECoroutine.h"
+#include "Core/WeakCoroutine/ValueStream.h"
 #include "GameFramework/PlayerController.h"
 #include "PlayerController2.generated.h"
 

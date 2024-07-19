@@ -4,7 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "Core/ActorComponent2.h"
-#include "Core/UECoroutine.h"
+#include "Core/WeakCoroutine/WeakCoroutine.h"
+#include "Core/WeakCoroutine/ValueStream.h"
 #include "Net/UnrealNetwork.h"
 #include "ByteStreamComponent.generated.h"
 
@@ -270,10 +271,11 @@ public:
 			{
 				OpenStream();
 				auto PathEvents = Streamer.CreateStream();
-				while (co_await PathEvents.NextIfNotEnd())
-				{
-					TriggerEvent(PathEvents.Pop().Serialize());
-				}
+				// TODO await
+				// while (co_await PathEvents.NextIfNotEnd())
+				// {
+				// 	TriggerEvent(PathEvents.Pop().Serialize());
+				// }
 				CloseStream();
 			}
 		});
@@ -288,10 +290,11 @@ public:
 			while (true)
 			{
 				auto ByteEvents = GetByteStreamer().CreateStream();
-				while (co_await ByteEvents.NextIfNotEnd())
-				{
-					Streamer.ReceiveValue(ByteEvents.Pop().Deserialize<typename StreamerType::ValueType>());
-				}
+				// TODO await
+				// while (co_await ByteEventsNext())
+				// {
+				// 	Streamer.ReceiveValue(ByteEvents.Pop().Deserialize<typename StreamerType::ValueType>());
+				// }
 				Streamer.EndStreams();
 			}
 		});

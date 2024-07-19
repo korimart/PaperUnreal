@@ -6,24 +6,24 @@
 #include "Utils.h"
 #include "GameFramework/PlayerState.h"
 
-TWeakAwaitable<AController*> ACharacter2::WaitForController()
+TCancellableFuture<AController*> ACharacter2::WaitForController()
 {
 	if (AController* ValidController = ValidOrNull(GetController()))
 	{
 		return ValidController;
 	}
 
-	return WaitForBroadcast(OnControllerChanged);
+	return MakeFutureFromDelegate(OnControllerChanged);
 }
 
-TWeakAwaitable<APlayerState*> ACharacter2::WaitForPlayerState()
+TCancellableFuture<APlayerState*> ACharacter2::WaitForPlayerState()
 {
 	if (APlayerState* ValidPlayerState = ValidOrNull(GetPlayerState()))
 	{
 		return ValidPlayerState;
 	}
 
-	return WaitForBroadcast(OnNewPlayerState);
+	return MakeFutureFromDelegate(OnNewPlayerState);
 }
 
 void ACharacter2::NotifyControllerChanged()

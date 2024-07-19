@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Core/ActorComponent2.h"
-#include "Core/UECoroutine.h"
+#include "Core/WeakCoroutine/ValueStream.h"
 #include "Net/UnrealNetwork.h"
 #include "PlayerSpawnerComponent.generated.h"
 

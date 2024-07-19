@@ -15,10 +15,10 @@
 #include "TracerToAreaConverterComponent.h"
 #include "TracerMeshGeneratorComponent.h"
 #include "TracerOverlapCheckerComponent.h"
-#include "Core/UECoroutine.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Core/ComponentRegistry.h"
 #include "Core/Utils.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
@@ -124,10 +124,10 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 			co_return;
 		}
 
-		Context.AbortIfInvalid(AreaSpawner);
-		Context.AbortIfInvalid(PlayerSpawner);
-		Context.AbortIfInvalid(Inventory);
-		Context.AbortIfInvalid(MyHomeArea);
+		Context.AbortIfNotValid(AreaSpawner);
+		Context.AbortIfNotValid(PlayerSpawner);
+		Context.AbortIfNotValid(Inventory);
+		Context.AbortIfNotValid(MyHomeArea);
 		auto HomeAreaBoundary = co_await WaitForComponent<UAreaBoundaryComponent>(MyHomeArea);
 
 		auto TracerPath = NewObject<UTracerPathComponent>(this);
@@ -162,7 +162,7 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 			{
 				RunWeakCoroutine(this, [this, NewArea, AreaConverter](FWeakCoroutineContext& Context) -> FWeakCoroutine
 				{
-					Context.AbortIfInvalid(AreaConverter);
+					Context.AbortIfNotValid(AreaConverter);
 
 					auto NewBoundary = co_await WaitForComponent<UAreaBoundaryComponent>(NewArea);
 					auto AreaSlasher = NewObject<UAreaSlasherComponent>(this);
@@ -179,7 +179,7 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 			{
 				RunWeakCoroutine(this, [this, NewPlayer, TracerOverlapChecker](FWeakCoroutineContext& Context) -> FWeakCoroutine
 				{
-					Context.AbortIfInvalid(TracerOverlapChecker);
+					Context.AbortIfNotValid(TracerOverlapChecker);
 
 					auto NewTracer = co_await WaitForComponent<UTracerPathComponent>(NewPlayer);
 					TracerOverlapChecker->AddOverlapTarget(NewTracer);
@@ -200,7 +200,7 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 		}
 
 		// 디펜던시: UInventoryComponent를 가지는 PlayerState에 대해서만 이 클래스를 사용할 수 있음
-		UInventoryComponent* Inventory = Context.AbortIfInvalid(PlayerState->FindComponentByClass<UInventoryComponent>());
+		UInventoryComponent* Inventory = Context.AbortIfNotValid(PlayerState->FindComponentByClass<UInventoryComponent>());
 		if (!ensureAlways(IsValid(Inventory)))
 		{
 			co_return;
@@ -232,12 +232,13 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 				TracerMaterialStream = Inventory->GetTracerMaterial().CreateStream()
 			](FWeakCoroutineContext& Context) mutable -> FWeakCoroutine
 			{
-				Context.AbortIfInvalid(TracerMesh);
+				Context.AbortIfNotValid(TracerMesh);
 
 				while (true)
 				{
 					auto SoftTracerMaterial = co_await TracerMaterialStream.Next();
-					TracerMesh->ConfigureMaterialSet({co_await RequestAsyncLoad(SoftTracerMaterial)});
+					// TODO await
+					// TracerMesh->ConfigureMaterialSet({co_await RequestAsyncLoad(SoftTracerMaterial)});
 				}
 			});
 	});

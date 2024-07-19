@@ -3,7 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UECoroutine.h"
 #include "GameFramework/GameStateBase.h"
 #include "Engine/AssetManager.h"
 #include "Engine/StreamableManager.h"
@@ -139,38 +138,39 @@ void FindAndDestroyComponent(AActor* Actor)
 }
 
 
-inline TWeakAwaitable<void> WaitOneTick(UWorld* World)
-{
-	TWeakAwaitable<void> Ret;
-	World->GetTimerManager().SetTimerForNextTick(Ret.CreateSetValueDelegate<FTimerDelegate>());
-	return Ret;
-}
-
-
-inline TWeakAwaitable<AGameStateBase*> WaitForGameState(UWorld* World)
-{
-	if (AGameStateBase* Ret = ValidOrNull(World->GetGameState()))
-	{
-		return Ret;
-	}
-
-	return WaitForBroadcast(World->GameStateSetEvent);
-}
-
-
-// TODO 바로 수령하지 않으면 garbage를 반환할 수 있음
-template <typename SoftObjectType>
-TWeakAwaitable<SoftObjectType*> RequestAsyncLoad(const TSoftObjectPtr<SoftObjectType>& SoftPointer)
-{
-	TWeakAwaitable<SoftObjectType*> Ret;
-	UAssetManager::GetStreamableManager().RequestAsyncLoad(
-		SoftPointer.ToSoftObjectPath(),
-		Ret.CreateSetValueDelegate<FStreamableDelegate>([SoftPointer]()
-		{
-			return SoftPointer.Get();
-		}));
-	return Ret;
-}
+// TODO await
+// inline TWeakAwaitable<void> WaitOneTick(UWorld* World)
+// {
+// 	TWeakAwaitable<void> Ret;
+// 	World->GetTimerManager().SetTimerForNextTick(Ret.CreateSetValueDelegate<FTimerDelegate>());
+// 	return Ret;
+// }
+//
+//
+// inline TWeakAwaitable<AGameStateBase*> WaitForGameState(UWorld* World)
+// {
+// 	if (AGameStateBase* Ret = ValidOrNull(World->GetGameState()))
+// 	{
+// 		return Ret;
+// 	}
+//
+// 	return WaitForBroadcast(World->GameStateSetEvent);
+// }
+//
+//
+// // TODO 바로 수령하지 않으면 garbage를 반환할 수 있음
+// template <typename SoftObjectType>
+// TWeakAwaitable<SoftObjectType*> RequestAsyncLoad(const TSoftObjectPtr<SoftObjectType>& SoftPointer)
+// {
+// 	TWeakAwaitable<SoftObjectType*> Ret;
+// 	UAssetManager::GetStreamableManager().RequestAsyncLoad(
+// 		SoftPointer.ToSoftObjectPath(),
+// 		Ret.CreateSetValueDelegate<FStreamableDelegate>([SoftPointer]()
+// 		{
+// 			return SoftPointer.Get();
+// 		}));
+// 	return Ret;
+// }
 
 
 #define AS_WEAK(name) name = ToWeak(name)

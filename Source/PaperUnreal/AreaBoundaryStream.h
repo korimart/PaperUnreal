@@ -5,7 +5,6 @@
 #include "CoreMinimal.h"
 #include "Core/LiveData.h"
 #include "Core/SegmentArray.h"
-#include "Core/UECoroutine.h"
 #include "UObject/Interface.h"
 #include "AreaBoundaryStream.generated.h"
 

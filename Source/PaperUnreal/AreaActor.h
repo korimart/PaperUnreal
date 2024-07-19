@@ -9,7 +9,6 @@
 #include "ReplicatedAreaBoundaryComponent.h"
 #include "TeamComponent.h"
 #include "Core/Actor2.h"
-#include "Core/ComponentRegistry.h"
 #include "AreaActor.generated.h"
 
 
@@ -103,11 +102,12 @@ private:
 
 		RunWeakCoroutine(this, [this, AreaMesh](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
-			Context.AbortIfInvalid(AreaMesh);
+			Context.AbortIfNotValid(AreaMesh);
 			for (auto AreaMaterialStream = AreaMaterial.CreateStream();;)
 			{
 				auto SoftAreaMaterial = co_await AreaMaterialStream.Next();
-				AreaMesh->ConfigureMaterialSet({co_await RequestAsyncLoad(SoftAreaMaterial)});
+				// TODO await
+				// AreaMesh->ConfigureMaterialSet({co_await RequestAsyncLoad(SoftAreaMaterial)});
 			}
 		});
 	}

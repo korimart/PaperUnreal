@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "PaperUnreal/Core/Utils.h"
+#include "PaperUnreal/Core/WeakCoroutine/TypeTraits.h"
 
 
 struct FMinimalCoroutine

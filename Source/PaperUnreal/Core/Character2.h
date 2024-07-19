@@ -3,8 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UECoroutine.h"
 #include "GameFramework/Character.h"
+#include "WeakCoroutine/CancellableFuture.h"
 #include "Character2.generated.h"
 
 
@@ -20,8 +20,8 @@ public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnPlayerStateChanged, APlayerState*);
 	FOnPlayerStateChanged OnNewPlayerState;
 	
-	TWeakAwaitable<AController*> WaitForController();
-	TWeakAwaitable<APlayerState*> WaitForPlayerState();
+	TCancellableFuture<AController*> WaitForController();
+	TCancellableFuture<APlayerState*> WaitForPlayerState();
 
 	virtual void NotifyControllerChanged() override;
 	virtual void OnPlayerStateChanged(APlayerState* NewPlayerState, APlayerState* OldPlayerState) override;

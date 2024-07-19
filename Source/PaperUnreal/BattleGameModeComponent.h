@@ -54,7 +54,7 @@ public:
 		PawnClass = Class;
 	}
 	
-	TWeakAwaitable<FBattleModeGameResult> Start(int32 TeamCount, int32 EachTeamMemberCount)
+	TCancellableFuture<FBattleModeGameResult> Start(int32 TeamCount, int32 EachTeamMemberCount)
 	{
 		check(HasBegunPlay());
 
@@ -78,9 +78,9 @@ public:
 
 		InitiateGameFlow();
 
-		TWeakAwaitable<FBattleModeGameResult> Ret;
-		ResultAwaitable.Emplace(Ret.GetHandle());
-		return Ret;
+		auto [Promise, Future] = MakePromise<FBattleModeGameResult>();
+		ResultPromise.Emplace(MoveTemp(Promise));
+		return MoveTemp(Future);
 	}
 
 private:
@@ -95,7 +95,7 @@ private:
 
 	FTeamAllocator TeamAllocator;
 	FBattleModeGameResult GameResult{};
-	TOptional<TWeakAwaitableHandle<FBattleModeGameResult>> ResultAwaitable;
+	TOptional<TCancellablePromise<FBattleModeGameResult>> ResultPromise;
 	
 	const TSoftObjectPtr<UMaterialInstance> SoftSolidBlue{FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Blue.MI_Solid_Blue'")}};
 	const TSoftObjectPtr<UMaterialInstance> SoftSolidBlueLight{FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Blue_Light.MI_Solid_Blue_Light'")}};
@@ -118,7 +118,7 @@ private:
 	{
 		RunWeakCoroutine(this, [this, ReadyPlayer](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
-			Context.AbortIfInvalid(ReadyPlayer);
+			Context.AbortIfNotValid(ReadyPlayer);
 
 			auto TeamComponent = ReadyPlayer->FindComponentByClass<UTeamComponent>();
 			auto ReadyState = ReadyPlayer->FindComponentByClass<UReadyStateComponent>();
@@ -127,9 +127,9 @@ private:
 			// 이 컴포넌트들은 디펜던시: 이 컴포넌트들을 가지는 PlayerState에 대해서만 이 클래스를 사용할 수 있음
 			check(AllValid(TeamComponent, ReadyState, Inventory));
 
-			Context.AbortIfInvalid(TeamComponent);
-			Context.AbortIfInvalid(ReadyState);
-			Context.AbortIfInvalid(Inventory);
+			Context.AbortIfNotValid(TeamComponent);
+			Context.AbortIfNotValid(ReadyState);
+			Context.AbortIfNotValid(Inventory);
 
 			co_await ReadyState->GetbReady().WaitForValue(true);
 
@@ -203,9 +203,9 @@ private:
 	{
 		Super::EndPlay(EndPlayReason);
 
-		if (ResultAwaitable)
+		if (ResultPromise)
 		{
-			ResultAwaitable->SetValue(MoveTemp(GameResult));
+			ResultPromise->SetValue(MoveTemp(GameResult));
 		}
 	}
 };
