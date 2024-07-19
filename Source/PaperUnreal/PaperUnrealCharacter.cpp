@@ -26,6 +26,7 @@
 #include "Materials/Material.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerState.h"
+#include "GameFramework/GameStateBase.h"
 
 APaperUnrealCharacter::APaperUnrealCharacter()
 {
@@ -237,8 +238,7 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 				while (true)
 				{
 					auto SoftTracerMaterial = co_await TracerMaterialStream.Next();
-					// TODO await
-					// TracerMesh->ConfigureMaterialSet({co_await RequestAsyncLoad(SoftTracerMaterial)});
+					TracerMesh->ConfigureMaterialSet({co_await RequestAsyncLoad(SoftTracerMaterial)});
 				}
 			});
 	});

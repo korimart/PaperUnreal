@@ -189,17 +189,16 @@ public:
 
 	TCancellableFuture<ValueType> WaitForValue() { return LiveData.WaitForValue(); }
 
-	// TODO await
 	template <CEqualityComparable<ValueType> ArgType>
-	TCancellableFuture<ValueType> WaitForValue(ArgType&& OfThis)
+	TCancellableFuture<ValueType, EValueStreamError> WaitForValue(ArgType&& OfThis)
 	{
-		// return FirstInStream(CreateStream(), [OfThis = Forward<ArgType>(OfThis)](const ValueType& Value){ return Value == OfThis; });
+		return FirstInStream(CreateStream(), [OfThis = Forward<ArgType>(OfThis)](const ValueType& Value){ return Value == OfThis; });
 	}
 	
 	template <CPredicate<ValueType> PredicateType>
-	TCancellableFuture<ValueType> WaitForValue(PredicateType&& Predicate)
+	TCancellableFuture<ValueType, EValueStreamError> WaitForValue(PredicateType&& Predicate)
 	{
-		// return FirstInStream(CreateStream(), [Predicate = Forward<PredicateType>(Predicate)](const ValueType& Value){ return Predicate(Value); });
+		return FirstInStream(CreateStream(), [Predicate = Forward<PredicateType>(Predicate)](const ValueType& Value){ return Predicate(Value); });
 	}
 
 	TValueStream<ValueType> CreateStream() { return LiveData.CreateStream(); }

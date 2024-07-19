@@ -46,10 +46,18 @@ public:
 
 	void Resume();
 
+	TCancellableFuture<T, ErrorTypes...> ReturnValue()
+	{
+		check(Future.IsSet());
+		auto Ret = MoveTemp(*Future);
+		Future.Reset();
+		return Ret;
+	}
+
 	template <typename U> requires std::is_convertible_v<U, TWeakCoroutine>
 	friend auto operator co_await(U&& Coroutine)
 	{
-		return operator co_await(MoveTemp(*Coroutine.Future));
+		return operator co_await(Coroutine.ReturnValue());
 	}
 
 private:
@@ -321,6 +329,22 @@ auto RunWeakCoroutine(const auto& Lifetime, FuncType&& Func)
 	CoroutineType WeakCoroutine = (*LambdaCaptures)(*Context);
 	WeakCoroutine.Init(MoveTemp(LambdaCaptures), MoveTemp(Context));
 	ContextPtr->AbortIfNotValid(Lifetime);
+	WeakCoroutine.Resume();
+	return WeakCoroutine;
+}
+
+
+template <typename FuncType, typename... ArgTypes>
+auto RunWeakCoroutineNoCaptures(const FuncType& Func, ArgTypes&&... Args)
+{
+	using CoroutineType = typename TGetReturnType<FuncType>::Type;
+	using ContextType = typename CoroutineType::ContextType;
+
+	// TUniqueFunction 구현 보면 32바이트 이하는 힙에 할당하지 않고 inline 할당하기 때문에 항상 UniquePtr 써줘야 함
+	auto Context = MakeUnique<ContextType>();
+
+	CoroutineType WeakCoroutine = Func(*Context, Forward<ArgTypes>(Args)...);
+	WeakCoroutine.Init(nullptr, MoveTemp(Context));
 	WeakCoroutine.Resume();
 	return WeakCoroutine;
 }

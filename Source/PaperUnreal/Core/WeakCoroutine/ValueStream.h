@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "CancellableFuture.h"
+#include "WeakCoroutine.h"
 #include "PaperUnreal/Core/Utils.h"
 
 
@@ -18,10 +19,10 @@ class TValueStreamValueReceiver
 {
 public:
 	TValueStreamValueReceiver() = default;
-	
+
 	TValueStreamValueReceiver(const TValueStreamValueReceiver&) = delete;
 	TValueStreamValueReceiver& operator=(const TValueStreamValueReceiver&) = delete;
-	
+
 	TValueStreamValueReceiver(TValueStreamValueReceiver&&) = default;
 	TValueStreamValueReceiver& operator=(TValueStreamValueReceiver&&) = default;
 
@@ -31,7 +32,7 @@ public:
 		{
 			return EValueStreamError::StreamEnded;
 		}
-		
+
 		if (UnclaimedFutures.Num() > 0)
 		{
 			return PopFront(UnclaimedFutures);
@@ -52,7 +53,7 @@ public:
 			UnclaimedFutures.Add(MakeReadyFuture<T, EValueStreamError, ErrorTypes...>(Forward<U>(Value)));
 			return;
 		}
-		
+
 		PopFront(Promises).SetValue(Forward<U>(Value));
 	}
 
@@ -79,7 +80,7 @@ class TValueStream
 {
 public:
 	using ReceiverType = TValueStreamValueReceiver<T, ErrorTypes...>;
-	
+
 	TValueStream() = default;
 
 	// 복사 허용하면 내가 Next하고 다른 애가 Next하면 다른 애의 Next는 나 다음에 호출되므로
@@ -276,25 +277,33 @@ TValueStream<T> CreateMulticastValueStream(const TArray<T>& ReadyValues, Delegat
 }
 
 
-// TODO await
-// template <typename T, typename PredicateType>
-// TCancellableFuture<T> FirstInStream(TValueStream<T>&& Stream, PredicateType&& Predicate)
-// {
-// 	TWeakAwaitable<T> Ret;
-// 	RunCoroutine([
-// 			Handle = Ret.GetHandle(),
-// 			Stream = MoveTemp(Stream),
-// 			Predicate = Forward<PredicateType>(Predicate)](auto&) mutable -> FWeakCoroutine
-// 		{
-// 			while (true)
-// 			{
-// 				auto Value = co_await Stream.Next();
-// 				if (Invoke(Predicate, Value))
-// 				{
-// 					Handle.SetValue(MoveTemp(Value));
-// 					break;
-// 				}
-// 			}
-// 		});
-// 	return Ret;
-// }
+template <typename T, typename PredicateType>
+TCancellableFuture<T, EValueStreamError> FirstInStream(TValueStream<T>&& Stream, PredicateType&& Predicate)
+{
+	return RunWeakCoroutineNoCaptures([](
+		TWeakCoroutineContext<T, EValueStreamError>& Context,
+		TValueStream<T> Stream,
+		std::decay_t<PredicateType> Predicate
+	) -> TWeakCoroutine<T, EValueStreamError>
+	{
+		while (true)
+		{
+			TVariant<T, EDefaultFutureError, EValueStreamError> Value = co_await WithError(Stream.Next());
+	
+			if (auto* Error = Value.template TryGet<EDefaultFutureError>())
+			{
+				continue;
+			}
+	
+			if (auto* Error = Value.template TryGet<EValueStreamError>())
+			{
+				co_return *Error;
+			}
+	
+			if (Invoke(Predicate, Value.template Get<T>()))
+			{
+				co_return Value.template Get<T>();
+			}
+		}
+	}, MoveTemp(Stream), Forward<PredicateType>(Predicate)).ReturnValue();
+}

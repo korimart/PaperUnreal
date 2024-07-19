@@ -61,7 +61,7 @@ public:
 	void SetValue(U&& Value) requires IsConvertibleV<U, ResultType, ErrorTypes...>
 	{
 		constexpr bool bSettingNonError = std::is_convertible_v<U, ResultType>;
-		
+
 		if constexpr (bUObject && bSettingNonError)
 		{
 			if (!IsValid(Value))
@@ -73,7 +73,7 @@ public:
 
 		using ReturnInPlaceType = typename TFirstConvertibleType<U, ResultType, ErrorTypes...>::Type;
 		using ReturnStorageInPlaceType = std::conditional_t<bUObject && bSettingNonError, WeakResultType, ReturnInPlaceType>;
-		
+
 		if (Callback)
 		{
 			Callback(ReturnType{TInPlaceType<ReturnInPlaceType>{}, Forward<U>(Value)});
@@ -436,21 +436,21 @@ template <CDelegate DelegateType>
 auto MakeFutureFromDelegate(DelegateType& Delegate)
 {
 	using ParamTypeTuple = typename TFuncParamTypesToTypeList<TTuple, typename DelegateType::TFuncType>::Type;
-
 	constexpr int32 ParamCount = TTypeListCount_V<ParamTypeTuple>;
 
 	if constexpr (ParamCount == 0)
 	{
-		auto [Promise, Future] = MakeShareablePromise<void>();
-		FutureDetails::BindOneOff(Delegate, [Promise]() mutable { Promise.SetValue(); });
-		return MoveTemp(Future);
+		return MakeFutureFromDelegate<void>(Delegate, []()
+		{
+		});
 	}
 	else if constexpr (ParamCount == 1)
 	{
 		using ResultType = std::decay_t<typename TFirstInTypeList<ParamTypeTuple>::Type>;
-		auto [Promise, Future] = MakeShareablePromise<ResultType>();
-		FutureDetails::BindOneOff(Delegate, [Promise]<typename ArgType>(ArgType&& Arg) mutable { Promise.SetValue(Forward<ArgType>(Arg)); });
-		return MoveTemp(Future);
+		return MakeFutureFromDelegate<ResultType>(Delegate, []<typename T>(T&& V) -> decltype(auto)
+		{
+			return Forward<T>(V);
+		});
 	}
 	else
 	{
@@ -459,6 +459,25 @@ auto MakeFutureFromDelegate(DelegateType& Delegate)
 	}
 }
 
+template <typename T, CDelegate DelegateType, typename TransformFuncType>
+auto MakeFutureFromDelegate(DelegateType& Delegate, TransformFuncType&& TransformFunc)
+{
+	auto [Promise, Future] = MakeShareablePromise<T>();
+	FutureDetails::BindOneOff(Delegate,
+		[Promise, TransformFunc = Forward<TransformFuncType>(TransformFunc)]<typename... ArgTypes>(ArgTypes&&... Args) mutable
+		{
+			if constexpr (std::is_same_v<T, void>)
+			{
+				TransformFunc(Forward<ArgTypes>(Args)...);
+				Promise.SetValue();
+			}
+			else
+			{
+				Promise.SetValue(TransformFunc(Forward<ArgTypes>(Args)...));
+			}
+		});
+	return MoveTemp(Future);
+}
 
 template <CMulticastDelegate MulticastDelegateType>
 auto MakeFutureFromDelegate(MulticastDelegateType& MulticastDelegate)
@@ -466,5 +485,28 @@ auto MakeFutureFromDelegate(MulticastDelegateType& MulticastDelegate)
 	typename MulticastDelegateType::FDelegate Delegate;
 	auto Ret = MakeFutureFromDelegate(Delegate);
 	MulticastDelegate.Add(Delegate);
+	return Ret;
+}
+
+template <typename T, CMulticastDelegate MulticastDelegateType, typename TransformFuncType>
+auto MakeFutureFromDelegate(MulticastDelegateType& MulticastDelegate, TransformFuncType&& TransformFunc)
+{
+	typename MulticastDelegateType::FDelegate Delegate;
+	auto Ret = MakeFutureFromDelegate<T>(Delegate, Forward<TransformFuncType>(TransformFunc));
+	MulticastDelegate.Add(Delegate);
+	return Ret;
+}
+
+
+#include "Engine/AssetManager.h"
+
+
+// TODO 바로 수령하지 않으면 nullptr를 반환할 수 있음
+template <typename SoftObjectType>
+TCancellableFuture<SoftObjectType*> RequestAsyncLoad(const TSoftObjectPtr<SoftObjectType>& SoftPointer)
+{
+	FStreamableDelegate Delegate;
+	auto Ret = MakeFutureFromDelegate<SoftObjectType*>(Delegate, [SoftPointer]() { return SoftPointer.Get(); });
+	UAssetManager::GetStreamableManager().RequestAsyncLoad(SoftPointer.ToSoftObjectPath(), Delegate);
 	return Ret;
 }

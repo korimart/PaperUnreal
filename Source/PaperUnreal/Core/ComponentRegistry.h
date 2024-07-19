@@ -72,12 +72,11 @@ TCancellableFuture<ComponentType*> WaitForComponent(AActor* Owner)
 	}
 	
 	UComponentRegistry* Registry = Owner->GetWorld()->GetSubsystem<UComponentRegistry>();
-	// TODO await
-	// return MakeFutureFromDelegate(
-	// 	Registry->GetComponentMulticastDelegate(ComponentType::StaticClass(), Owner),
-	// 	[](UActorComponent* BeforeCast)
-	// 	{
-	// 		return Cast<ComponentType>(BeforeCast);
-	// 	});
+	return MakeFutureFromDelegate<ComponentType*>(
+		Registry->GetComponentMulticastDelegate(ComponentType::StaticClass(), Owner),
+		[](UActorComponent* BeforeCast)
+		{
+			return Cast<ComponentType>(BeforeCast);
+		});
 	return nullptr;
 }

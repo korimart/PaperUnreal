@@ -1,5 +1,6 @@
 ﻿#include "Misc/AutomationTest.h"
 #include "PaperUnreal/Core/WeakCoroutine/CancellableFuture.h"
+#include "PaperUnreal/Core/WeakCoroutine/ValueStream.h"
 #include "PaperUnreal/Core/WeakCoroutine/WeakCoroutine.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAwaitableWrapperTest, "PaperUnreal.PaperUnreal.Test.AwaitableWrapperTest", EAutomationTestFlags::EditorContext | EAutomationTestFlags::SmokeFilter)
@@ -39,6 +40,6 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 		Array[1].Get<0>().SetValue();
 		TestTrue(TEXT("AnyOf 테스트: 두 개 중에 뒤에 거가 먼저 완료되면 AnyOf도 완료하는지 테스트"), bOver);
 	}
-	
+
 	return true;
 }
