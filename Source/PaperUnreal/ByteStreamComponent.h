@@ -289,11 +289,17 @@ public:
 			while (true)
 			{
 				auto ByteEvents = GetByteStreamer().CreateStream();
-				// TODO await
-				// while (co_await ByteEventsNext())
-				// {
-				// 	Streamer.ReceiveValue(ByteEvents.Pop().Deserialize<typename StreamerType::ValueType>());
-				// }
+				while (true)
+				{
+					// 아래 5줄 while 조건문 안으로 옮기면 컴파일이 안 됨 컴파일러 버그인 듯
+					auto ByteEvent = co_await ByteEvents;
+					if (!ByteEvent)
+					{
+						break;
+					}
+					
+					Streamer.ReceiveValue(ByteEvent.Get().template Deserialize<typename StreamerType::ValueType>());
+				}
 				Streamer.EndStreams();
 			}
 		});

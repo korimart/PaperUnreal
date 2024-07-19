@@ -101,7 +101,8 @@ public:
 		return Receiver->NextValue();
 	}
 
-	friend auto operator co_await(TValueStream& Stream) { return Stream.Next(); }
+	friend TCancellableFutureAwaitable<T, EValueStreamError, ErrorTypes...>
+	operator co_await(TValueStream& Stream) { return operator co_await(Stream.Next()); }
 
 private:
 	TSharedPtr<ReceiverType> Receiver = MakeShared<ReceiverType>();
@@ -280,6 +281,7 @@ TValueStream<T> CreateMulticastValueStream(const TArray<T>& ReadyValues, Delegat
 template <typename T, typename PredicateType>
 TCancellableFuture<T, EValueStreamError> FirstInStream(TValueStream<T>&& Stream, PredicateType&& Predicate)
 {
+	// 이거 NoCapture 버전 안 쓰고 그냥 람다 캡쳐로 하면 컴파일이 안 됨 컴파일러 버그인 듯
 	return RunWeakCoroutineNoCaptures([](
 		TWeakCoroutineContext<T, EValueStreamError>& Context,
 		TValueStream<T> Stream,

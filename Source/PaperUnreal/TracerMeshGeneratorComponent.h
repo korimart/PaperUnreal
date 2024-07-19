@@ -109,38 +109,36 @@ private:
 		{
 			while (true)
 			{
-				// TODO await
-				// auto PathStream = MeshSource->GetTracerPathStreamer().CreateStream();
-				//
-				// if (!co_await PathStream.NextIfNotEnd())
-				// {
-				// 	continue;
-				// }
-				//
-				// MeshDestination->Edit([&, FirstEvent = PathStream.Pop()]()
-				// {
-				// 	MeshDestination->Reset();
-				// 	AppendVerticesFromTracerPath(FirstEvent.Affected);
-				// 	AttachVerticesToAttachmentTarget(0);
-				// });
-				//
-				// while (co_await PathStream.NextIfNotEnd())
-				// {
-				// 	const auto Event = PathStream.Pop();
-				//
-				// 	if (Event.IsAppendedEvent())
-				// 	{
-				// 		MeshDestination->Edit([&]() { AppendVerticesFromTracerPath(Event.Affected); });
-				// 	}
-				// 	else if (Event.IsLastModifiedEvent())
-				// 	{
-				// 		// 현재 이 클래스의 가정: 수정은 Path의 가장 마지막 점에 대해서만 발생. 이 전제가 바뀌면 로직 수정해야 됨
-				// 		check(Event.Affected.Num() == 1);
-				// 		MeshDestination->Edit([&]() { ModifyLastVerticesWithTracerPoint(Event.Affected[0]); });
-				// 	}
-				// }
-				//
-				// MeshDestination->Edit([&]() { AttachVerticesToAttachmentTarget(-1); });
+				auto PathStream = MeshSource->GetTracerPathStreamer().CreateStream();
+				auto FirstPath = co_await PathStream;
+				
+				if (!FirstPath)
+				{
+					continue;
+				}
+				
+				MeshDestination->Edit([&]()
+				{
+					MeshDestination->Reset();
+					AppendVerticesFromTracerPath(FirstPath.Get().Affected);
+					AttachVerticesToAttachmentTarget(0);
+				});
+				
+				while (auto Path = co_await PathStream)
+				{
+					if (Path.Get().IsAppendedEvent())
+					{
+						MeshDestination->Edit([&]() { AppendVerticesFromTracerPath(Path.Get().Affected); });
+					}
+					else if (Path.Get().IsLastModifiedEvent())
+					{
+						// 현재 이 클래스의 가정: 수정은 Path의 가장 마지막 점에 대해서만 발생. 이 전제가 바뀌면 로직 수정해야 됨
+						check(Path.Get().Affected.Num() == 1);
+						MeshDestination->Edit([&]() { ModifyLastVerticesWithTracerPoint(Path.Get().Affected[0]); });
+					}
+				}
+				
+				MeshDestination->Edit([&]() { AttachVerticesToAttachmentTarget(-1); });
 			}
 		});
 	}

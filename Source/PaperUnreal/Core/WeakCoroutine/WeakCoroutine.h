@@ -196,23 +196,23 @@ private:
 
 
 template <typename PromiseType, typename WrappedAwaitableType>
-class TWeakAwaitable2
+class TWeakAwaitable
 {
 public:
 	using ReturnType = decltype(std::declval<WrappedAwaitableType>().await_resume());
 
 	template <typename T> requires std::is_convertible_v<T, WrappedAwaitableType>
-	TWeakAwaitable2(T&& Awaitable)
+	TWeakAwaitable(T&& Awaitable)
 		: WrappedAwaitable(Forward<T>(Awaitable))
 	{
 	}
 
 	bool await_ready() const
 	{
-		return WrappedAwaitable.await_ready();
+		return false;
 	}
 
-	void await_suspend(std::coroutine_handle<PromiseType> InHandle)
+	bool await_suspend(std::coroutine_handle<PromiseType> InHandle)
 	{
 		Handle = InHandle;
 
@@ -231,7 +231,13 @@ public:
 			}
 		};
 
+		if (WrappedAwaitable.await_ready())
+		{
+			return false;
+		}
+		
 		WrappedAwaitable.await_suspend(FWeakCheckingHandle{Handle});
+		return true;
 	}
 
 	ReturnType await_resume()
@@ -279,7 +285,7 @@ template <typename Derived, typename T, typename... ErrorTypes>
 template <CAwaitable AwaitableType>
 auto TWeakCoroutinePromiseTypeBase<Derived, T, ErrorTypes...>::await_transform(AwaitableType&& Awaitable)
 {
-	return TWeakAwaitable2<Derived, std::decay_t<AwaitableType>>{Forward<AwaitableType>(Awaitable)};
+	return TWeakAwaitable<Derived, std::decay_t<AwaitableType>>{Forward<AwaitableType>(Awaitable)};
 }
 
 

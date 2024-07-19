@@ -210,12 +210,17 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 		AAreaActor* MyHomeArea = co_await AbortOnError(Inventory->GetHomeArea().WaitForValue());
 		auto MyHomeAreaMesh = co_await AbortOnError(WaitForComponent<UAreaMeshComponent>(MyHomeArea));
 
-		ITracerPathStream* TracerMeshSource = GetNetMode() == NM_Client
-			? static_cast<ITracerPathStream*>(FindComponentByClass<UReplicatedTracerPathComponent>())
-			: static_cast<ITracerPathStream*>(FindComponentByClass<UTracerPathComponent>());
-
-		// 클래스 서버 코드에서 뭔가 실수한 거임 고쳐야 됨
-		check(TracerMeshSource);
+		ITracerPathStream* TracerMeshSource;
+		if (GetNetMode() == NM_Client)
+		{
+			TracerMeshSource = static_cast<ITracerPathStream*>(
+				co_await AbortOnError(WaitForComponent<UReplicatedTracerPathComponent>(this)));
+		}
+		else
+		{
+			TracerMeshSource = static_cast<ITracerPathStream*>(
+				co_await AbortOnError(WaitForComponent<UTracerPathComponent>(this)));
+		}
 
 		auto TracerMesh = NewObject<UTracerMeshComponent>(this);
 		TracerMesh->RegisterComponent();
