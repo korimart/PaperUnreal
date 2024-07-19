@@ -195,6 +195,12 @@ public:
 	{
 	}
 
+	TCancellableFuture() requires std::is_same_v<T, void>
+		: State(MakeShared<StateType>())
+	{
+		State->SetValue();
+	}
+	
 	template <typename U>
 	TCancellableFuture(U&& ReadyValue) requires IsConvertibleV<U, T, ErrorTypes...>
 		: State(MakeShared<StateType>())

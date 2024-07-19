@@ -19,7 +19,7 @@ class UReadyStateTrackerComponent : public UActorComponent2
 public:
 	TLiveDataView<int32> GetReadyCount() { return ReadyCount; }
 
-	TCancellableFuture<int32, EValueStreamError> WaitUntilCountIsAtLeast(int32 Least)
+	TCancellableFuture<int32, EValueStreamError> ReadyCountIsAtLeast(int32 Least)
 	{
 		return GetReadyCount().WaitForValue([Least](int32 Count) { return Count >= Least; });
 	}

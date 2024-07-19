@@ -6,6 +6,7 @@
 #include "AreaSpawnerComponent.h"
 #include "PlayerSpawnerComponent.h"
 #include "ReadyStateTrackerComponent.h"
+#include "WorldTimerComponent.h"
 #include "Core/GameStateBase2.h"
 #include "PaperUnrealGameState.generated.h"
 
@@ -19,6 +20,9 @@ class APaperUnrealGameState : public AGameStateBase2
 
 public:
 	UPROPERTY()
+	UWorldTimerComponent* WorldTimerComponent;
+	
+	UPROPERTY()
 	UAreaSpawnerComponent* AreaSpawnerComponent;
 	
 	UPROPERTY()
@@ -30,6 +34,7 @@ public:
 private:
 	APaperUnrealGameState()
 	{
+		WorldTimerComponent = CreateDefaultSubobject<UWorldTimerComponent>(TEXT("WorldTimerComponent"));
 		AreaSpawnerComponent = CreateDefaultSubobject<UAreaSpawnerComponent>(TEXT("AreaSpawnerComponent"));
 		PlayerSpawnerComponent = CreateDefaultSubobject<UPlayerSpawnerComponent>(TEXT("PlayerSpawnerComponent"));
 		ReadyStateTrackerComponent = CreateDefaultSubobject<UReadyStateTrackerComponent>(TEXT("ReadyStateTrackerComponent"));

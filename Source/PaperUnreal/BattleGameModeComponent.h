@@ -4,9 +4,11 @@
 
 #include "CoreMinimal.h"
 #include "AreaSpawnerComponent.h"
+#include "AreaStateTrackerComponent.h"
 #include "InventoryComponent.h"
 #include "PlayerSpawnerComponent.h"
 #include "ReadyStateComponent.h"
+#include "WorldTimerComponent.h"
 #include "Core/ActorComponent2.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
@@ -58,11 +60,12 @@ public:
 	{
 		check(HasBegunPlay());
 
+		WorldTimer = GetWorld()->GetGameState()->FindComponentByClass<UWorldTimerComponent>();
 		AreaSpawner = GetWorld()->GetGameState()->FindComponentByClass<UAreaSpawnerComponent>();
 		PlayerSpawner = GetWorld()->GetGameState()->FindComponentByClass<UPlayerSpawnerComponent>();
 
-		// 이 두 컴포넌트는 디펜던시: 이 컴포넌트들을 가지는 GameState에 대해서만 이 클래스를 사용할 수 있음
-		check(AllValid(AreaSpawner, PlayerSpawner));
+		// 이 컴포넌트들은 디펜던시: 이 컴포넌트들을 가지는 GameState에 대해서만 이 클래스를 사용할 수 있음
+		check(AllValid(WorldTimer, AreaSpawner, PlayerSpawner));
 
 		TeamAllocator.Configure(TeamCount, EachTeamMemberCount);
 
@@ -86,6 +89,9 @@ public:
 private:
 	UPROPERTY()
 	UClass* PawnClass;
+	
+	UPROPERTY()
+	UWorldTimerComponent* WorldTimer;
 	
 	UPROPERTY()
 	UAreaSpawnerComponent* AreaSpawner;
@@ -126,10 +132,6 @@ private:
 
 			// 이 컴포넌트들은 디펜던시: 이 컴포넌트들을 가지는 PlayerState에 대해서만 이 클래스를 사용할 수 있음
 			check(AllValid(TeamComponent, ReadyState, Inventory));
-
-			Context.AbortIfNotValid(TeamComponent);
-			Context.AbortIfNotValid(ReadyState);
-			Context.AbortIfNotValid(Inventory);
 
 			co_await ReadyState->GetbReady().WaitForValue(true);
 
@@ -179,24 +181,32 @@ private:
 
 	void InitiateGameFlow()
 	{
-		// RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
-		// {
-		// 	// auto GameOverAwaitable = Sharable awaitable
-		// 	
-		// 	RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
-		// 	{
-		// 		// co_await WaitForSeconds(GetWorld(), 60);
-		// 		// GameOverAwaitableHandle.SetValue();
-		// 	});
-		// 	
-		// 	RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
-		// 	{
-		// 		// co_await OnlyOneTeamLeft
-		// 		// GameOverAwaitableHandle.SetValue();
-		// 	});
-		//
-		// 	// co_await GameOverAwaitable
-		// });
+		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			auto Timeout = AbortOnError(RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+			{
+				co_await WorldTimer->At(GetWorld()->GetTimeSeconds() + 60.f);
+			}));
+			
+			auto OnlyOneTeamSurviving = AbortOnError(RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+			{
+				auto AreaStateTracker = NewObject<UAreaStateTrackerComponent>(GetOwner());
+				AreaStateTracker->SetSpawner(AreaSpawner);
+				AreaStateTracker->RegisterComponent();
+				
+				auto F = FinallyIfValid(AreaStateTracker, [AreaStateTracker](){ AreaStateTracker->DestroyComponent(); });
+
+				co_await AreaStateTracker->OnlyOneAreaIsSurviving();
+			}));
+		
+			const TOptional<int32> CompletedAwaitableIndex = co_await AnyOf(MoveTemp(Timeout), MoveTemp(OnlyOneTeamSurviving));
+			if (!CompletedAwaitableIndex)
+			{
+				co_return;
+			}
+
+			// TODO end game
+		});
 	}
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override

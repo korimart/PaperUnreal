@@ -19,6 +19,12 @@ public:
 	FPlayerStateEvent OnPlayerStateAdded;
 	FPlayerStateEvent OnPlayerStateRemoved;
 
+	double GetLatestServerWorldTimeSeconds() const
+	{
+		return ReplicatedWorldTimeSecondsDouble;
+	}
+
+protected:
 	virtual void AddPlayerState(APlayerState* PlayerState) override
 	{
 		Super::AddPlayerState(PlayerState);

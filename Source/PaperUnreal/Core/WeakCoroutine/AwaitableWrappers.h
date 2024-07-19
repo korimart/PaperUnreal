@@ -144,41 +144,69 @@ public:
 	template <typename HandleType>
 	void await_suspend(const HandleType& Handle)
 	{
-		auto bComplete = MakeShared<bool>(false);
-
-		struct FCompleteCheckingHandle
+		struct FCompletionReporter
 		{
+			int32 Index;
+			HandleType Handle;
+			TAnyOfAwaitable* This;
 			TSharedRef<bool> bComplete;
-			std::decay_t<HandleType> Handle;
 
-			void Resume()
+			void OnComplete()
 			{
 				if (!*bComplete)
 				{
 					*bComplete = true;
+					This->ReturnValue = Index;
 					Handle.resume();
 				}
 			}
 		};
 
-		const auto WaitForCompletion = [](auto Awaitable, FCompleteCheckingHandle Handle) -> FMinimalCoroutine
+		struct FNoCompletionReporter
 		{
-			auto F = Finally([&]() { Handle.Resume(); });
-			co_await Awaitable;
+			HandleType Handle;
+			TSharedRef<bool> bComplete;
+
+			~FNoCompletionReporter()
+			{
+				if (!*bComplete)
+				{
+					Handle.resume();
+				}
+			}
 		};
 
-		MoveTemp(Awaitables).ApplyAfter([&](auto&&... Args)
+		const auto WaitForCompletion = [](
+			auto Awaitable,
+			FCompletionReporter Reporter,
+			TSharedRef<FNoCompletionReporter>) -> FMinimalCoroutine
 		{
-			(WaitForCompletion(MoveTemp(Args), {bComplete, Handle}), ...);
-		});
+			co_await Awaitable;
+			Reporter.OnComplete();
+		};
+
+		auto bComplete = MakeShared<bool>(false);
+		auto NoCompletionReporter = MakeShared<FNoCompletionReporter>(Handle, bComplete);
+		
+		const auto RunCoroutines = [&]<std::size_t... Indices>(std::index_sequence<Indices...>)
+		{
+			(WaitForCompletion(
+				MoveTemp(Awaitables.template Get<Indices>()),
+				{Indices, Handle, this, bComplete},
+				NoCompletionReporter), ...);
+		};
+
+		RunCoroutines(std::make_index_sequence<sizeof...(AwaitableTypes)>());
 	}
 
-	void await_resume()
+	TOptional<int32> await_resume()
 	{
+		return ReturnValue;
 	}
 
 private:
 	TTuple<AwaitableTypes...> Awaitables;
+	TOptional<int32> ReturnValue;
 };
 
 

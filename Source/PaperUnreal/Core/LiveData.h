@@ -187,6 +187,7 @@ public:
 	{
 	}
 
+	// TODO 없애자
 	TCancellableFuture<ValueType> WaitForValue() { return LiveData.WaitForValue(); }
 
 	template <CEqualityComparable<ValueType> ArgType>

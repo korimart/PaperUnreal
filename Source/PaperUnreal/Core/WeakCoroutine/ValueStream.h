@@ -96,6 +96,7 @@ public:
 		return Receiver;
 	}
 
+	// TODO 없애자
 	TCancellableFuture<T, EValueStreamError, ErrorTypes...> Next()
 	{
 		return Receiver->NextValue();
@@ -112,6 +113,7 @@ private:
 bool AllValid(const auto&... Check);
 
 
+// TODO dangling pointer for uobject types
 template <typename T>
 class TValueStreamer
 {
