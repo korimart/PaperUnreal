@@ -12,9 +12,9 @@ bool FCancellableFutureTest::RunTest(const FString& Parameters)
 		TCancellableFuture<void> Future = Promise.GetFuture();
 
 		bool bReceived = false;
-		Future.Then([&](const TVariant<std::monostate, EDefaultFutureError>& Result)
+		Future.Then([&](const auto& Result)
 		{
-			bReceived = Result.IsType<std::monostate>();
+			bReceived = !!Result;
 		});
 
 		TestFalse(TEXT("void 타입에 대해 값이 Future에서 잘 받아지는지 테스트"), bReceived);
@@ -29,9 +29,9 @@ bool FCancellableFutureTest::RunTest(const FString& Parameters)
 		Promise.SetValue();
 
 		bool bReceived = false;
-		Future.Then([&](const TVariant<std::monostate, EDefaultFutureError>& Result)
+		Future.Then([&](const auto& Result)
 		{
-			bReceived = Result.IsType<std::monostate>();
+			bReceived = !!Result;
 		});
 
 		TestTrue(TEXT("void 타입에 대해 값이 미리 준비되어 있는 경우에 Future에서 잘 받아지는지 테스트"), bReceived);
@@ -42,9 +42,9 @@ bool FCancellableFutureTest::RunTest(const FString& Parameters)
 		TCancellableFuture<void> Future = Promise->GetFuture();
 
 		bool bReceived = false;
-		Future.Then([&](const TVariant<std::monostate, EDefaultFutureError>& Result)
+		Future.Then([&](const auto& Result)
 		{
-			bReceived = Result.Get<EDefaultFutureError>() == EDefaultFutureError::PromiseNotFulfilled;
+			bReceived = *Result.template TryGet<EDefaultFutureError>() == EDefaultFutureError::PromiseNotFulfilled;
 		});
 
 		TestFalse(TEXT("void 타입에 대해 약속이 지켜지지 않은 경우 Future에서 잘 받아지는지 테스트"), bReceived);
@@ -92,10 +92,10 @@ bool FCancellableFutureTest::RunTest(const FString& Parameters)
 
 		bool bReceived = false;
 		int32 CopyCount;
-		Future.Then([&](const TVariant<FPassThisAround, EDefaultFutureError>& Result)
+		Future.Then([&](const auto& Result)
 		{
 			bReceived = true;
-			CopyCount = Result.Get<FPassThisAround>().Copied;
+			CopyCount = Result.Get().Copied;
 		});
 
 		TestFalse(TEXT("non void 타입에 대해 Future에서 잘 받아지는지 테스트"), bReceived);
@@ -111,7 +111,7 @@ bool FCancellableFutureTest::RunTest(const FString& Parameters)
 		TCancellableFuture<FPassThisAround> Future = Promise0.GetFuture();
 
 		int32 Count = 0;
-		Future.Then([&](const TVariant<FPassThisAround, EDefaultFutureError>& Result)
+		Future.Then([&](const auto& Result)
 		{
 			Count++;
 		});
@@ -134,9 +134,9 @@ bool FCancellableFutureTest::RunTest(const FString& Parameters)
 		TCancellableFuture<FPassThisAround> Future = PromiseArray[0].GetFuture();
 
 		bool bReceived = false;
-		Future.Then([&](const TVariant<FPassThisAround, EDefaultFutureError>& Result)
+		Future.Then([&](const auto& Result)
 		{
-			bReceived = Result.Get<EDefaultFutureError>() == EDefaultFutureError::PromiseNotFulfilled;
+			bReceived = *Result.template TryGet<EDefaultFutureError>() == EDefaultFutureError::PromiseNotFulfilled;
 		});
 
 		TestFalse(TEXT("Shareable Promise가 약속을 지키지 않을 때 Future에서 잘 받아지는지 테스트"), bReceived);
@@ -152,9 +152,9 @@ bool FCancellableFutureTest::RunTest(const FString& Parameters)
 		FSimpleMulticastDelegate MulticastDelegate;
 
 		int32 Count = 0;
-		MakeFutureFromDelegate(MulticastDelegate).Then([&](const TVariant<std::monostate, EDefaultFutureError>& Result)
+		MakeFutureFromDelegate(MulticastDelegate).Then([&](const auto& Result)
 		{
-			check(!Result.IsType<EDefaultFutureError>());
+			check(!!Result);
 			Count++;
 		});
 
@@ -174,9 +174,9 @@ bool FCancellableFutureTest::RunTest(const FString& Parameters)
 		FIntMulticastDelegate MulticastDelegate;
 
 		int32 Sum = 0;
-		MakeFutureFromDelegate(MulticastDelegate).Then([&](const TVariant<int32, EDefaultFutureError>& Result)
+		MakeFutureFromDelegate(MulticastDelegate).Then([&](const auto& Result)
 		{
-			Sum += Result.Get<int32>();
+			Sum += Result.Get();
 		});
 
 		TestEqual(TEXT("파라미터가 하나인 멀티캐스트 델리게이트에서 Future 만들기 테스트"), Sum, 0);
@@ -195,9 +195,9 @@ bool FCancellableFutureTest::RunTest(const FString& Parameters)
 		FIntMulticastDelegate MulticastDelegate;
 
 		int32 Received = 0;
-		MakeFutureFromDelegate(MulticastDelegate).Then([&](const TVariant<int32, EDefaultFutureError>& Result)
+		MakeFutureFromDelegate(MulticastDelegate).Then([&](const auto& Result)
 		{
-			Received = Result.Get<int32>();
+			Received = Result.Get();
 		});
 
 		TestEqual(TEXT("파라미터가 레퍼런스인 멀티캐스트 델리게이트에서 Future 만들기 테스트"), Received, 0);
@@ -212,9 +212,9 @@ bool FCancellableFutureTest::RunTest(const FString& Parameters)
 		Promise.SetValue(Dummy);
 
 		bool bReceived = false;
-		Future.Then([&](const TVariant<UDummy*, EDefaultFutureError>& Result)
+		Future.Then([&](const auto& Result)
 		{
-			bReceived = IsValid(Result.Get<UDummy*>());
+			bReceived = IsValid(Result.Get());
 		});
 
 		TestTrue(TEXT("UObject 타입에 대해 값이 Future에서 잘 받아지는지 테스트"), bReceived);
@@ -228,9 +228,9 @@ bool FCancellableFutureTest::RunTest(const FString& Parameters)
 		Dummy->MarkAsGarbage();
 
 		bool bReceived = false;
-		Future.Then([&](const TVariant<UDummy*, EDefaultFutureError>& Result)
+		Future.Then([&](const auto& Result)
 		{
-			bReceived = Result.Get<EDefaultFutureError>() == EDefaultFutureError::InvalidObject;
+			bReceived = *Result.template TryGet<EDefaultFutureError>() == EDefaultFutureError::InvalidObject;
 		});
 
 		TestTrue(TEXT("이미 파괴된 UObject가 Future에서 dangling pointer가 되지 않고 잘 받아지는지 테스트"), bReceived);

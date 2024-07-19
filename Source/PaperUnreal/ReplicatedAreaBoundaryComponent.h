@@ -56,7 +56,7 @@ private:
 			Context.AbortIfNotValid(BoundarySource);
 			for (auto Boundaries = BoundarySource->GetBoundaryStreamer().CreateStream();;)
 			{
-				RepPoints = (co_await Boundaries.Next()).GetPoints();
+				RepPoints = (co_await AbortOnError(Boundaries)).GetPoints();
 			}
 		});
 	}

@@ -90,7 +90,7 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 {
 	RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
 	{
-		APlayerState* PlayerState = co_await WaitForPlayerState();
+		APlayerState* PlayerState = co_await AbortOnError(WaitForPlayerState());
 		if (!IsValid(PlayerState))
 		{
 			co_return;
@@ -129,7 +129,7 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		Context.AbortIfNotValid(PlayerSpawner);
 		Context.AbortIfNotValid(Inventory);
 		Context.AbortIfNotValid(MyHomeArea);
-		auto HomeAreaBoundary = co_await WaitForComponent<UAreaBoundaryComponent>(MyHomeArea);
+		auto HomeAreaBoundary = co_await AbortOnError(WaitForComponent<UAreaBoundaryComponent>(MyHomeArea));
 
 		auto TracerPath = NewObject<UTracerPathComponent>(this);
 		TracerPath->SetNoPathArea(HomeAreaBoundary);
@@ -165,7 +165,7 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 				{
 					Context.AbortIfNotValid(AreaConverter);
 
-					auto NewBoundary = co_await WaitForComponent<UAreaBoundaryComponent>(NewArea);
+					auto NewBoundary = co_await AbortOnError(WaitForComponent<UAreaBoundaryComponent>(NewArea));
 					auto AreaSlasher = NewObject<UAreaSlasherComponent>(this);
 					AreaSlasher->SetSlashTarget(NewBoundary);
 					AreaSlasher->SetTracerToAreaConverter(AreaConverter.Get());
@@ -182,7 +182,7 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 				{
 					Context.AbortIfNotValid(TracerOverlapChecker);
 
-					auto NewTracer = co_await WaitForComponent<UTracerPathComponent>(NewPlayer);
+					auto NewTracer = co_await AbortOnError(WaitForComponent<UTracerPathComponent>(NewPlayer));
 					TracerOverlapChecker->AddOverlapTarget(NewTracer);
 				});
 			}
@@ -194,7 +194,7 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 {
 	RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
 	{
-		APlayerState* PlayerState = co_await WaitForPlayerState();
+		APlayerState* PlayerState = co_await AbortOnError(WaitForPlayerState());
 		if (!IsValid(PlayerState))
 		{
 			co_return;
@@ -207,8 +207,8 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 			co_return;
 		}
 
-		AAreaActor* MyHomeArea = co_await Inventory->GetHomeArea().WaitForValue();
-		auto MyHomeAreaMesh = co_await WaitForComponent<UAreaMeshComponent>(MyHomeArea);
+		AAreaActor* MyHomeArea = co_await AbortOnError(Inventory->GetHomeArea().WaitForValue());
+		auto MyHomeAreaMesh = co_await AbortOnError(WaitForComponent<UAreaMeshComponent>(MyHomeArea));
 
 		ITracerPathStream* TracerMeshSource = GetNetMode() == NM_Client
 			? static_cast<ITracerPathStream*>(FindComponentByClass<UReplicatedTracerPathComponent>())
@@ -237,8 +237,8 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 
 				while (true)
 				{
-					auto SoftTracerMaterial = co_await TracerMaterialStream.Next();
-					TracerMesh->ConfigureMaterialSet({co_await RequestAsyncLoad(SoftTracerMaterial)});
+					auto SoftTracerMaterial = co_await AbortOnError(TracerMaterialStream);
+					TracerMesh->ConfigureMaterialSet({co_await AbortOnError(RequestAsyncLoad(SoftTracerMaterial))});
 				}
 			});
 	});

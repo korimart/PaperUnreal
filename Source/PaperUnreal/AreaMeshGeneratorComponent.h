@@ -50,7 +50,7 @@ private:
 			Context.AbortIfNotValid(MeshDest);
 			for (auto BoundaryStream = MeshSource->GetBoundaryStreamer().CreateStream();;)
 			{
-				MeshDest->SetMeshByWorldBoundary(co_await BoundaryStream.Next());
+				MeshDest->SetMeshByWorldBoundary(co_await AbortOnError(BoundaryStream));
 			}
 		});
 	}

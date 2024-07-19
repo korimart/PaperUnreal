@@ -105,8 +105,8 @@ private:
 			Context.AbortIfNotValid(AreaMesh);
 			for (auto AreaMaterialStream = AreaMaterial.CreateStream();;)
 			{
-				auto SoftAreaMaterial = co_await AreaMaterialStream.Next();
-				AreaMesh->ConfigureMaterialSet({co_await RequestAsyncLoad(SoftAreaMaterial)});
+				auto SoftAreaMaterial = co_await AbortOnError(AreaMaterialStream);
+				AreaMesh->ConfigureMaterialSet({co_await AbortOnError(RequestAsyncLoad(SoftAreaMaterial))});
 			}
 		});
 	}

@@ -279,22 +279,7 @@ template <typename Derived, typename T, typename... ErrorTypes>
 template <CAwaitable AwaitableType>
 auto TWeakCoroutinePromiseTypeBase<Derived, T, ErrorTypes...>::await_transform(AwaitableType&& Awaitable)
 {
-	if constexpr (TIsInstantiationOf_V<AwaitableType, TCancellableFutureAwaitable>)
-	{
-		using NoErrorAwaitableType = TErrorRemovedCancellableFutureAwaitable<std::decay_t<AwaitableType>>;
-		return TWeakAwaitable2<Derived, NoErrorAwaitableType>{NoErrorAwaitableType{Forward<AwaitableType>(Awaitable)}};
-	}
-	else
-	{
-		return TWeakAwaitable2<Derived, std::decay_t<AwaitableType>>{Forward<AwaitableType>(Awaitable)};
-	}
-}
-
-
-template <typename... Types>
-auto WithError(TCancellableFuture<Types...>&& Future)
-{
-	return TIdentityAwaitable<TCancellableFutureAwaitable<Types...>>{operator co_await(MoveTemp(Future))};
+	return TWeakAwaitable2<Derived, std::decay_t<AwaitableType>>{Forward<AwaitableType>(Awaitable)};
 }
 
 

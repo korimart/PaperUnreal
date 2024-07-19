@@ -37,7 +37,7 @@ void APaperUnrealPlayerController::BeginPlay()
 		{
 			for (auto PawnStream = CreatePossessedPawnStream();;)
 			{
-				APawn* PossessedPawn = co_await PawnStream.Next();
+				APawn* PossessedPawn = co_await AbortOnError(PawnStream);
 				if (!PossessedPawn)
 				{
 					Subsystem->RemoveMappingContext(DefaultMappingContext);

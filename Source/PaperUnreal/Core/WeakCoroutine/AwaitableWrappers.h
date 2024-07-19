@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "PaperUnreal/Core/Utils.h"
 #include "PaperUnreal/Core/WeakCoroutine/TypeTraits.h"
+#include "PaperUnreal/Core/WeakCoroutine/CancellableFuture.h"
 
 
 struct FMinimalCoroutine
@@ -103,7 +104,7 @@ public:
 
 			void resume() const
 			{
-				This->FutureAwaitable.Peek().GetIndex() == 0 ? Handle.resume() : Handle.destroy();
+				This->FutureAwaitable.Peek() ? Handle.resume() : Handle.destroy();
 			}
 		};
 
@@ -112,7 +113,7 @@ public:
 
 	auto await_resume()
 	{
-		return FutureAwaitable.await_resume().template Get<typename FutureAwaitableType::ResultType>();
+		return FutureAwaitable.await_resume().Get();
 	}
 
 private:
@@ -199,8 +200,21 @@ namespace AwaitableWrapperDetails
 	template <typename... AwaitableTypes>
 	TAnyOfAwaitable<AwaitableTypes...> AnyOfImpl(AwaitableTypes... Awaitables)
 	{
-		return TAnyOfAwaitable<AwaitableTypes...>{MoveTemp(Awaitables)...};
+		return {MoveTemp(Awaitables)...};
 	}
+}
+
+
+template <typename AnyType>
+auto AbortOnError(AnyType&& Awaitable)
+{
+	return AbortOnError(operator co_await(Forward<AnyType>(Awaitable)));
+}
+
+template <typename... Types>
+auto AbortOnError(TCancellableFutureAwaitable<Types...>&& Awaitable)
+{
+	return TErrorRemovedCancellableFutureAwaitable<TCancellableFutureAwaitable<Types...>>{MoveTemp(Awaitable)};
 }
 
 

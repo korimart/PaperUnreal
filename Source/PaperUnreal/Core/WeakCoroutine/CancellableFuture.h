@@ -155,13 +155,40 @@ private:
 };
 
 
+template <typename ResultVariantType>
+class TCancellableFutureReturn
+{
+	using NonErrorType = typename TFirstInTypeList<ResultVariantType>::Type;
+
+public:
+	TCancellableFutureReturn(ResultVariantType&& ResultVariant)
+		: Variant(MoveTemp(ResultVariant))
+	{
+	}
+
+	explicit operator bool() const
+	{
+		return Variant.GetIndex() == 0;
+	}
+
+	const auto& Get() const & { return Variant.template Get<NonErrorType>(); }
+	auto& Get() & { return Variant.template Get<NonErrorType>(); }
+
+	template <typename T>
+	auto TryGet() const { return Variant.template TryGet<T>(); }
+
+private:
+	ResultVariantType Variant;
+};
+
+
 template <typename T, typename... ErrorTypes>
 class TCancellableFuture
 {
 public:
 	using StateType = TCancellableFutureState<T, EDefaultFutureError, ErrorTypes...>;
 	using ResultType = typename StateType::ResultType;
-	using ReturnType = typename StateType::ReturnType;
+	using ReturnType = TCancellableFutureReturn<typename StateType::ReturnType>;
 
 	TCancellableFuture(const TSharedRef<StateType>& InState)
 		: State(InState)
@@ -197,13 +224,18 @@ public:
 	{
 		check(!IsConsumed());
 
+		auto FuncTakingFutureReturn = [Func = Forward<FuncType>(Func)]<typename U>(U&& FromState)
+		{
+			Func(ReturnType{Forward<U>(FromState)});
+		};
+
 		if (State->HasValue())
 		{
-			Func(State->ConsumeValue());
+			FuncTakingFutureReturn(State->ConsumeValue());
 		}
 		else
 		{
-			State->ConsumeValueOnArrival(Forward<FuncType>(Func));
+			State->ConsumeValueOnArrival(MoveTemp(FuncTakingFutureReturn));
 		}
 
 		State = nullptr;

@@ -271,11 +271,10 @@ public:
 			{
 				OpenStream();
 				auto PathEvents = Streamer.CreateStream();
-				// TODO await
-				// while (co_await PathEvents.NextIfNotEnd())
-				// {
-				// 	TriggerEvent(PathEvents.Pop().Serialize());
-				// }
+				while (auto PathEvent = co_await PathEvents)
+				{
+					TriggerEvent(PathEvent.Get().Serialize());
+				}
 				CloseStream();
 			}
 		});

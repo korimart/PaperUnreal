@@ -52,7 +52,7 @@ void APaperUnrealGameMode::BeginPlay()
 		BattleMode->SetPawnClass(DefaultPawnClass);
 		BattleMode->RegisterComponent();
 		
-		const FBattleModeGameResult GameResult = co_await BattleMode->Start(2, 2);
+		const FBattleModeGameResult GameResult = co_await AbortOnError(BattleMode->Start(2, 2));
 
 		// TODO replicate game result
 

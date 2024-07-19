@@ -288,7 +288,11 @@ TCancellableFuture<T, EValueStreamError> FirstInStream(TValueStream<T>&& Stream,
 	{
 		while (true)
 		{
-			TVariant<T, EDefaultFutureError, EValueStreamError> Value = co_await WithError(Stream.Next());
+			auto Value = co_await Stream;
+			if (Value && Invoke(Predicate, Value.Get()))
+			{
+				co_return Value.Get();
+			}
 	
 			if (auto* Error = Value.template TryGet<EDefaultFutureError>())
 			{
@@ -298,11 +302,6 @@ TCancellableFuture<T, EValueStreamError> FirstInStream(TValueStream<T>&& Stream,
 			if (auto* Error = Value.template TryGet<EValueStreamError>())
 			{
 				co_return *Error;
-			}
-	
-			if (Invoke(Predicate, Value.template Get<T>()))
-			{
-				co_return Value.template Get<T>();
 			}
 		}
 	}, MoveTemp(Stream), Forward<PredicateType>(Predicate)).ReturnValue();
