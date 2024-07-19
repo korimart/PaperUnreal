@@ -121,6 +121,15 @@ UE_NODISCARD auto FinallyIfValid(UObject* Object, FuncType&& Func)
 
 
 template <typename T>
+T PopFront(TArray<T>& Array, int32 Index = 0)
+{
+	T Ret = MoveTemp(Array[Index]);
+	Array.RemoveAt(Index);
+	return Ret;
+}
+
+
+template <typename T>
 void FindAndDestroyComponent(AActor* Actor)
 {
 	if (auto Found = Actor->FindComponentByClass<T>())

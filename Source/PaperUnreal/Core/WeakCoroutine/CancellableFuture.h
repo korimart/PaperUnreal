@@ -168,6 +168,13 @@ public:
 	{
 	}
 
+	template <typename U>
+	TCancellableFuture(U&& ReadyValue) requires IsConvertibleV<U, T, ErrorTypes...>
+		: State(MakeShared<StateType>())
+	{
+		State->SetValue(Forward<U>(ReadyValue));
+	}
+
 	TCancellableFuture(const TCancellableFuture&) = delete;
 	TCancellableFuture& operator=(const TCancellableFuture&) = delete;
 
@@ -398,6 +405,13 @@ template <typename... Types>
 TCancellableFutureAwaitable<Types...> operator co_await(TCancellableFuture<Types...>&& Future)
 {
 	return {MoveTemp(Future)};
+}
+
+
+template <typename T, typename... ErrorTypes, typename U>
+TCancellableFuture<T, ErrorTypes...> MakeReadyFuture(U&& ReadyValue) requires IsConvertibleV<U, T, ErrorTypes...>
+{
+	return TCancellableFuture<T, ErrorTypes...>{Forward<U>(ReadyValue)};
 }
 
 

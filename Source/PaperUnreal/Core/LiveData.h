@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "UECoroutine.h"
+#include "WeakCoroutine/ValueStream.h"
 
 
 template <typename T>
