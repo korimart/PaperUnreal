@@ -7,31 +7,29 @@
 #include "WeakCoroutine/ValueStream.h"
 
 
-template <typename Derived, typename InValueType>
+template <typename Derived, typename InternalStorageType>
 class TLiveDataBase
 {
 public:
-	using ValueType = InValueType;
-
-	TLiveDataBase() requires std::is_default_constructible_v<ValueType>
+	TLiveDataBase() requires std::is_default_constructible_v<InternalStorageType>
 		: Value{}
 	{
 	}
 
-	template <typename T> requires std::is_convertible_v<T, ValueType>
+	template <typename T> requires std::is_convertible_v<T, InternalStorageType>
 	TLiveDataBase(T&& Init)
 		: Value(Forward<T>(Init))
 	{
 	}
 
-	template <typename T> requires CInequalityComparable<ValueType> && std::is_convertible_v<T, ValueType>
+	template <typename T> requires CInequalityComparable<InternalStorageType> && std::is_convertible_v<T, InternalStorageType>
 	TLiveDataBase& operator=(T&& NewValue)
 	{
 		SetValue(Forward<T>(NewValue));
 		return *this;
 	}
 
-	template <typename T> requires CInequalityComparable<ValueType> && std::is_convertible_v<T, ValueType>
+	template <typename T> requires CInequalityComparable<InternalStorageType> && std::is_convertible_v<T, InternalStorageType>
 	void SetValue(T&& Right)
 	{
 		check(!bExecutingCallbacks);
@@ -41,7 +39,7 @@ public:
 		}
 	}
 
-	template <typename T> requires CInequalityComparable<ValueType> && std::is_convertible_v<T, ValueType>
+	template <typename T> requires CInequalityComparable<InternalStorageType> && std::is_convertible_v<T, InternalStorageType>
 	bool SetValueSilent(T&& Right)
 	{
 		check(!bExecutingCallbacks);
@@ -53,7 +51,7 @@ public:
 		return false;
 	}
 
-	template <typename T> requires std::is_convertible_v<T, ValueType>
+	template <typename T> requires std::is_convertible_v<T, InternalStorageType>
 	void SetValueAlways(T&& Right)
 	{
 		Value = Forward<T>(Right);
@@ -94,26 +92,26 @@ public:
 			: TArray<typename Derived::ValidType>{};
 
 		return CreateMulticastValueStream(InitArray, OnChanged,
-			[](const ValueType& NewValue) { return Derived::IsValid(NewValue); },
-			[](const ValueType& NewValue) { return Derived::ToValid(NewValue); });
+			[](const InternalStorageType& NewValue) { return Derived::IsValid(NewValue); },
+			[](const InternalStorageType& NewValue) { return Derived::ToValid(NewValue); });
 	}
 
 	// 이거 허용을 안 하면 LiveData 안에 들어있는 객체의 non const 함수를 호출할 수 없음
-	ValueType& Get() [[msvc::lifetimebound]] { return Value; }
+	InternalStorageType& Get() [[msvc::lifetimebound]] { return Value; }
 
-	const ValueType& Get() const [[msvc::lifetimebound]] { return Value; }
+	const InternalStorageType& Get() const [[msvc::lifetimebound]] { return Value; }
 
 protected:
-	DECLARE_MULTICAST_DELEGATE_OneParam(FOnChanged, const ValueType&);
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnChanged, const std::decay_t<InternalStorageType>&);
 	FOnChanged OnChanged;
 
-	ValueType Value;
+	InternalStorageType Value;
 	bool bExecutingCallbacks = false;
 
 	template <typename FuncType>
 	auto ToValidCheckingFunc(FuncType&& Func)
 	{
-		return [Func = Forward<FuncType>(Func)](const ValueType& Target)
+		return [Func = Forward<FuncType>(Func)](const InternalStorageType& Target)
 		{
 			if (Derived::IsValid(Target))
 			{
@@ -129,9 +127,11 @@ class TLiveData : public TLiveDataBase<TLiveData<InValueType>, InValueType>
 {
 public:
 	using Super = TLiveDataBase<TLiveData, InValueType>;
-	using ValueType = typename Super::ValueType;
+	using ValueType = InValueType;
 	using ValidType = ValueType;
+	
 	using Super::Super;
+	using Super::operator=;
 
 	ValidType* operator->() { return &Super::Get(); }
 	const ValidType* operator->() const { return &Super::Get(); }
@@ -151,10 +151,11 @@ class TLiveData<TOptional<InValueType>> : private TLiveDataBase<TLiveData<TOptio
 {
 public:
 	using Super = TLiveDataBase<TLiveData, TOptional<InValueType>>;
-	using ValueType = typename Super::ValueType;
+	using ValueType = TOptional<InValueType>;
 	using ValidType = InValueType;
 
 	using Super::Super;
+	using Super::operator=;
 	using Super::SetValue;
 	using Super::SetValueSilent;
 	using Super::SetValueAlways;
@@ -189,16 +190,16 @@ private:
 };
 
 
-// TODO Object 타입에 대한 처리가 필요함 Cache 되어 있는 동안에 파괴될 수 있음
 template <typename InValueType>
-class TLiveData<InValueType*> : private TLiveDataBase<TLiveData<InValueType*>, InValueType*>
+class TLiveData<InValueType*> : private TLiveDataBase<TLiveData<InValueType*>, InValueType*&>
 {
 public:
-	using Super = TLiveDataBase<TLiveData, InValueType*>;
-	using ValueType = typename Super::ValueType;
+	using Super = TLiveDataBase<TLiveData, InValueType*&>;
+	using ValueType = InValueType*;
 	using ValidType = InValueType*;
 
 	using Super::Super;
+	using Super::operator=;
 	using Super::SetValue;
 	using Super::SetValueSilent;
 	using Super::SetValueAlways;
@@ -268,17 +269,8 @@ public:
 	decltype(auto) operator*() { return *LiveData; }
 	decltype(auto) operator*() const { return *LiveData; }
 
-	template <typename FuncType>
-	void Observe(UObject* Lifetime, FuncType&& Func)
-	{
-		LiveData.Observe(Lifetime, Forward<FuncType>(Func));
-	}
-
-	template <typename T, typename FuncType>
-	void Observe(const TSharedRef<T>& Lifetime, FuncType&& Func)
-	{
-		LiveData.Observe(Lifetime, Forward<FuncType>(Func));
-	}
+	template <typename... ArgTypes>
+	void Observe(ArgTypes&&... Args) { LiveData.Observe(Forward<ArgTypes>(Args)...); }
 
 private:
 	TLiveData<ValueType>& LiveData;
@@ -286,19 +278,23 @@ private:
 
 
 // TLiveData Declarations
-#define REPPED_VALUE_TYPE(Type) std::conditional_t<std::is_pointer_v<Type>, Type, TOptional<Type>>
-
-
 #define DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(Type, Name)\
-	private: TLiveData<REPPED_VALUE_TYPE(Type)> Name;\
+	private: TLiveData<TOptional<Type>> Name;\
 	public:\
-	TLiveDataView<REPPED_VALUE_TYPE(Type)> Get##Name() { return Name; };\
+	TLiveDataView<TOptional<Type>> Get##Name() { return Name; };\
 	void Set##Name(const std::type_identity_t<Type>& NewValue) { DEFINE_REPPED_VAR_SETTER(Name, NewValue); }
 
 
 #define DECLARE_REPPED_LIVE_DATA_GETTER_SETTER_WITH_DEFAULT(Type, Name, Default)\
-	private: TLiveData<REPPED_VALUE_TYPE(Type)> Name{Default};\
+	private: TLiveData<TOptional<Type>> Name{Default};\
 	public:\
-	TLiveDataView<REPPED_VALUE_TYPE(Type)> Get##Name() { return Name; };\
+	TLiveDataView<TOptional<Type>> Get##Name() { return Name; };\
+	void Set##Name(const std::type_identity_t<Type>& NewValue) { DEFINE_REPPED_VAR_SETTER(Name, NewValue); }
+
+
+#define DECLARE_REPPED_UOBJECT_LIVE_DATA_GETTER_SETTER(Type, Name, BackingField)\
+	private: TLiveData<Type> Name{BackingField};\
+	public:\
+	TLiveDataView<Type> Get##Name() { return Name; };\
 	void Set##Name(const std::type_identity_t<Type>& NewValue) { DEFINE_REPPED_VAR_SETTER(Name, NewValue); }
 // ~TLiveData Declarations

@@ -14,7 +14,7 @@ class UInventoryComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(AAreaActor*, HomeArea); // TODO move
+	DECLARE_REPPED_UOBJECT_LIVE_DATA_GETTER_SETTER(AAreaActor*, HomeArea, RepHomeArea); // TODO move
 	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(TSoftObjectPtr<UMaterialInstance>, TracerMaterial);
 
 private:
