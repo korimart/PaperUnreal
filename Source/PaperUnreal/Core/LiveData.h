@@ -45,6 +45,17 @@ public:
 
 		OnChanged.AddWeakLambda(Lifetime, Forward<FuncType>(Func));
 	}
+	
+	template <typename T, typename FuncType>
+	void Observe(const TSharedRef<T>& Lifetime, FuncType&& Func)
+	{
+		if (Value)
+		{
+			Func(*Value);
+		}
+
+		OnChanged.Add(FOnChanged::FDelegate::CreateSPLambda(Lifetime, Forward<FuncType>(Func)));
+	}
 
 	TCancellableFuture<ValueType> WaitForValue()
 	{
@@ -211,6 +222,12 @@ public:
 
 	template <typename FuncType>
 	void Observe(UObject* Lifetime, FuncType&& Func)
+	{
+		LiveData.Observe(Lifetime, Forward<FuncType>(Func));
+	}
+	
+	template <typename T, typename FuncType>
+	void Observe(const TSharedRef<T>& Lifetime, FuncType&& Func)
 	{
 		LiveData.Observe(Lifetime, Forward<FuncType>(Func));
 	}

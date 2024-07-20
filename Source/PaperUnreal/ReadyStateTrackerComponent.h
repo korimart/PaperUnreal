@@ -6,6 +6,7 @@
 #include "ReadyStateComponent.h"
 #include "Core/ActorComponent2.h"
 #include "Core/GameStateBase2.h"
+#include "Core/Utils.h"
 #include "Core/WeakCoroutine/CancellableFuture.h"
 #include "GameFramework/PlayerState.h"
 #include "ReadyStateTrackerComponent.generated.h"
@@ -25,10 +26,14 @@ public:
 	}
 
 private:
-	TLiveData<int32> ReadyCount{0};
-
+	// TODO replace with live data
 	UPROPERTY()
 	TSet<APlayerState*> ReadyPlayerStates;
+
+	UPROPERTY()
+	TMap<APlayerState*, FDelegateSPHandle> PlayerStateToHandleMap;
+	
+	TLiveData<int32> ReadyCount{0};
 
 	UReadyStateTrackerComponent()
 	{
@@ -39,27 +44,31 @@ private:
 	{
 		Super::InitializeComponent();
 
-		// PlayerState가 한 번 추가되면 같은 PlayerState가 다시 추가되지 않는다고 가정함
-		// (즉 플레이어가 한 번 나갔다 오면 APlayerState 액터가 재사용 되는 것이 아닌 새 것이 만들어진다고 가정함)
-		// 가정이 깨질 경우 한 액터에 여러번 콜백을 바인딩 할 수 있음
-		GetOuterAGameStateBase2()->OnPlayerStateAdded.AddWeakLambda(this, [this](APlayerState* NewPlayerState)
+		GetOuterAGameStateBase2()->OnPlayerStateAdded.AddWeakLambda(this, [this](APlayerState* PlayerState)
 		{
-			if (UReadyStateComponent* ReadyState = NewPlayerState->FindComponentByClass<UReadyStateComponent>())
+			if (auto ReadyState = PlayerState->FindComponentByClass<UReadyStateComponent>())
 			{
-				ReadyState->GetbReady().Observe(this, [this, NewPlayerState](bool bReady)
+				FDelegateSPHandle Handle = PlayerStateToHandleMap.Emplace(PlayerState, {});
+				ReadyState->GetbReady().Observe(Handle.ToShared(), [this, PlayerState](bool bReady)
 				{
-					if (bReady)
-					{
-						ReadyPlayerStates.Add(NewPlayerState);
-					}
-					else
-					{
-						ReadyPlayerStates.Remove(NewPlayerState);
-					}
-
+					bReady ? (void)ReadyPlayerStates.Add(PlayerState) : (void)ReadyPlayerStates.Remove(PlayerState);
 					ReadyCount.SetValue(ReadyPlayerStates.Num());
 				});
 			}
 		});
+		
+		GetOuterAGameStateBase2()->OnPlayerStateRemoved.AddWeakLambda(this, [this](APlayerState* PlayerState)
+		{
+			PlayerStateToHandleMap.Remove(PlayerState);
+			ReadyPlayerStates.Remove(PlayerState);
+			ReadyCount.SetValue(ReadyPlayerStates.Num());
+		});
+	}
+
+	virtual void UninitializeComponent() override
+	{
+		Super::UninitializeComponent();
+
+		PlayerStateToHandleMap.Empty();
 	}
 };

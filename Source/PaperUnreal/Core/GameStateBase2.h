@@ -15,6 +15,7 @@ class AGameStateBase2 : public AGameStateBase
 	GENERATED_BODY()
 
 public:
+	// TODO replace with live data
 	DECLARE_MULTICAST_DELEGATE_OneParam(FPlayerStateEvent, APlayerState*);
 	FPlayerStateEvent OnPlayerStateAdded;
 	FPlayerStateEvent OnPlayerStateRemoved;

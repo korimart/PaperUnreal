@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Utils.generated.h"
 
 
 namespace Utils_Private
@@ -29,7 +30,7 @@ namespace Utils_Private
 		return SmartPointer.IsValid();
 	}
 
-	
+
 	template <typename FuncType>
 	class TFinally
 	{
@@ -60,6 +61,18 @@ namespace Utils_Private
 		TOptional<FuncType> Func;
 	};
 }
+
+
+USTRUCT()
+struct FDelegateSPHandle
+{
+	GENERATED_BODY()
+	
+	const TSharedRef<bool>& ToShared() const { return Life; }
+
+private:
+	TSharedRef<bool> Life = MakeShared<bool>();
+};
 
 
 template <typename T>

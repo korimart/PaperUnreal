@@ -9,15 +9,16 @@
 #include "AreaStateTrackerComponent.generated.h"
 
 
+// TODO 이 클래스 구현 ReadyStateTracker랑 완전히 똑같다
 UCLASS()
 class UAreaStateTrackerComponent : public UActorComponent2
 {
 	GENERATED_BODY()
 
 public:
-	TCancellableFuture<void> OnlyOneAreaIsSurviving()
+	TCancellableFuture<int32, EValueStreamError> OnlyOneAreaIsSurviving()
 	{
-		return {};
+		return TLiveDataView{LiveAreaCount}.WaitForValue(0);
 	}
 	
 	void SetSpawner(UAreaSpawnerComponent* Spawner)
@@ -29,6 +30,14 @@ public:
 private:
 	UPROPERTY()
 	UAreaSpawnerComponent* AreaSpawner;
+	
+	UPROPERTY()
+	TSet<AAreaActor*> LiveAreas;
+	
+	UPROPERTY()
+	TMap<AAreaActor*, FDelegateSPHandle> AreaToHandleMap;
+	
+	TLiveData<int32> LiveAreaCount{0};
 
 	UAreaStateTrackerComponent()
 	{
@@ -40,5 +49,22 @@ private:
 		Super::InitializeComponent();
 
 		AddLifeDependency(AreaSpawner);
+
+		AreaSpawner->GetSpawnedAreaStreamer().Observe(this, [this](AAreaActor* SpawnedArea)
+		{
+			FDelegateSPHandle Handle = AreaToHandleMap.Emplace(SpawnedArea, {});
+			SpawnedArea->LifeComponent->GetbAlive().Observe(Handle.ToShared(), [this, SpawnedArea](bool bAlive)
+			{
+				bAlive ? (void)LiveAreas.Add(SpawnedArea) : (void)LiveAreas.Remove(SpawnedArea);
+				LiveAreaCount.SetValue(LiveAreas.Num());
+			});
+		});
+	}
+
+	virtual void UninitializeComponent() override
+	{
+		Super::UninitializeComponent();
+
+		AreaToHandleMap.Empty();
 	}
 };
