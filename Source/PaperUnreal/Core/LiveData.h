@@ -45,7 +45,7 @@ public:
 
 		OnChanged.AddWeakLambda(Lifetime, Forward<FuncType>(Func));
 	}
-	
+
 	template <typename T, typename FuncType>
 	void Observe(const TSharedRef<T>& Lifetime, FuncType&& Func)
 	{
@@ -57,19 +57,19 @@ public:
 		OnChanged.Add(FOnChanged::FDelegate::CreateSPLambda(Lifetime, Forward<FuncType>(Func)));
 	}
 
-	TCancellableFuture<ValueType> WaitForValue()
+	friend TCancellableFutureAwaitable<ValueType> operator co_await(TLiveData& LiveData)
 	{
-		if (Value)
+		auto Future = [&]() -> TCancellableFuture<ValueType>
 		{
-			return *Value;
-		}
+			if (LiveData.Value)
+			{
+				return *LiveData.Value;
+			}
 
-		return MakeFutureFromDelegate(OnChanged);
-	}
+			return MakeFutureFromDelegate(LiveData.OnChanged);
+		}();
 
-	friend TCancellableFuture<ValueType> operator co_await(TLiveData& LiveData)
-	{
-		return LiveData.WaitForValue();
+		return Future;
 	}
 
 	TValueStream<ValueType> CreateStream()
@@ -198,19 +198,21 @@ public:
 	{
 	}
 
-	// TODO 없애자
-	TCancellableFuture<ValueType> WaitForValue() { return LiveData.WaitForValue(); }
+	friend TCancellableFutureAwaitable<ValueType> operator co_await(TLiveDataView LiveDataView)
+	{
+		return operator co_await(LiveDataView.LiveData);
+	}
 
 	template <CEqualityComparable<ValueType> ArgType>
-	TCancellableFuture<ValueType, EValueStreamError> WaitForValue(ArgType&& OfThis)
+	TCancellableFuture<ValueType, EValueStreamError> If(ArgType&& OfThis)
 	{
-		return FirstInStream(CreateStream(), [OfThis = Forward<ArgType>(OfThis)](const ValueType& Value){ return Value == OfThis; });
+		return FirstInStream(CreateStream(), [OfThis = Forward<ArgType>(OfThis)](const ValueType& Value) { return Value == OfThis; });
 	}
-	
+
 	template <CPredicate<ValueType> PredicateType>
-	TCancellableFuture<ValueType, EValueStreamError> WaitForValue(PredicateType&& Predicate)
+	TCancellableFuture<ValueType, EValueStreamError> If(PredicateType&& Predicate)
 	{
-		return FirstInStream(CreateStream(), [Predicate = Forward<PredicateType>(Predicate)](const ValueType& Value){ return Predicate(Value); });
+		return FirstInStream(CreateStream(), [Predicate = Forward<PredicateType>(Predicate)](const ValueType& Value) { return Predicate(Value); });
 	}
 
 	TValueStream<ValueType> CreateStream() { return LiveData.CreateStream(); }
@@ -225,7 +227,7 @@ public:
 	{
 		LiveData.Observe(Lifetime, Forward<FuncType>(Func));
 	}
-	
+
 	template <typename T, typename FuncType>
 	void Observe(const TSharedRef<T>& Lifetime, FuncType&& Func)
 	{

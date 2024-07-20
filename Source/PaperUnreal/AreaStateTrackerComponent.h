@@ -18,7 +18,7 @@ class UAreaStateTrackerComponent : public UActorComponent2
 public:
 	TCancellableFuture<int32, EValueStreamError> OnlyOneAreaIsSurviving()
 	{
-		return TLiveDataView{LiveAreaCount}.WaitForValue(0);
+		return TLiveDataView{LiveAreaCount}.If(1);
 	}
 	
 	void SetSpawner(UAreaSpawnerComponent* Spawner)

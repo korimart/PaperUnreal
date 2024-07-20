@@ -133,7 +133,7 @@ private:
 			// 이 컴포넌트들은 디펜던시: 이 컴포넌트들을 가지는 PlayerState에 대해서만 이 클래스를 사용할 수 있음
 			check(AllValid(TeamComponent, ReadyState, Inventory));
 
-			co_await ReadyState->GetbReady().WaitForValue(true);
+			co_await ReadyState->GetbReady().If(true);
 
 			// 죽은 다음에 다시 스폰하는 경우에는 팀이 이미 있음
 			if (!TeamComponent->GetTeamIndex().GetValue().IsSet())

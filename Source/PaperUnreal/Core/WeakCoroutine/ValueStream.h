@@ -96,14 +96,8 @@ public:
 		return Receiver;
 	}
 
-	// TODO 없애자
-	TCancellableFuture<T, EValueStreamError, ErrorTypes...> Next()
-	{
-		return Receiver->NextValue();
-	}
-
 	friend TCancellableFutureAwaitable<T, EValueStreamError, ErrorTypes...>
-	operator co_await(TValueStream& Stream) { return operator co_await(Stream.Next()); }
+	operator co_await(TValueStream& Stream) { return operator co_await(Stream.Receiver->NextValue()); }
 
 private:
 	TSharedPtr<ReceiverType> Receiver = MakeShared<ReceiverType>();
@@ -289,24 +283,24 @@ TCancellableFuture<T, EValueStreamError> FirstInStream(TValueStream<T>&& Stream,
 		TValueStream<T> Stream,
 		std::decay_t<PredicateType> Predicate
 	) -> TWeakCoroutine<T, EValueStreamError>
-	{
-		while (true)
 		{
-			auto Value = co_await Stream;
-			if (Value && Invoke(Predicate, Value.Get()))
+			while (true)
 			{
-				co_return Value.Get();
+				auto Value = co_await Stream;
+				if (Value && Invoke(Predicate, Value.Get()))
+				{
+					co_return Value.Get();
+				}
+
+				if (auto* Error = Value.template TryGet<EDefaultFutureError>())
+				{
+					continue;
+				}
+
+				if (auto* Error = Value.template TryGet<EValueStreamError>())
+				{
+					co_return *Error;
+				}
 			}
-	
-			if (auto* Error = Value.template TryGet<EDefaultFutureError>())
-			{
-				continue;
-			}
-	
-			if (auto* Error = Value.template TryGet<EValueStreamError>())
-			{
-				co_return *Error;
-			}
-		}
-	}, MoveTemp(Stream), Forward<PredicateType>(Predicate)).ReturnValue();
+		}, MoveTemp(Stream), Forward<PredicateType>(Predicate)).ReturnValue();
 }

@@ -22,7 +22,7 @@ public:
 
 	TCancellableFuture<int32, EValueStreamError> ReadyCountIsAtLeast(int32 Least)
 	{
-		return GetReadyCount().WaitForValue([Least](int32 Count) { return Count >= Least; });
+		return GetReadyCount().If([Least](int32 Count) { return Count >= Least; });
 	}
 
 private:

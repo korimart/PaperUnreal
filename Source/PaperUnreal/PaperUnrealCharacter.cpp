@@ -207,7 +207,7 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 			co_return;
 		}
 
-		AAreaActor* MyHomeArea = co_await AbortOnError(Inventory->GetHomeArea().WaitForValue());
+		AAreaActor* MyHomeArea = co_await AbortOnError(Inventory->GetHomeArea());
 		auto MyHomeAreaMesh = co_await AbortOnError(WaitForComponent<UAreaMeshComponent>(MyHomeArea));
 
 		ITracerPathStream* TracerMeshSource;
