@@ -16,27 +16,27 @@ class UAreaStateTrackerComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	TCancellableFuture<int32, EValueStreamError> OnlyOneAreaIsSurviving()
-	{
-		return TLiveDataView{LiveAreaCount}.If(1);
-	}
-	
 	void SetSpawner(UAreaSpawnerComponent* Spawner)
 	{
 		check(!HasBeenInitialized());
 		AreaSpawner = Spawner;
 	}
 
+	TCancellableFuture<int32, EValueStreamError> OnlyOneAreaIsSurviving()
+	{
+		return TLiveDataView{LiveAreaCount}.If(1);
+	}
+
 private:
 	UPROPERTY()
 	UAreaSpawnerComponent* AreaSpawner;
-	
+
 	UPROPERTY()
 	TSet<AAreaActor*> LiveAreas;
-	
+
 	UPROPERTY()
 	TMap<AAreaActor*, FDelegateSPHandle> AreaToHandleMap;
-	
+
 	TLiveData<int32> LiveAreaCount{0};
 
 	UAreaStateTrackerComponent()

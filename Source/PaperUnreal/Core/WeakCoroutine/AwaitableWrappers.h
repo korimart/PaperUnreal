@@ -136,9 +136,29 @@ public:
 	TAnyOfAwaitable(TAnyOfAwaitable&&) = default;
 	TAnyOfAwaitable& operator=(TAnyOfAwaitable&&) = delete;
 
-	bool await_ready() const
+	bool await_ready()
 	{
-		return Awaitables.ApplyAfter([](const auto&... Args) { return (Args.await_ready() || ...); });
+		const auto FindReadyAwaitable = [&]<std::size_t Index, std::size_t... Indices>(
+			auto& Self, std::index_sequence<Index, Indices...>) -> TOptional<int32>
+		{
+			if (Awaitables.template Get<Index>().await_ready())
+			{
+				return Index;
+			}
+
+			if constexpr (sizeof...(Indices) > 0)
+			{
+				return Self(Self, std::index_sequence<Indices...>{});
+			}
+			else
+			{
+				return {};
+			}
+		};
+
+		ReturnValue = FindReadyAwaitable(FindReadyAwaitable, std::index_sequence_for<AwaitableTypes...>{});
+		
+		return !!ReturnValue;
 	}
 
 	template <typename HandleType>
@@ -187,7 +207,7 @@ public:
 
 		auto bComplete = MakeShared<bool>(false);
 		auto NoCompletionReporter = MakeShared<FNoCompletionReporter>(Handle, bComplete);
-		
+
 		const auto RunCoroutines = [&]<std::size_t... Indices>(std::index_sequence<Indices...>)
 		{
 			(WaitForCompletion(
@@ -196,7 +216,7 @@ public:
 				NoCompletionReporter), ...);
 		};
 
-		RunCoroutines(std::make_index_sequence<sizeof...(AwaitableTypes)>());
+		RunCoroutines(std::index_sequence_for<AwaitableTypes...>());
 	}
 
 	TOptional<int32> await_resume()

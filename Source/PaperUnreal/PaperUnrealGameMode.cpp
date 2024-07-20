@@ -45,7 +45,7 @@ void APaperUnrealGameMode::BeginPlay()
 		
 		// TODO 방설정 완료될 때까지 대기
 		
-		co_await AbortOnError(GetGameState<APaperUnrealGameState>()->ReadyStateTrackerComponent->ReadyCountIsAtLeast(1));
+		co_await AbortOnError(GetGameState<APaperUnrealGameState>()->ReadyStateTrackerComponent->ReadyCountIsAtLeast(2));
 
 		// TODO 실제 game mode 설정
 		auto BattleMode = NewObject<UBattleGameModeComponent>(this);

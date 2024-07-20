@@ -15,6 +15,9 @@
 #include "BattleGameModeComponent.generated.h"
 
 
+DECLARE_LOG_CATEGORY_EXTERN(LogBattleGameMode, Log, All);
+
+
 class FTeamAllocator
 {
 public:
@@ -183,6 +186,8 @@ private:
 	{
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
+			UE_LOG(LogBattleGameMode, Log, TEXT("게임을 시작합니다"));
+			
 			auto Timeout = AbortOnError(RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 			{
 				co_await WorldTimer->At(GetWorld()->GetTimeSeconds() + 60.f);
@@ -203,6 +208,15 @@ private:
 			if (!CompletedAwaitableIndex)
 			{
 				co_return;
+			}
+
+			if (CompletedAwaitableIndex == 0)
+			{
+				UE_LOG(LogBattleGameMode, Log, TEXT("제한시간이 끝나 게임을 종료합니다"));
+			}
+			else if (CompletedAwaitableIndex == 1)
+			{
+				UE_LOG(LogBattleGameMode, Log, TEXT("팀이 하나 밖에 남지 않아 게임을 종료합니다"));
 			}
 
 			// TODO end game

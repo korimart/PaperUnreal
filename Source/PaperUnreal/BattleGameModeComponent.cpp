@@ -2,3 +2,6 @@
 
 
 #include "BattleGameModeComponent.h"
+
+
+DEFINE_LOG_CATEGORY(LogBattleGameMode);
