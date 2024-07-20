@@ -244,17 +244,22 @@ private:
 
 
 template <typename T, typename DelegateType>
-TValueStream<T> CreateMulticastValueStream(const TArray<T>& ReadyValues, DelegateType& MulticastDelegate)
+TValueStream<T> CreateMulticastValueStream(
+	const TArray<T>& ReadyValues,
+	DelegateType& MulticastDelegate)
 {
-	return CreateMulticastValueStream(ReadyValues, MulticastDelegate, []<typename ArgType>(ArgType&& Arg) -> decltype(auto)
-	{
-		return Forward<ArgType>(Arg);
-	});
+	return CreateMulticastValueStream(ReadyValues, MulticastDelegate,
+		[](auto...) { return true; },
+		[]<typename ArgType>(ArgType&& Arg) -> decltype(auto) { return Forward<ArgType>(Arg); });
 }
 
 
-template <typename T, typename DelegateType, typename TransformFuncType>
-TValueStream<T> CreateMulticastValueStream(const TArray<T>& ReadyValues, DelegateType& MulticastDelegate, TransformFuncType&& TransformFunc)
+template <typename T, typename DelegateType, typename PredicateType, typename TransformFuncType>
+TValueStream<T> CreateMulticastValueStream(
+	const TArray<T>& ReadyValues,
+	DelegateType& MulticastDelegate,
+	PredicateType&& Predicate,
+	TransformFuncType&& TransformFunc)
 {
 	TValueStream<T> Ret;
 
@@ -265,9 +270,16 @@ TValueStream<T> CreateMulticastValueStream(const TArray<T>& ReadyValues, Delegat
 	}
 
 	MulticastDelegate.Add(DelegateType::FDelegate::CreateSPLambda(Receiver.Pin().ToSharedRef(),
-		[Receiver, TransformFunc = Forward<TransformFuncType>(TransformFunc)]<typename... ArgTypes>(ArgTypes&&... NewValues)
+		[
+			Receiver,
+			Predicate = Forward<PredicateType>(Predicate),
+			TransformFunc = Forward<TransformFuncType>(TransformFunc)
+		]<typename... ArgTypes>(ArgTypes&&... NewValues)
 		{
-			Receiver.Pin()->ReceiveValue(TransformFunc(Forward<ArgTypes>(NewValues)...));
+			if (Predicate(Forward<ArgTypes>(NewValues)...))
+			{
+				Receiver.Pin()->ReceiveValue(TransformFunc(Forward<ArgTypes>(NewValues)...));
+			}
 		}));
 
 	return Ret;

@@ -90,7 +90,7 @@ public:
 	
 	bool IsInside(UAreaBoundaryComponent* Other) const
 	{
-		if (const TOptional<FLoopedSegmentArray2D>& OtherBoundary = Other->GetBoundaryStreamer().GetValue())
+		if (const TOptional<FLoopedSegmentArray2D>& OtherBoundary = Other->GetBoundaryStreamer().Get())
 		{
 			return AreaBoundary->IsInside(*OtherBoundary);
 		}

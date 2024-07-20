@@ -263,7 +263,7 @@ public:
 	}
 
 	template <typename StreamerType>
-	void SetInputStream(UE_LIFETIMEBOUND StreamerType& Streamer)
+	void SetInputStream([[msvc::lifetimebound]] StreamerType& Streamer)
 	{
 		RunWeakCoroutine(this, [this, &Streamer](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
@@ -281,7 +281,7 @@ public:
 	}
 	
 	template <typename StreamerType>
-	void SetOutputStream(UE_LIFETIMEBOUND StreamerType& Streamer)
+	void SetOutputStream([[msvc::lifetimebound]] StreamerType& Streamer)
 	{
 		RunWeakCoroutine(this, [this, &Streamer](FWeakCoroutineContext&) -> FWeakCoroutine
 		{

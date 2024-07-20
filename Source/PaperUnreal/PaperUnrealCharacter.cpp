@@ -119,7 +119,7 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 
 		// 캐릭터의 possess 시점에 영역이 이미 준비되어 있다고 가정함
 		// 영역 스폰을 기다리는 기획이 되면 기다리는 동안 뭘 할 것인지에 대한 기획이 필요함
-		AAreaActor* MyHomeArea = Inventory->GetHomeArea().GetValue();
+		AAreaActor* MyHomeArea = Inventory->GetHomeArea().Get();
 		if (!ensureAlways(IsValid(MyHomeArea)))
 		{
 			co_return;

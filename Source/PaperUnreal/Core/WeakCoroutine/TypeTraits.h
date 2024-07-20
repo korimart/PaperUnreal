@@ -105,3 +105,15 @@ concept CMulticastDelegate = TIsInstantiationOf_V<T, TMulticastDelegate>;
 
 template <typename AwaitableType>
 concept CAwaitable = requires(AwaitableType Awaitable) { Awaitable.await_resume(); };
+
+template <typename T>
+concept CAwaitableConvertible = requires (T Arg) { operator co_await(Arg); };
+
+template <typename T, typename U>
+concept CEqualityComparable = requires(T Arg0, U Arg1) { Arg0 == Arg1; };
+
+template <typename T>
+concept CInequalityComparable = requires(T Arg0, T Arg1) { Arg0 != Arg1; };
+
+template <typename PredicateType, typename ValueType>
+concept CPredicate = requires(PredicateType Predicate, ValueType Value) { { Predicate(Value) } -> std::same_as<bool>; };

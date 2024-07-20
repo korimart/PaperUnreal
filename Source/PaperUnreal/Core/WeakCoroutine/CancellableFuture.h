@@ -89,7 +89,7 @@ public:
 		return Ret.IsSet();
 	}
 
-	ReturnType&& ConsumeValue() UE_LIFETIMEBOUND requires !bUObject
+	ReturnType&& ConsumeValue() [[msvc::lifetimebound]] requires !bUObject
 	{
 		check(!bResultConsumed);
 		bResultConsumed = true;
@@ -200,7 +200,7 @@ public:
 	{
 		State->SetValue();
 	}
-	
+
 	template <typename U>
 	TCancellableFuture(U&& ReadyValue) requires IsConvertibleV<U, T, ErrorTypes...>
 		: State(MakeShared<StateType>())
@@ -478,17 +478,16 @@ auto MakeFutureFromDelegate(DelegateType& Delegate)
 
 	if constexpr (ParamCount == 0)
 	{
-		return MakeFutureFromDelegate<void>(Delegate, []()
-		{
-		});
+		return MakeFutureFromDelegate<void>(Delegate,
+			[]() { return true; },
+			[]() { return; });
 	}
 	else if constexpr (ParamCount == 1)
 	{
 		using ResultType = std::decay_t<typename TFirstInTypeList<ParamTypeTuple>::Type>;
-		return MakeFutureFromDelegate<ResultType>(Delegate, []<typename T>(T&& V) -> decltype(auto)
-		{
-			return Forward<T>(V);
-		});
+		return MakeFutureFromDelegate<ResultType>(Delegate,
+			[](auto) { return true; },
+			[]<typename T>(T&& V) -> decltype(auto) { return Forward<T>(V); });
 	}
 	else
 	{
@@ -497,13 +496,22 @@ auto MakeFutureFromDelegate(DelegateType& Delegate)
 	}
 }
 
-template <typename T, CDelegate DelegateType, typename TransformFuncType>
-auto MakeFutureFromDelegate(DelegateType& Delegate, TransformFuncType&& TransformFunc)
+template <typename T, CDelegate DelegateType, typename PredicateType, typename TransformFuncType>
+auto MakeFutureFromDelegate(DelegateType& Delegate, PredicateType&& Predicate, TransformFuncType&& TransformFunc)
 {
 	auto [Promise, Future] = MakeShareablePromise<T>();
-	FutureDetails::BindOneOff(Delegate,
-		[Promise, TransformFunc = Forward<TransformFuncType>(TransformFunc)]<typename... ArgTypes>(ArgTypes&&... Args) mutable
+
+	FutureDetails::BindOneOff(Delegate, [
+			Promise,
+			Predicate = Forward<PredicateType>(Predicate),
+			TransformFunc = Forward<TransformFuncType>(TransformFunc)
+		]<typename... ArgTypes>(ArgTypes&&... Args) mutable
 		{
+			if (!Predicate(Forward<ArgTypes>(Args)...))
+			{
+				return;
+			}
+
 			if constexpr (std::is_same_v<T, void>)
 			{
 				TransformFunc(Forward<ArgTypes>(Args)...);
@@ -514,6 +522,7 @@ auto MakeFutureFromDelegate(DelegateType& Delegate, TransformFuncType&& Transfor
 				Promise.SetValue(TransformFunc(Forward<ArgTypes>(Args)...));
 			}
 		});
+
 	return MoveTemp(Future);
 }
 
@@ -526,11 +535,11 @@ auto MakeFutureFromDelegate(MulticastDelegateType& MulticastDelegate)
 	return Ret;
 }
 
-template <typename T, CMulticastDelegate MulticastDelegateType, typename TransformFuncType>
-auto MakeFutureFromDelegate(MulticastDelegateType& MulticastDelegate, TransformFuncType&& TransformFunc)
+template <typename T, CMulticastDelegate MulticastDelegateType, typename PredicateType, typename TransformFuncType>
+auto MakeFutureFromDelegate(MulticastDelegateType& MulticastDelegate, PredicateType&& Predicate, TransformFuncType&& TransformFunc)
 {
 	typename MulticastDelegateType::FDelegate Delegate;
-	auto Ret = MakeFutureFromDelegate<T>(Delegate, Forward<TransformFuncType>(TransformFunc));
+	auto Ret = MakeFutureFromDelegate<T>(Delegate, Forward<PredicateType>(Predicate), Forward<TransformFuncType>(TransformFunc));
 	MulticastDelegate.Add(Delegate);
 	return Ret;
 }
@@ -544,7 +553,10 @@ template <typename SoftObjectType>
 TCancellableFuture<SoftObjectType*> RequestAsyncLoad(const TSoftObjectPtr<SoftObjectType>& SoftPointer)
 {
 	FStreamableDelegate Delegate;
-	auto Ret = MakeFutureFromDelegate<SoftObjectType*>(Delegate, [SoftPointer]() { return SoftPointer.Get(); });
+	auto Ret = MakeFutureFromDelegate<SoftObjectType*>(
+		Delegate,
+		[]() { return true; },
+		[SoftPointer]() { return SoftPointer.Get(); });
 	UAssetManager::GetStreamableManager().RequestAsyncLoad(SoftPointer.ToSoftObjectPath(), Delegate);
 	return Ret;
 }

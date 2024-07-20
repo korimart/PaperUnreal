@@ -3,82 +3,32 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "WeakCoroutine/TypeTraits.h"
 #include "WeakCoroutine/ValueStream.h"
 
 
-template <typename T>
-concept CInequalityComparable = requires(T Arg0, T Arg1)
-{
-	Arg0 != Arg1;
-};
-
-
-// TODO Object 타입에 대한 처리가 필요함 Cache 되어 있는 동안에 파괴될 수 있음
-template <typename InValueType>
-class TLiveData
+template <typename Derived, typename InValueType>
+class TLiveDataBase
 {
 public:
 	using ValueType = InValueType;
 
-	TLiveData() = default;
-
-	template <typename T> requires std::is_convertible_v<T, ValueType>
-	TLiveData(T&& Other)
-		: Value(Forward<T>(Other))
+	TLiveDataBase() requires std::is_default_constructible_v<ValueType>
+		: Value{}
 	{
 	}
 
 	template <typename T> requires std::is_convertible_v<T, ValueType>
-	TLiveData& operator=(T&& Other)
+	TLiveDataBase(T&& Init)
+		: Value(Forward<T>(Init))
 	{
-		SetValue(Forward<T>(Other));
+	}
+
+	template <typename T> requires CInequalityComparable<ValueType> && std::is_convertible_v<T, ValueType>
+	TLiveDataBase& operator=(T&& NewValue)
+	{
+		SetValue(Forward<T>(NewValue));
 		return *this;
-	}
-
-	template <typename FuncType>
-	void Observe(UObject* Lifetime, FuncType&& Func)
-	{
-		if (Value)
-		{
-			Func(*Value);
-		}
-
-		OnChanged.AddWeakLambda(Lifetime, Forward<FuncType>(Func));
-	}
-
-	template <typename T, typename FuncType>
-	void Observe(const TSharedRef<T>& Lifetime, FuncType&& Func)
-	{
-		if (Value)
-		{
-			Func(*Value);
-		}
-
-		OnChanged.Add(FOnChanged::FDelegate::CreateSPLambda(Lifetime, Forward<FuncType>(Func)));
-	}
-
-	friend TCancellableFutureAwaitable<ValueType> operator co_await(TLiveData& LiveData)
-	{
-		auto Future = [&]() -> TCancellableFuture<ValueType>
-		{
-			if (LiveData.Value)
-			{
-				return *LiveData.Value;
-			}
-
-			return MakeFutureFromDelegate(LiveData.OnChanged);
-		}();
-
-		return Future;
-	}
-
-	TValueStream<ValueType> CreateStream()
-	{
-		if (Value)
-		{
-			return CreateMulticastValueStream(TArray<ValueType>{*Value}, OnChanged);
-		}
-		return CreateMulticastValueStream(TArray<ValueType>{}, OnChanged);
 	}
 
 	template <typename T> requires CInequalityComparable<ValueType> && std::is_convertible_v<T, ValueType>
@@ -97,7 +47,7 @@ public:
 		check(!bExecutingCallbacks);
 		if (Value != Right)
 		{
-			Value.Emplace(Forward<T>(Right));
+			Value = Forward<T>(Right);
 			return true;
 		}
 		return false;
@@ -106,86 +56,180 @@ public:
 	template <typename T> requires std::is_convertible_v<T, ValueType>
 	void SetValueAlways(T&& Right)
 	{
-		Value.Emplace(Forward<T>(Right));
+		Value = Forward<T>(Right);
 		Notify();
 	}
 
 	void Notify()
 	{
-		if (Value)
+		if (Derived::IsValid(Get()))
 		{
 			check(!bExecutingCallbacks);
 			bExecutingCallbacks = true;
-			OnChanged.Broadcast(*Value);
+			OnChanged.Broadcast(Derived::ToValid(Get()));
 			bExecutingCallbacks = false;
 		}
 	}
 
-	TOptional<ValueType>& GetValue() requires !std::is_pointer_v<ValueType>
+	template <typename FuncType>
+	void Observe(UObject* Lifetime, FuncType&& Func)
 	{
-		return Value;
+		auto ValidCheckingFunc = ToValidCheckingFunc(Forward<FuncType>(Func));
+		ValidCheckingFunc(Get());
+		OnChanged.AddWeakLambda(Lifetime, ValidCheckingFunc);
 	}
 
-	ValueType* operator->() requires !std::is_pointer_v<ValueType>
+	template <typename T, typename FuncType>
+	void Observe(const TSharedRef<T>& Lifetime, FuncType&& Func)
 	{
-		return &*Value;
+		auto ValidCheckingFunc = ToValidCheckingFunc(Forward<FuncType>(Func));
+		ValidCheckingFunc(Get());
+		OnChanged.Add(FOnChanged::FDelegate::CreateSPLambda(Lifetime, ValidCheckingFunc));
 	}
 
-	ValueType& operator*() requires !std::is_pointer_v<ValueType>
+	auto CreateStream()
 	{
-		return *Value;
+		auto InitArray = Derived::IsValid(Get())
+			? TArray<typename Derived::ValidType>{Derived::ToValid(Get())}
+			: TArray<typename Derived::ValidType>{};
+
+		return CreateMulticastValueStream(InitArray, OnChanged,
+			[](const ValueType& NewValue) { return Derived::IsValid(NewValue); },
+			[](const ValueType& NewValue) { return Derived::ToValid(NewValue); });
 	}
 
-	const TOptional<ValueType>& GetValue() const requires !std::is_pointer_v<ValueType>
-	{
-		return Value;
-	}
+	// 이거 허용을 안 하면 LiveData 안에 들어있는 객체의 non const 함수를 호출할 수 없음
+	ValueType& Get() [[msvc::lifetimebound]] { return Value; }
 
-	const ValueType* operator->() const requires !std::is_pointer_v<ValueType>
-	{
-		return &*Value;
-	}
-
-	const ValueType& operator*() const requires !std::is_pointer_v<ValueType>
-	{
-		return *Value;
-	}
-
-	operator const TOptional<ValueType>&() const requires !std::is_pointer_v<ValueType>
-	{
-		return GetValue();
-	}
-
-	ValueType GetValue() const requires std::is_pointer_v<ValueType>
-	{
-		return Value ? *Value : nullptr;
-	}
-
-	operator ValueType() const requires std::is_pointer_v<ValueType>
-	{
-		return GetValue();
-	}
+	const ValueType& Get() const [[msvc::lifetimebound]] { return Value; }
 
 protected:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnChanged, const ValueType&);
 	FOnChanged OnChanged;
 
-	TOptional<ValueType> Value;
+	ValueType Value;
 	bool bExecutingCallbacks = false;
+
+	template <typename FuncType>
+	auto ToValidCheckingFunc(FuncType&& Func)
+	{
+		return [Func = Forward<FuncType>(Func)](const ValueType& Target)
+		{
+			if (Derived::IsValid(Target))
+			{
+				Func(Derived::ToValid(Target));
+			}
+		};
+	}
 };
 
 
-template <typename PredicateType, typename ValueType>
-concept CPredicate = requires(PredicateType Predicate, ValueType Value)
+template <typename InValueType>
+class TLiveData : public TLiveDataBase<TLiveData<InValueType>, InValueType>
 {
-	{ Predicate(Value) } -> std::same_as<bool>;
+public:
+	using Super = TLiveDataBase<TLiveData, InValueType>;
+	using ValueType = typename Super::ValueType;
+	using ValidType = ValueType;
+	using Super::Super;
+
+	ValidType* operator->() { return &Super::Get(); }
+	const ValidType* operator->() const { return &Super::Get(); }
+	ValidType& operator*() { return Super::Get(); }
+	const ValidType& operator*() const { return Super::Get(); }
+
+private:
+	friend class Super;
+
+	static bool IsValid(const ValueType&) { return true; }
+	static const ValueType& ToValid(const ValueType& This [[msvc::lifetimebound]]) { return This; }
 };
 
 
-template <typename T, typename U>
-concept CEqualityComparable = requires(T Arg0, U Arg1)
+template <typename InValueType>
+class TLiveData<TOptional<InValueType>> : private TLiveDataBase<TLiveData<TOptional<InValueType>>, TOptional<InValueType>>
 {
-	Arg0 == Arg1;
+public:
+	using Super = TLiveDataBase<TLiveData, TOptional<InValueType>>;
+	using ValueType = typename Super::ValueType;
+	using ValidType = InValueType;
+
+	using Super::Super;
+	using Super::SetValue;
+	using Super::SetValueSilent;
+	using Super::SetValueAlways;
+	using Super::Notify;
+	using Super::Observe;
+	using Super::CreateStream;
+	using Super::Get;
+
+	const ValidType* operator->() const { return &Super::Get().GetValue(); }
+	const ValidType& operator*() const { return Super::Get().GetValue(); }
+
+	friend TCancellableFutureAwaitable<ValidType> operator co_await(TLiveData& LiveData)
+	{
+		return [&]() -> TCancellableFuture<ValidType>
+		{
+			if (LiveData.Get())
+			{
+				return *LiveData.Get();
+			}
+
+			return MakeFutureFromDelegate(LiveData.OnChanged,
+				[](const ValueType& Value) { return Value.IsSet(); },
+				[](const ValueType& Value) { return *Value; });
+		}();
+	}
+
+private:
+	friend class Super;
+
+	static bool IsValid(const ValueType& This) { return This.IsSet(); }
+	static const auto& ToValid(const ValueType& This [[msvc::lifetimebound]]) { return This.GetValue(); }
+};
+
+
+// TODO Object 타입에 대한 처리가 필요함 Cache 되어 있는 동안에 파괴될 수 있음
+template <typename InValueType>
+class TLiveData<InValueType*> : private TLiveDataBase<TLiveData<InValueType*>, InValueType*>
+{
+public:
+	using Super = TLiveDataBase<TLiveData, InValueType*>;
+	using ValueType = typename Super::ValueType;
+	using ValidType = InValueType*;
+
+	using Super::Super;
+	using Super::SetValue;
+	using Super::SetValueSilent;
+	using Super::SetValueAlways;
+	using Super::Notify;
+	using Super::Observe;
+	using Super::CreateStream;
+	using Super::Get;
+
+	ValidType* operator->() const { return Super::Get(); }
+	const ValidType& operator*() const { return *Super::Get(); }
+
+	friend TCancellableFutureAwaitable<ValidType> operator co_await(TLiveData& LiveData)
+	{
+		return [&]() -> TCancellableFuture<ValidType>
+		{
+			if (::IsValid(LiveData.Get()))
+			{
+				return LiveData.Get();
+			}
+
+			return MakeFutureFromDelegate<ValidType>(LiveData.OnChanged,
+				[](const ValueType& Value) { return ::IsValid(Value); },
+				[](const ValueType& Value) { return Value; });
+		}();
+	}
+
+private:
+	friend class Super;
+
+	static bool IsValid(const ValueType& Value) { return ::IsValid(Value); }
+	static ValidType ToValid(const ValueType& Value) { return Value; }
 };
 
 
@@ -193,32 +237,34 @@ template <typename ValueType>
 class TLiveDataView
 {
 public:
+	using ValidType = typename TLiveData<ValueType>::ValidType;
+
 	TLiveDataView(TLiveData<ValueType>& InLiveData)
 		: LiveData(InLiveData)
 	{
 	}
 
-	friend TCancellableFutureAwaitable<ValueType> operator co_await(TLiveDataView LiveDataView)
+	friend TCancellableFutureAwaitable<ValidType> operator co_await(TLiveDataView LiveDataView)
 	{
 		return operator co_await(LiveDataView.LiveData);
 	}
 
 	template <CEqualityComparable<ValueType> ArgType>
-	TCancellableFuture<ValueType, EValueStreamError> If(ArgType&& OfThis)
+	TCancellableFuture<ValidType, EValueStreamError> If(ArgType&& OfThis)
 	{
 		return FirstInStream(CreateStream(), [OfThis = Forward<ArgType>(OfThis)](const ValueType& Value) { return Value == OfThis; });
 	}
 
 	template <CPredicate<ValueType> PredicateType>
-	TCancellableFuture<ValueType, EValueStreamError> If(PredicateType&& Predicate)
+	TCancellableFuture<ValidType, EValueStreamError> If(PredicateType&& Predicate)
 	{
 		return FirstInStream(CreateStream(), [Predicate = Forward<PredicateType>(Predicate)](const ValueType& Value) { return Predicate(Value); });
 	}
 
-	TValueStream<ValueType> CreateStream() { return LiveData.CreateStream(); }
+	TValueStream<ValidType> CreateStream() { return LiveData.CreateStream(); }
 
-	decltype(auto) GetValue() { return LiveData.GetValue(); }
-	decltype(auto) GetValue() const { return LiveData.GetValue(); }
+	decltype(auto) Get() { return LiveData.Get(); }
+	decltype(auto) Get() const { return LiveData.Get(); }
 	decltype(auto) operator*() { return *LiveData; }
 	decltype(auto) operator*() const { return *LiveData; }
 
@@ -240,16 +286,19 @@ private:
 
 
 // TLiveData Declarations
+#define REPPED_VALUE_TYPE(Type) std::conditional_t<std::is_pointer_v<Type>, Type, TOptional<Type>>
+
+
 #define DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(Type, Name)\
-	private: TLiveData<Type> Name;\
+	private: TLiveData<REPPED_VALUE_TYPE(Type)> Name;\
 	public:\
-	TLiveDataView<Type> Get##Name() { return Name; };\
+	TLiveDataView<REPPED_VALUE_TYPE(Type)> Get##Name() { return Name; };\
 	void Set##Name(const std::type_identity_t<Type>& NewValue) { DEFINE_REPPED_VAR_SETTER(Name, NewValue); }
 
 
 #define DECLARE_REPPED_LIVE_DATA_GETTER_SETTER_WITH_DEFAULT(Type, Name, Default)\
-	private: TLiveData<Type> Name{Default};\
+	private: TLiveData<REPPED_VALUE_TYPE(Type)> Name{Default};\
 	public:\
-	TLiveDataView<Type> Get##Name() { return Name; };\
+	TLiveDataView<REPPED_VALUE_TYPE(Type)> Get##Name() { return Name; };\
 	void Set##Name(const std::type_identity_t<Type>& NewValue) { DEFINE_REPPED_VAR_SETTER(Name, NewValue); }
 // ~TLiveData Declarations

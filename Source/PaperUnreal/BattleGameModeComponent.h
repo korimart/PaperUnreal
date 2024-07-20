@@ -139,7 +139,7 @@ private:
 			co_await ReadyState->GetbReady().If(true);
 
 			// 죽은 다음에 다시 스폰하는 경우에는 팀이 이미 있음
-			if (!TeamComponent->GetTeamIndex().GetValue().IsSet())
+			if (!TeamComponent->GetTeamIndex().Get().IsSet())
 			{
 				if (TOptional<int32> NextTeamIndex = TeamAllocator.NextTeamIndex())
 				{
@@ -157,7 +157,7 @@ private:
 			AAreaActor* ThisPlayerArea =
 				ValidOrNull(AreaSpawner->GetSpawnedAreaStreamer().GetHistory().FindByPredicate([&](AAreaActor* Each)
 				{
-					return *Each->TeamComponent->GetTeamIndex().GetValue() == ThisPlayerTeamIndex;
+					return *Each->TeamComponent->GetTeamIndex().Get() == ThisPlayerTeamIndex;
 				}));
 
 			if (!ThisPlayerArea)

@@ -22,7 +22,11 @@ public:
 	TValueStream<APawn*> CreatePossessedPawnStream()
 	{
 		auto Init = GetPawn() ? TArray{GetPawn()} : TArray<APawn*>{};
-		return CreateMulticastValueStream(Init, OnPossessedPawnChanged2, [](auto, APawn* New) { return New; });
+		return CreateMulticastValueStream(
+			Init,
+			OnPossessedPawnChanged2,
+			[](auto...) { return true; },
+			[](auto, APawn* New) { return New; });
 	}
 
 protected:
