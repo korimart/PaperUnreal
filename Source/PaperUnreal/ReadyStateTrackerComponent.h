@@ -4,7 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "ReadyStateComponent.h"
-#include "Core/ActorComponent2.h"
+#include "StateTrackerComponent.h"
+#include "Algo/Accumulate.h"
 #include "Core/GameStateBase2.h"
 #include "Core/Utils.h"
 #include "Core/WeakCoroutine/CancellableFuture.h"
@@ -12,33 +13,30 @@
 #include "ReadyStateTrackerComponent.generated.h"
 
 
+namespace ReadyStateTracker
+{
+	inline FName ReadyHandle{ TEXT("ReadyStateTracker_ReadyHandle")};
+}
+
+
 UCLASS(Within=GameStateBase2)
-class UReadyStateTrackerComponent : public UActorComponent2
+class UReadyStateTrackerComponent : public UStateTrackerComponent
 {
 	GENERATED_BODY()
 
 public:
-	TLiveDataView<TLiveData<int32>> GetReadyCount() { return ReadyCount; }
-
-	TCancellableFuture<int32, EValueStreamError> ReadyCountIsAtLeast(int32 Least)
+	TCancellableFuture<void> ReadyCountIsAtLeast(int32 Least)
 	{
-		return GetReadyCount().If([Least](int32 Count) { return Count >= Least; });
+		return MakeConditionedPromise([this, Least]()
+		{
+			return Algo::TransformAccumulate(
+				GetComponents<UReadyStateComponent>(GetOuterAGameStateBase2()->GetPlayerStateArray().Get()),
+				[](auto Each) { return Each->GetbReady().Get() ? 1 : 0; },
+				0) >= Least;
+		});
 	}
 
 private:
-	// TODO replace with live data
-	UPROPERTY()
-	TSet<APlayerState*> ReadyPlayerStates;
-	TLiveData<int32> ReadyCount{0};
-
-	UPROPERTY()
-	TMap<APlayerState*, FDelegateSPHandle> ReadyHandles;
-
-	UReadyStateTrackerComponent()
-	{
-		bWantsInitializeComponent = true;
-	}
-
 	virtual void InitializeComponent() override
 	{
 		Super::InitializeComponent();
@@ -47,26 +45,17 @@ private:
 		{
 			if (auto ReadyState = PlayerState->FindComponentByClass<UReadyStateComponent>())
 			{
-				ReadyHandles.FindOrAdd(PlayerState) = ReadyState->GetbReady().Observe([this, PlayerState](bool bReady)
+				UniqueHandle(PlayerState, ReadyStateTracker::ReadyHandle) = ReadyState->GetbReady().Observe([this](bool)
 				{
-					bReady ? (void)ReadyPlayerStates.Add(PlayerState) : (void)ReadyPlayerStates.Remove(PlayerState);
-					ReadyCount.SetValue(ReadyPlayerStates.Num());
+					OnSomeConditionMaybeSatisfied();
 				});
 			}
 		});
-		
+
 		GetOuterAGameStateBase2()->GetPlayerStateArray().ObserveRemove(this, [this](APlayerState* PlayerState)
 		{
-			ReadyHandles.Remove(PlayerState);
-			ReadyPlayerStates.Remove(PlayerState);
-			ReadyCount.SetValue(ReadyPlayerStates.Num());
+			RemoveHandles(PlayerState);
+			OnSomeConditionMaybeSatisfied();
 		});
-	}
-
-	virtual void UninitializeComponent() override
-	{
-		Super::UninitializeComponent();
-
-		ReadyHandles.Empty();
 	}
 };

@@ -4,14 +4,20 @@
 
 #include "CoreMinimal.h"
 #include "AreaSpawnerComponent.h"
+#include "StateTrackerComponent.h"
 #include "Core/ActorComponent2.h"
 #include "Core/WeakCoroutine/CancellableFuture.h"
 #include "AreaStateTrackerComponent.generated.h"
 
 
-// TODO 이 클래스 구현 ReadyStateTracker랑 완전히 똑같다
+namespace AreaStateTracker
+{
+	inline FName AliveHandle{TEXT("AreaStateTracer_AliveHandle")};
+}
+
+
 UCLASS()
-class UAreaStateTrackerComponent : public UActorComponent2
+class UAreaStateTrackerComponent : public UStateTrackerComponent
 {
 	GENERATED_BODY()
 
@@ -22,26 +28,20 @@ public:
 		AreaSpawner = Spawner;
 	}
 
-	TCancellableFuture<int32, EValueStreamError> OnlyOneAreaIsSurviving()
+	TCancellableFuture<void> OnlyOneAreaIsSurviving()
 	{
-		return TLiveDataView{LiveAreaCount}.If(1);
+		return MakeConditionedPromise([this]()
+		{
+			return Algo::TransformAccumulate(
+				GetComponents<ULifeComponent>(AreaSpawner->GetSpawnedAreas().Get()),
+				[](auto Each) { return Each->GetbAlive().Get() ? 1 : 0; },
+				0) == 1;
+		});
 	}
 
 private:
 	UPROPERTY()
 	UAreaSpawnerComponent* AreaSpawner;
-
-	UPROPERTY()
-	TMap<AAreaActor*, FDelegateSPHandle> AreabAliveHandles;
-
-	UPROPERTY()
-	TSet<AAreaActor*> LiveAreas;
-	TLiveData<int32> LiveAreaCount{0};
-
-	UAreaStateTrackerComponent()
-	{
-		bWantsInitializeComponent = true;
-	}
 
 	virtual void InitializeComponent() override
 	{
@@ -51,24 +51,17 @@ private:
 
 		AreaSpawner->GetSpawnedAreas().ObserveAdd(this, [this](AAreaActor* SpawnedArea)
 		{
-			AreabAliveHandles.FindOrAdd(SpawnedArea) = SpawnedArea->LifeComponent->GetbAlive().Observe([this, SpawnedArea](bool bAlive)
-			{
-				bAlive ? (void)LiveAreas.Add(SpawnedArea) : (void)LiveAreas.Remove(SpawnedArea);
-				LiveAreaCount.SetValue(LiveAreas.Num());
-			});
+			UniqueHandle(SpawnedArea, AreaStateTracker::AliveHandle)
+				= SpawnedArea->LifeComponent->GetbAlive().Observe([this, SpawnedArea](bool)
+				{
+					OnSomeConditionMaybeSatisfied();
+				});
 		});
-		
+
 		AreaSpawner->GetSpawnedAreas().ObserveRemove(this, [this](AAreaActor* SpawnedArea)
 		{
-			LiveAreas.Remove(SpawnedArea);
-			LiveAreaCount.SetValue(LiveAreas.Num());
+			RemoveHandles(SpawnedArea);
+			OnSomeConditionMaybeSatisfied();
 		});
-	}
-
-	virtual void UninitializeComponent() override
-	{
-		Super::UninitializeComponent();
-
-		AreabAliveHandles.Empty();
 	}
 };

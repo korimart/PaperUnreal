@@ -138,6 +138,21 @@ T PopFront(TArray<T>& Array, int32 Index = 0)
 }
 
 
+template <typename T, typename U>
+TArray<T*> GetComponents(const TArray<U>& Actors)
+{
+	TArray<T*> Ret;
+	for (auto Each : Actors)
+	{
+		if (T* Found = Each->template FindComponentByClass<T>())
+		{
+			Ret.Add(Found);
+		}
+	}
+	return Ret;
+}
+
+
 template <typename T>
 void FindAndDestroyComponent(AActor* Actor)
 {
