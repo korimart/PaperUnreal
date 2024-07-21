@@ -16,6 +16,7 @@ class APlayerController2 : public APlayerController
 	GENERATED_BODY()
 
 public:
+	// TODO live data
 	DECLARE_MULTICAST_DELEGATE_TwoParams(FOnPossessedPawnChanged2, APawn*, APawn*);
 	FOnPossessedPawnChanged2 OnPossessedPawnChanged2;
 

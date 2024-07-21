@@ -3,6 +3,7 @@
 #include "PaperUnrealGameMode.h"
 
 #include "BattleGameModeComponent.h"
+#include "FixedCameraPawn.h"
 #include "PaperUnrealCharacter.h"
 #include "PaperUnrealPlayerController.h"
 #include "PaperUnrealGameState.h"
@@ -35,6 +36,8 @@ APaperUnrealGameMode::APaperUnrealGameMode()
 	{
 		PlayerControllerClass = PlayerControllerBPClass.Class;
 	}
+
+	SpectatorClass = AFixedCameraPawn::StaticClass();
 
 	bStartPlayersAsSpectators = true;
 }
