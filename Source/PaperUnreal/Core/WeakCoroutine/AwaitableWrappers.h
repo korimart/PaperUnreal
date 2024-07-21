@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <source_location>
+
 #include "CoreMinimal.h"
 #include "PaperUnreal/Core/Utils.h"
 #include "PaperUnreal/Core/WeakCoroutine/TypeTraits.h"
@@ -78,8 +80,8 @@ template <typename FutureAwaitableType>
 class TErrorRemovedCancellableFutureAwaitable
 {
 public:
-	TErrorRemovedCancellableFutureAwaitable(FutureAwaitableType&& Awaitable)
-		: FutureAwaitable(MoveTemp(Awaitable))
+	TErrorRemovedCancellableFutureAwaitable(FutureAwaitableType&& Awaitable, std::source_location Location)
+		: FutureAwaitable(MoveTemp(Awaitable)), SourceLocation(Location)
 	{
 	}
 
@@ -104,7 +106,20 @@ public:
 
 			void resume() const
 			{
-				This->FutureAwaitable.Peek() ? Handle.resume() : Handle.destroy();
+				if (This->FutureAwaitable.Peek())
+				{
+					Handle.resume();
+				}
+				else
+				{
+					UE_LOG(LogTemp, Warning, TEXT("AbortOnError %hs %hs %d %d"),
+						This->SourceLocation.file_name(),
+						This->SourceLocation.function_name(),
+						This->SourceLocation.line(),
+						This->SourceLocation.column());
+					
+					Handle.destroy();
+				}
 			}
 		};
 
@@ -118,6 +133,7 @@ public:
 
 private:
 	FutureAwaitableType FutureAwaitable;
+	std::source_location SourceLocation;
 };
 
 
@@ -157,7 +173,7 @@ public:
 		};
 
 		ReturnValue = FindReadyAwaitable(FindReadyAwaitable, std::index_sequence_for<AwaitableTypes...>{});
-		
+
 		return !!ReturnValue;
 	}
 
@@ -254,15 +270,15 @@ namespace AwaitableWrapperDetails
 
 
 template <typename AnyType>
-auto AbortOnError(AnyType&& Awaitable)
+auto AbortOnError(AnyType&& Awaitable, std::source_location Location = std::source_location::current())
 {
-	return AbortOnError(operator co_await(Forward<AnyType>(Awaitable)));
+	return AbortOnError(operator co_await(Forward<AnyType>(Awaitable)), Location);
 }
 
 template <typename... Types>
-auto AbortOnError(TCancellableFutureAwaitable<Types...>&& Awaitable)
+auto AbortOnError(TCancellableFutureAwaitable<Types...>&& Awaitable, std::source_location Location = std::source_location::current())
 {
-	return TErrorRemovedCancellableFutureAwaitable<TCancellableFutureAwaitable<Types...>>{MoveTemp(Awaitable)};
+	return TErrorRemovedCancellableFutureAwaitable<TCancellableFutureAwaitable<Types...>>{MoveTemp(Awaitable), Location};
 }
 
 

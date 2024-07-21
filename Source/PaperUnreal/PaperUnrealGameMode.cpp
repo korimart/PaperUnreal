@@ -9,6 +9,10 @@
 #include "PaperUnrealPlayerState.h"
 #include "UObject/ConstructorHelpers.h"
 
+
+DEFINE_LOG_CATEGORY(LogPaperUnrealGameMode);
+
+
 APaperUnrealGameMode::APaperUnrealGameMode()
 {
 	GameStateClass = APaperUnrealGameState::StaticClass();
@@ -47,12 +51,18 @@ void APaperUnrealGameMode::BeginPlay()
 		
 		co_await AbortOnError(GetGameState<APaperUnrealGameState>()->ReadyStateTrackerComponent->ReadyCountIsAtLeast(2));
 
-		// TODO 실제 game mode 설정
 		auto BattleMode = NewObject<UBattleGameModeComponent>(this);
 		BattleMode->SetPawnClass(DefaultPawnClass);
 		BattleMode->RegisterComponent();
 		
 		const FBattleModeGameResult GameResult = co_await AbortOnError(BattleMode->Start(2, 2));
+
+		for (const auto& Each : GameResult.SortedByRank)
+		{
+			UE_LOG(LogPaperUnrealGameMode, Log, TEXT("게임 결과 팀 : %d / 면적 : %f"), Each.TeamIndex, Each.Area);
+		}
+
+		// TODO 플레이어들을 경기장을 내려다보는 스펙테이터로 바꾼다
 
 		// TODO replicate game result
 

@@ -44,6 +44,13 @@ private:
 
 struct FBattleModeGameResult
 {
+	struct FTeamAndArea
+	{
+		int32 TeamIndex;
+		float Area;
+	};
+
+	TArray<FTeamAndArea> SortedByRank;
 };
 
 
@@ -103,6 +110,7 @@ private:
 	UPlayerSpawnerComponent* PlayerSpawner;
 
 	FTeamAllocator TeamAllocator;
+	bool bEndedWithAResult = false;
 	FBattleModeGameResult GameResult{};
 	TOptional<TCancellablePromise<FBattleModeGameResult>> ResultPromise;
 	
@@ -191,7 +199,7 @@ private:
 			
 			auto Timeout = AbortOnError(RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 			{
-				co_await WorldTimer->At(GetWorld()->GetTimeSeconds() + 60.f);
+				co_await AbortOnError(WorldTimer->At(GetWorld()->GetTimeSeconds() + 60.f));
 			}));
 			
 			auto OnlyOneTeamSurviving = AbortOnError(RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
@@ -199,7 +207,7 @@ private:
 				auto AreaStateTracker = NewObject<UAreaStateTrackerComponent>(GetOwner());
 				AreaStateTracker->SetSpawner(AreaSpawner);
 				AreaStateTracker->RegisterComponent();
-				co_await AreaStateTracker->OnlyOneAreaIsSurviving();
+				co_await AbortOnError(AreaStateTracker->OnlyOneAreaIsSurviving());
 				AreaStateTracker->DestroyComponent();
 			}));
 		
@@ -218,7 +226,17 @@ private:
 				UE_LOG(LogBattleGameMode, Log, TEXT("팀이 하나 밖에 남지 않아 게임을 종료합니다"));
 			}
 
-			// TODO end game
+			for (auto Each : GetComponents<UAreaBoundaryComponent>(AreaSpawner->GetSpawnedAreas().Get()))
+			{
+				const float Area = Each->GetBoundary()->CalculateArea();
+				GameResult.SortedByRank.Emplace(Each->GetOwner<AAreaActor>()->TeamComponent->GetTeamIndex().Get(), Area);
+			}
+
+			Algo::SortBy(GameResult.SortedByRank, &FBattleModeGameResult::FTeamAndArea::Area);
+			std::reverse(GameResult.SortedByRank.begin(), GameResult.SortedByRank.end());
+
+			bEndedWithAResult = true;
+			DestroyComponent();
 		});
 	}
 
@@ -226,9 +244,11 @@ private:
 	{
 		Super::EndPlay(EndPlayReason);
 
-		if (ResultPromise)
+		if (ResultPromise && bEndedWithAResult)
 		{
 			ResultPromise->SetValue(MoveTemp(GameResult));
 		}
+
+		ResultPromise.Reset();
 	}
 };

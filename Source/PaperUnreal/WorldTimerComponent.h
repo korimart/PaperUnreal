@@ -58,4 +58,10 @@ private:
 			Each.Promise.SetValue();
 		}
 	}
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override
+	{
+		Super::EndPlay(EndPlayReason);
+		PendingTimers.Empty();
+	}
 };

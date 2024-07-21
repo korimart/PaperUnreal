@@ -506,6 +506,8 @@ public:
 	decltype(auto) Get() const { return LiveData.Get(); }
 	decltype(auto) operator*() { return *LiveData; }
 	decltype(auto) operator*() const { return *LiveData; }
+	decltype(auto) operator->() { return LiveData.operator->(); }
+	decltype(auto) operator->() const { return LiveData.operator->(); }
 
 private:
 	LiveDataType& LiveData;

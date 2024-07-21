@@ -179,6 +179,11 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 			auto AreaStream = AreaSpawner->GetSpawnedAreas().CreateAddStream();
 			while (auto NewArea = co_await AbortOnError(AreaStream))
 			{
+				if (NewArea == MyHomeArea)
+				{
+					continue;
+				}
+				
 				RunWeakCoroutine(this, [this, NewArea, AreaConverter](FWeakCoroutineContext& Context) -> FWeakCoroutine
 				{
 					Context.AbortIfNotValid(NewArea);
@@ -240,13 +245,11 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 		// 일단 위에까지 완료했으면 플레이는 가능한 거임 여기부터는 미적인 요소들을 준비한다
 		RunWeakCoroutine(TracerMesh, [TracerMesh, Inventory](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			auto MaterialStream = Inventory->GetTracerMaterial().CreateStream();
-			while (auto NextMaterial = co_await AbortOnError(MaterialStream))
+			for (auto MaterialStream = Inventory->GetTracerMaterial().CreateStream();;)
 			{
-				if (auto Loaded = co_await RequestAsyncLoad(NextMaterial))
-				{
-					TracerMesh->ConfigureMaterialSet({Loaded.Get()});
-				}
+				auto NextMaterial = co_await AbortOnError(MaterialStream);
+				auto Loaded = co_await AbortOnError(RequestAsyncLoad(NextMaterial));
+				TracerMesh->ConfigureMaterialSet({Loaded});
 			}
 		});
 	});

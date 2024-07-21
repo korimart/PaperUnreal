@@ -6,6 +6,10 @@
 #include "GameFramework/GameModeBase.h"
 #include "PaperUnrealGameMode.generated.h"
 
+
+DECLARE_LOG_CATEGORY_EXTERN(LogPaperUnrealGameMode, Log, All);
+
+
 UCLASS(minimalapi)
 class APaperUnrealGameMode : public AGameModeBase
 {
