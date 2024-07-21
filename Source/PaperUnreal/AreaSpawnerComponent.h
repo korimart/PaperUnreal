@@ -133,40 +133,45 @@ class UAreaSpawnerComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	const TValueStreamer<AAreaActor*>& GetSpawnedAreaStreamer() const
-	{
-		return SpawnedAreaStreamer;
-	}
+	auto GetSpawnedAreas() { return ToLiveDataView(SpawnedAreas); }
 
 	AAreaActor* SpawnAreaAtRandomEmptyLocation()
 	{
 		check(GetNetMode() != NM_Client);
 
-		SpawnLocationCalculator.ClearGrid();
-		for (AAreaActor* Each : RepSpawnedAreas)
+		const TOptional<FBox2D> CellToSpawnAreaIn = [&]()
 		{
-			const auto AreaBoundary = Each->FindComponentByClass<UAreaBoundaryComponent>();
-			SpawnLocationCalculator.OccupyGrid(AreaBoundary->GetBoundaryStreamer().Get());
+			SpawnLocationCalculator.ClearGrid();
+			for (AAreaActor* Each : RepSpawnedAreas)
+			{
+				const auto AreaBoundary = Each->FindComponentByClass<UAreaBoundaryComponent>();
+				SpawnLocationCalculator.OccupyGrid(AreaBoundary->GetBoundaryStreamer().Get());
+			}
+			return SpawnLocationCalculator.GetRandomEmptyCell();
+		}();
+
+		if (!CellToSpawnAreaIn)
+		{
+			return nullptr;
 		}
 
-		if (TOptional<FBox2D> CellToSpawnAreaIn = SpawnLocationCalculator.GetRandomEmptyCell())
-		{
-			const FVector SpawnLocation{CellToSpawnAreaIn->GetCenter(), 50.f};
-
-			AAreaActor* Ret = GetWorld()->SpawnActor<AAreaActor>(SpawnLocation, {});
-			RepSpawnedAreas.Add(Ret);
-			OnRep_SpawnedAreas();
-			return Ret;
-		}
-
-		return nullptr;
+		const FVector SpawnLocation{CellToSpawnAreaIn->GetCenter(), 50.f};
+		AAreaActor* Ret = GetWorld()->SpawnActor<AAreaActor>(SpawnLocation, {});
+		const TArray<AAreaActor*> Prev = RepSpawnedAreas;
+		RepSpawnedAreas.Add(Ret);
+		OnRep_SpawnedAreas(Prev);
+		return Ret;
 	}
 
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_SpawnedAreas)
 	TArray<AAreaActor*> RepSpawnedAreas;
 
-	TValueStreamer<AAreaActor*> SpawnedAreaStreamer;
+	TBackedLiveData<
+		TArray<AAreaActor*>,
+		ERepHandlingPolicy::CompareForAddOrRemove
+	> SpawnedAreas{RepSpawnedAreas};
+
 	FAreaSpawnLocationCalculator SpawnLocationCalculator;
 
 	UAreaSpawnerComponent()
@@ -185,7 +190,7 @@ private:
 	}
 
 	UFUNCTION()
-	void OnRep_SpawnedAreas() { SpawnedAreaStreamer.ReceiveValuesIfNotInHistory(RepSpawnedAreas); }
+	void OnRep_SpawnedAreas(const TArray<AAreaActor*>& Old) { SpawnedAreas.OnRep(Old); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{

@@ -83,7 +83,7 @@ T* ValidOrNull(T* Object)
 
 
 template <typename T>
-T* ValidOrNull(T* const* Object)
+T* ValidOrNull(T** Object)
 {
 	return Object ? *Object : nullptr;
 }

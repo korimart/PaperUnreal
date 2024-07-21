@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Core/ActorComponent2.h"
+#include "Core/LiveData.h"
 #include "Core/WeakCoroutine/ValueStream.h"
 #include "Net/UnrealNetwork.h"
 #include "PlayerSpawnerComponent.generated.h"
@@ -15,15 +16,16 @@ class UPlayerSpawnerComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	const TValueStreamer<AActor*>& GetSpawnedPlayerStreamer() const { return SpawnedPlayerStreamer; }
+	auto GetSpawnedPlayers() { return ToLiveDataView(Players); }
 
 	AActor* SpawnAtLocation(UClass* Class, const FVector& Location)
 	{
 		check(GetNetMode() != NM_Client);
 		
 		AActor* Spawned = GetWorld()->SpawnActor(Class, &Location);
+		const TArray<AActor*> Prev = RepPlayers;
 		RepPlayers.Add(Spawned);
-		OnRep_SpawnedPlayers();
+		OnRep_SpawnedPlayers(Prev);
 
 		return Spawned;
 	}
@@ -31,8 +33,11 @@ public:
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_SpawnedPlayers)
 	TArray<AActor*> RepPlayers;
-
-	TValueStreamer<AActor*> SpawnedPlayerStreamer;
+	
+	TBackedLiveData<
+		TArray<AActor*>,
+		ERepHandlingPolicy::CompareForAddOrRemove
+	> Players{RepPlayers};
 
 	UPlayerSpawnerComponent()
 	{
@@ -40,7 +45,7 @@ private:
 	}
 
 	UFUNCTION()
-	void OnRep_SpawnedPlayers() { SpawnedPlayerStreamer.ReceiveValuesIfNotInHistory(RepPlayers); }
+	void OnRep_SpawnedPlayers(const TArray<AActor*>& Prev) { Players.OnRep(Prev); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{

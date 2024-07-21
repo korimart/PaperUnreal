@@ -549,6 +549,7 @@ auto MakeFutureFromDelegate(MulticastDelegateType& MulticastDelegate, PredicateT
 
 
 // TODO 바로 수령하지 않으면 nullptr를 반환할 수 있음
+// TODO 로드 실패했으면 에러를 반환하기
 template <typename SoftObjectType>
 TCancellableFuture<SoftObjectType*> RequestAsyncLoad(const TSoftObjectPtr<SoftObjectType>& SoftPointer)
 {

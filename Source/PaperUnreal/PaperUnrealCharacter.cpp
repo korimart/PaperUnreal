@@ -146,6 +146,19 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		TracerOverlapChecker->SetTracer(TracerPath);
 		TracerOverlapChecker->RegisterComponent();
 
+		PlayerSpawner->GetSpawnedPlayers().ObserveAdd(TracerOverlapChecker, [TracerOverlapChecker](AActor* NewPlayer)
+		{
+			RunWeakCoroutine([NewPlayer, TracerOverlapChecker](FWeakCoroutineContext& Context) -> FWeakCoroutine
+			{
+				Context.AbortIfNotValid(TracerOverlapChecker);
+
+				if (auto NewTracer = co_await WaitForComponent<UTracerPathComponent>(NewPlayer))
+				{
+					TracerOverlapChecker->AddOverlapTarget(NewTracer.Get());
+				}
+			});
+		});
+
 		auto Killer = NewObject<UPlayerKillerComponent>(this);
 		Killer->SetTracer(TracerPath);
 		Killer->SetArea(HomeAreaBoundary);
@@ -157,7 +170,7 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		AreaConverter->SetConversionDestination(HomeAreaBoundary);
 		AreaConverter->RegisterComponent();
 
-		AreaSpawner->GetSpawnedAreaStreamer().Observe(this, [this, AS_WEAK(MyHomeArea), AS_WEAK(AreaConverter)](AAreaActor* NewArea)
+		AreaSpawner->GetSpawnedAreas().ObserveAdd(this, [this, AS_WEAK(MyHomeArea), AS_WEAK(AreaConverter)](AAreaActor* NewArea)
 		{
 			if (AllValid(MyHomeArea, AreaConverter) && NewArea != MyHomeArea)
 			{
@@ -170,20 +183,6 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 					AreaSlasher->SetSlashTarget(NewBoundary);
 					AreaSlasher->SetTracerToAreaConverter(AreaConverter.Get());
 					AreaSlasher->RegisterComponent();
-				});
-			}
-		});
-
-		PlayerSpawner->GetSpawnedPlayerStreamer().Observe(this, [this, AS_WEAK(TracerOverlapChecker)](AActor* NewPlayer)
-		{
-			if (AllValid(TracerOverlapChecker))
-			{
-				RunWeakCoroutine(this, [this, NewPlayer, TracerOverlapChecker](FWeakCoroutineContext& Context) -> FWeakCoroutine
-				{
-					Context.AbortIfNotValid(TracerOverlapChecker);
-
-					auto NewTracer = co_await AbortOnError(WaitForComponent<UTracerPathComponent>(NewPlayer));
-					TracerOverlapChecker->AddOverlapTarget(NewTracer);
 				});
 			}
 		});
@@ -232,19 +231,16 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 		TracerMeshGenerator->RegisterComponent();
 
 		// 일단 위에까지 완료했으면 플레이는 가능한 거임 여기부터는 미적인 요소들을 준비한다
-		RunWeakCoroutine(this, [
-				this,
-				TracerMesh,
-				TracerMaterialStream = Inventory->GetTracerMaterial().CreateStream()
-			](FWeakCoroutineContext& Context) mutable -> FWeakCoroutine
+		RunWeakCoroutine(TracerMesh, [TracerMesh, Inventory](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			auto MaterialStream = Inventory->GetTracerMaterial().CreateStream();
+			while (auto NextMaterial = co_await MaterialStream)
 			{
-				Context.AbortIfNotValid(TracerMesh);
-
-				while (true)
+				if (auto Loaded = co_await RequestAsyncLoad(NextMaterial.Get()))
 				{
-					auto SoftTracerMaterial = co_await AbortOnError(TracerMaterialStream);
-					TracerMesh->ConfigureMaterialSet({co_await AbortOnError(RequestAsyncLoad(SoftTracerMaterial))});
+					TracerMesh->ConfigureMaterialSet({Loaded.Get()});
 				}
-			});
+			}
+		});
 	});
 }

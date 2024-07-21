@@ -29,11 +29,10 @@ private:
 	// TODO replace with live data
 	UPROPERTY()
 	TSet<APlayerState*> ReadyPlayerStates;
+	TLiveData<int32> ReadyCount{0};
 
 	UPROPERTY()
-	TMap<APlayerState*, FDelegateSPHandle> PlayerStateToHandleMap;
-	
-	TLiveData<int32> ReadyCount{0};
+	TMap<APlayerState*, FDelegateSPHandle> ReadyHandles;
 
 	UReadyStateTrackerComponent()
 	{
@@ -44,12 +43,11 @@ private:
 	{
 		Super::InitializeComponent();
 
-		GetOuterAGameStateBase2()->OnPlayerStateAdded.AddWeakLambda(this, [this](APlayerState* PlayerState)
+		GetOuterAGameStateBase2()->GetPlayerStateArray().ObserveAdd(this, [this](APlayerState* PlayerState)
 		{
 			if (auto ReadyState = PlayerState->FindComponentByClass<UReadyStateComponent>())
 			{
-				FDelegateSPHandle Handle = PlayerStateToHandleMap.Emplace(PlayerState, {});
-				ReadyState->GetbReady().Observe(Handle.ToShared(), [this, PlayerState](bool bReady)
+				ReadyHandles.FindOrAdd(PlayerState) = ReadyState->GetbReady().Observe([this, PlayerState](bool bReady)
 				{
 					bReady ? (void)ReadyPlayerStates.Add(PlayerState) : (void)ReadyPlayerStates.Remove(PlayerState);
 					ReadyCount.SetValue(ReadyPlayerStates.Num());
@@ -57,9 +55,9 @@ private:
 			}
 		});
 		
-		GetOuterAGameStateBase2()->OnPlayerStateRemoved.AddWeakLambda(this, [this](APlayerState* PlayerState)
+		GetOuterAGameStateBase2()->GetPlayerStateArray().ObserveRemove(this, [this](APlayerState* PlayerState)
 		{
-			PlayerStateToHandleMap.Remove(PlayerState);
+			ReadyHandles.Remove(PlayerState);
 			ReadyPlayerStates.Remove(PlayerState);
 			ReadyCount.SetValue(ReadyPlayerStates.Num());
 		});
@@ -69,6 +67,6 @@ private:
 	{
 		Super::UninitializeComponent();
 
-		PlayerStateToHandleMap.Empty();
+		ReadyHandles.Empty();
 	}
 };

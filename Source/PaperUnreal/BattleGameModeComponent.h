@@ -155,7 +155,7 @@ private:
 			const int32 ThisPlayerTeamIndex = TeamComponent->GetTeamIndex().Get();
 
 			AAreaActor* ThisPlayerArea =
-				ValidOrNull(AreaSpawner->GetSpawnedAreaStreamer().GetHistory().FindByPredicate([&](AAreaActor* Each)
+				ValidOrNull(AreaSpawner->GetSpawnedAreas().Get().FindByPredicate([&](AAreaActor* Each)
 				{
 					return Each->TeamComponent->GetTeamIndex().Get() == ThisPlayerTeamIndex;
 				}));

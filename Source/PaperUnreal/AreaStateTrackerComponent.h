@@ -32,11 +32,10 @@ private:
 	UAreaSpawnerComponent* AreaSpawner;
 
 	UPROPERTY()
-	TSet<AAreaActor*> LiveAreas;
+	TMap<AAreaActor*, FDelegateSPHandle> AreabAliveHandles;
 
 	UPROPERTY()
-	TMap<AAreaActor*, FDelegateSPHandle> AreaToHandleMap;
-
+	TSet<AAreaActor*> LiveAreas;
 	TLiveData<int32> LiveAreaCount{0};
 
 	UAreaStateTrackerComponent()
@@ -50,14 +49,19 @@ private:
 
 		AddLifeDependency(AreaSpawner);
 
-		AreaSpawner->GetSpawnedAreaStreamer().Observe(this, [this](AAreaActor* SpawnedArea)
+		AreaSpawner->GetSpawnedAreas().ObserveAdd(this, [this](AAreaActor* SpawnedArea)
 		{
-			FDelegateSPHandle Handle = AreaToHandleMap.Emplace(SpawnedArea, {});
-			SpawnedArea->LifeComponent->GetbAlive().Observe(Handle.ToShared(), [this, SpawnedArea](bool bAlive)
+			AreabAliveHandles.FindOrAdd(SpawnedArea) = SpawnedArea->LifeComponent->GetbAlive().Observe([this, SpawnedArea](bool bAlive)
 			{
 				bAlive ? (void)LiveAreas.Add(SpawnedArea) : (void)LiveAreas.Remove(SpawnedArea);
 				LiveAreaCount.SetValue(LiveAreas.Num());
 			});
+		});
+		
+		AreaSpawner->GetSpawnedAreas().ObserveRemove(this, [this](AAreaActor* SpawnedArea)
+		{
+			LiveAreas.Remove(SpawnedArea);
+			LiveAreaCount.SetValue(LiveAreas.Num());
 		});
 	}
 
@@ -65,6 +69,6 @@ private:
 	{
 		Super::UninitializeComponent();
 
-		AreaToHandleMap.Empty();
+		AreabAliveHandles.Empty();
 	}
 };

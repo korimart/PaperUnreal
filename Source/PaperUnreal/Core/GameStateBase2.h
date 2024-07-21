@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameStateBase.h"
+#include "PaperUnreal/Core/LiveData.h"
 #include "GameStateBase2.generated.h"
 
 /**
@@ -14,11 +15,13 @@ class AGameStateBase2 : public AGameStateBase
 {
 	GENERATED_BODY()
 
+	TBackedLiveData<
+		TArray<TObjectPtr<APlayerState>>,
+		ERepHandlingPolicy::CompareForAddOrRemove
+	> PlayerStateArray{PlayerArray};
+
 public:
-	// TODO replace with live data
-	DECLARE_MULTICAST_DELEGATE_OneParam(FPlayerStateEvent, APlayerState*);
-	FPlayerStateEvent OnPlayerStateAdded;
-	FPlayerStateEvent OnPlayerStateRemoved;
+	auto GetPlayerStateArray() { return ToLiveDataView(PlayerStateArray); }
 
 	double GetLatestServerWorldTimeSeconds() const
 	{
@@ -29,13 +32,13 @@ protected:
 	virtual void AddPlayerState(APlayerState* PlayerState) override
 	{
 		Super::AddPlayerState(PlayerState);
-		OnPlayerStateAdded.Broadcast(PlayerState);
+		PlayerStateArray.NotifyAdd(PlayerState);
 	}
 
 	virtual void RemovePlayerState(APlayerState* PlayerState) override
 	{
 		Super::RemovePlayerState(PlayerState);
-		OnPlayerStateRemoved.Broadcast(PlayerState);
+		PlayerStateArray.NotifyRemove(PlayerState);
 	}
 
 	virtual void BeginPlay() override

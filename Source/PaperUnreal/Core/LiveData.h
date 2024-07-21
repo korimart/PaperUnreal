@@ -62,10 +62,10 @@ public:
 	{
 		if (Derived::IsValid(Get()))
 		{
-			check(!bExecutingCallbacks);
-			bExecutingCallbacks = true;
-			OnChanged.Broadcast(Derived::ToValid(Get()));
-			bExecutingCallbacks = false;
+			GuardCallbackInvocation([&]()
+			{
+				OnChanged.Broadcast(Derived::ToValid(Get()));
+			});
 		}
 	}
 
@@ -83,6 +83,14 @@ public:
 		auto ValidCheckingFunc = ToValidCheckingFunc(Forward<FuncType>(Func));
 		ValidCheckingFunc(Get());
 		OnChanged.Add(FOnChanged::FDelegate::CreateSPLambda(Lifetime, ValidCheckingFunc));
+	}
+	
+	template <typename FuncType>
+	UE_NODISCARD FDelegateSPHandle Observe(FuncType&& Func)
+	{
+		FDelegateSPHandle Ret;
+		Observe(Ret.ToShared(), Forward<FuncType>(Func));
+		return Ret;
 	}
 
 	auto CreateStream()
@@ -109,7 +117,19 @@ protected:
 	bool bExecutingCallbacks = false;
 
 	template <typename FuncType>
-	auto ToValidCheckingFunc(FuncType&& Func)
+	void GuardCallbackInvocation(const FuncType& Func)
+	{
+		// 여기 걸리면 콜백 호출 도중에 LiveData를 수정하려고 한 것임
+		// Array 순회 도중에 Array를 수정하려고 한 것과 비슷함
+		check(!bExecutingCallbacks);
+
+		bExecutingCallbacks = true;
+		Func();
+		bExecutingCallbacks = false;
+	}
+
+	template <typename FuncType>
+	static auto ToValidCheckingFunc(FuncType&& Func)
 	{
 		return [Func = Forward<FuncType>(Func)](const std::decay_t<InternalStorageType>& Target)
 		{
@@ -140,7 +160,6 @@ public:
 
 private:
 	friend class Super;
-
 	static bool IsValid(const ValueType&) { return true; }
 	static const ValueType& ToValid(const ValueType& This [[msvc::lifetimebound]]) { return This; }
 };
@@ -184,7 +203,6 @@ public:
 
 private:
 	friend class Super;
-
 	static bool IsValid(const ValueType& This) { return This.IsSet(); }
 	static const auto& ToValid(const ValueType& This [[msvc::lifetimebound]]) { return This.GetValue(); }
 };
@@ -197,7 +215,7 @@ public:
 	using Super = TLiveDataBase<Derived, InValueType&>;
 	using ValueType = InValueType;
 	using ValidType = InValueType;
-	
+
 	using Super::Super;
 
 	template <typename T> requires CInequalityComparable<ValidType> && std::is_convertible_v<T, ValidType>
@@ -210,8 +228,19 @@ public:
 };
 
 
+enum class ERepHandlingPolicy
+{
+	AlwaysNotify,
+	CompareForAddOrRemove,
+};
+
+
+template <typename ValueType, ERepHandlingPolicy = ERepHandlingPolicy::AlwaysNotify>
+class TBackedLiveData;
+
+
 template <typename InValueType>
-class TBackedLiveData : private TBackedLiveDataBase<TBackedLiveData<InValueType>, InValueType>
+class TBackedLiveData<InValueType, ERepHandlingPolicy::AlwaysNotify> : private TBackedLiveDataBase<TBackedLiveData<InValueType>, InValueType>
 {
 public:
 	using Super = TBackedLiveDataBase<TBackedLiveData, InValueType>;
@@ -235,14 +264,13 @@ public:
 
 private:
 	friend class Super::Super;
-
 	static bool IsValid(const ValueType&) { return true; }
 	static const ValidType& ToValid(const ValueType& Value [[msvc::lifetimebound]]) { return Value; }
 };
 
 
 template <typename InValueType>
-class TBackedLiveData<InValueType*> : private TBackedLiveDataBase<TBackedLiveData<InValueType*>, InValueType*>
+class TBackedLiveData<InValueType*, ERepHandlingPolicy::AlwaysNotify> : private TBackedLiveDataBase<TBackedLiveData<InValueType*>, InValueType*>
 {
 public:
 	using Super = TBackedLiveDataBase<TBackedLiveData, InValueType*>;
@@ -281,18 +309,151 @@ public:
 
 private:
 	friend class Super::Super;
-
 	static bool IsValid(const ValueType& Value) { return ::IsValid(Value); }
 	static ValidType ToValid(const ValueType& Value) { return Value; }
 };
 
 
 template <typename ElementType>
-class TBackedLiveData<TArray<ElementType>> : private TBackedLiveDataBase<TBackedLiveData<TArray<ElementType>>, TArray<ElementType>>
+class TBackedLiveData<TArray<ElementType>, ERepHandlingPolicy::CompareForAddOrRemove> : public TBackedLiveDataBase<TBackedLiveData<TArray<ElementType>>, TArray<ElementType>>
 {
 public:
+	using Super = TBackedLiveDataBase<TBackedLiveData<TArray<ElementType>>, TArray<ElementType>>;
+	using ValueType = TArray<ElementType>;
+	using ValidType = TArray<ElementType>;
+
+	using Super::Super;
+	using Super::operator=;
+	using Super::Notify;
+	using Super::Observe;
+	using Super::CreateStream;
+	using Super::Get;
+
+	ValidType* operator->() const { return Super::Get(); }
+	const ValidType& operator*() const { return *Super::Get(); }
+
+	template <typename U>
+	void Add(U&& Element) requires std::is_convertible_v<U, ElementType>
+	{
+		this->Value.Add(Forward<U>(Element));
+		NotifyAdd(this->Value.Last());
+	}
+
+	void Remove(const ElementType& Element)
+	{
+		this->Value.Remove(Element);
+		NotifyRemove(Element);
+	}
+
+	void RemoveAt(int32 Index)
+	{
+		auto Removed = MoveTemp(this->Value[Index]);
+		this->Value.RemoveAt(Index);
+		NotifyRemove(Removed);
+	}
+
+	void Empty()
+	{
+		auto Removed = MoveTemp(this->Value);
+		this->Value.Empty();
+		for (const ElementType& Each : Removed)
+		{
+			this->GuardCallbackInvocation([&]() { OnElementRemoved.Broadcast(Each); });
+		}
+		Super::Notify();
+	}
+
+	void OnRep(const TArray<ElementType>& OldArray)
+	{
+		for (const ElementType& Each : OldArray)
+		{
+			if (!this->Value.Contains(Each))
+			{
+				this->GuardCallbackInvocation([&]() { OnElementRemoved.Broadcast(Each); });
+			}
+		}
+
+		for (const ElementType& Each : this->Value)
+		{
+			if (!OldArray.Contains(Each))
+			{
+				this->GuardCallbackInvocation([&]() { OnElementAdded.Broadcast(Each); });
+			}
+		}
+
+		Super::Notify();
+	}
+
+	void NotifyAdd(const ElementType& Element)
+	{
+		this->GuardCallbackInvocation([&]() { OnElementAdded.Broadcast(Element); });
+		Super::Notify();
+	}
+	
+	void NotifyRemove(const ElementType& Element)
+	{
+		this->GuardCallbackInvocation([&]() { OnElementRemoved.Broadcast(Element); });
+		Super::Notify();
+	}
+	
+	template <typename FuncType>
+	void ObserveAdd(UObject* Lifetime, FuncType&& Func)
+	{
+		for (const ElementType& Each : this->Value)
+		{
+			this->GuardCallbackInvocation([&]() { Func(Each); });
+		}
+		
+		OnElementAdded.AddWeakLambda(Lifetime, Forward<FuncType>(Func));
+	}
+
+	template <typename T, typename FuncType>
+	void ObserveAdd(const TSharedRef<T>& Lifetime, FuncType&& Func)
+	{
+		for (const ElementType& Each : this->Value)
+		{
+			this->GuardCallbackInvocation([&]() { Func(Each); });
+		}
+		
+		OnElementAdded.Add(FElementEvent::FDelegate::CreateSPLambda(Lifetime, Forward<FuncType>(Func)));
+	}
+	
+	template <typename FuncType>
+	UE_NODISCARD FDelegateSPHandle ObserveAdd(FuncType&& Func)
+	{
+		FDelegateSPHandle Ret;
+		ObserveAdd(Ret.ToShared(), Forward<FuncType>(Func));
+		return Ret;
+	}
+	
+	template <typename FuncType>
+	void ObserveRemove(UObject* Lifetime, FuncType&& Func)
+	{
+		OnElementRemoved.AddWeakLambda(Lifetime, Forward<FuncType>(Func));
+	}
+
+	template <typename T, typename FuncType>
+	void ObserveRemove(const TSharedRef<T>& Lifetime, FuncType&& Func)
+	{
+		OnElementRemoved.Add(FElementEvent::FDelegate::CreateSPLambda(Lifetime, Forward<FuncType>(Func)));
+	}
+	
+	template <typename FuncType>
+	UE_NODISCARD FDelegateSPHandle ObserveRemove(FuncType&& Func)
+	{
+		FDelegateSPHandle Ret;
+		ObserveRemove(Ret.ToShared(), Forward<FuncType>(Func));
+		return Ret;
+	}
 
 private:
+	friend class Super::Super;
+	static bool IsValid(const ValueType&) { return true; }
+	static const ValidType& ToValid(const ValueType& Value [[msvc::lifetimebound]]) { return Value; }
+
+	DECLARE_MULTICAST_DELEGATE_OneParam(FElementEvent, const ElementType&);
+	FElementEvent OnElementAdded;
+	FElementEvent OnElementRemoved;
 };
 
 
@@ -308,7 +469,13 @@ public:
 	}
 
 	template <typename... ArgTypes>
-	void Observe(ArgTypes&&... Args) { LiveData.Observe(Forward<ArgTypes>(Args)...); }
+	decltype(auto) Observe(ArgTypes&&... Args) { return LiveData.Observe(Forward<ArgTypes>(Args)...); }
+	
+	template <typename... ArgTypes>
+	decltype(auto) ObserveAdd(ArgTypes&&... Args) { return LiveData.ObserveAdd(Forward<ArgTypes>(Args)...); }
+	
+	template <typename... ArgTypes>
+	decltype(auto) ObserveRemove(ArgTypes&&... Args) { return LiveData.ObserveRemove(Forward<ArgTypes>(Args)...); }
 
 	TValueStream<ValidType> CreateStream() { return LiveData.CreateStream(); }
 
@@ -337,6 +504,13 @@ public:
 private:
 	LiveDataType& LiveData;
 };
+
+
+template <typename LiveDataType>
+TLiveDataView<LiveDataType> ToLiveDataView(LiveDataType& LiveData)
+{
+	return TLiveDataView<LiveDataType>{LiveData};
+}
 
 
 // TLiveData Declarations
