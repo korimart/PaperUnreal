@@ -170,18 +170,25 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 		AreaConverter->SetConversionDestination(HomeAreaBoundary);
 		AreaConverter->RegisterComponent();
 
-		AreaSpawner->GetSpawnedAreas().ObserveAdd(this, [this, AS_WEAK(MyHomeArea), AS_WEAK(AreaConverter)](AAreaActor* NewArea)
+		RunWeakCoroutine(this, [this, AreaSpawner, MyHomeArea, AreaConverter](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
-			if (AllValid(MyHomeArea, AreaConverter) && NewArea != MyHomeArea)
+			Context.AbortIfNotValid(AreaSpawner);
+			Context.AbortIfNotValid(MyHomeArea);
+			Context.AbortIfNotValid(AreaConverter);
+
+			auto AreaStream = AreaSpawner->GetSpawnedAreas().CreateAddStream();
+			while (auto NewArea = co_await AbortOnError(AreaStream))
 			{
 				RunWeakCoroutine(this, [this, NewArea, AreaConverter](FWeakCoroutineContext& Context) -> FWeakCoroutine
 				{
+					Context.AbortIfNotValid(NewArea);
 					Context.AbortIfNotValid(AreaConverter);
 
 					auto NewBoundary = co_await AbortOnError(WaitForComponent<UAreaBoundaryComponent>(NewArea));
+					
 					auto AreaSlasher = NewObject<UAreaSlasherComponent>(this);
 					AreaSlasher->SetSlashTarget(NewBoundary);
-					AreaSlasher->SetTracerToAreaConverter(AreaConverter.Get());
+					AreaSlasher->SetTracerToAreaConverter(AreaConverter);
 					AreaSlasher->RegisterComponent();
 				});
 			}
@@ -234,9 +241,9 @@ void APaperUnrealCharacter::AttachPlayerMachineComponents()
 		RunWeakCoroutine(TracerMesh, [TracerMesh, Inventory](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
 			auto MaterialStream = Inventory->GetTracerMaterial().CreateStream();
-			while (auto NextMaterial = co_await MaterialStream)
+			while (auto NextMaterial = co_await AbortOnError(MaterialStream))
 			{
-				if (auto Loaded = co_await RequestAsyncLoad(NextMaterial.Get()))
+				if (auto Loaded = co_await RequestAsyncLoad(NextMaterial))
 				{
 					TracerMesh->ConfigureMaterialSet({Loaded.Get()});
 				}

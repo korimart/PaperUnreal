@@ -40,6 +40,7 @@ public:
 	{
 	}
 
+	// TODO context doesn't need to be a pointer
 	void Init(
 		TUniquePtr<TUniqueFunction<TWeakCoroutine(TWeakCoroutineContext<T, ErrorTypes...>&)>> Captures,
 		TUniquePtr<TWeakCoroutineContext<T, ErrorTypes...>> Context);

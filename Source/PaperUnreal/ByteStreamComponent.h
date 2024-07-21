@@ -203,6 +203,7 @@ private:
 };
 
 
+// TODO remove
 UCLASS()
 class UByteStreamComponent : public UActorComponent2
 {

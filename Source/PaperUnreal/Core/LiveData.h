@@ -445,6 +445,11 @@ public:
 		ObserveRemove(Ret.ToShared(), Forward<FuncType>(Func));
 		return Ret;
 	}
+	
+	TValueStream<ElementType> CreateAddStream()
+	{
+		return CreateMulticastValueStream(this->Value, OnElementAdded);
+	}
 
 private:
 	friend class Super::Super;
@@ -477,7 +482,8 @@ public:
 	template <typename... ArgTypes>
 	decltype(auto) ObserveRemove(ArgTypes&&... Args) { return LiveData.ObserveRemove(Forward<ArgTypes>(Args)...); }
 
-	TValueStream<ValidType> CreateStream() { return LiveData.CreateStream(); }
+	decltype(auto) CreateStream() { return LiveData.CreateStream(); }
+	decltype(auto) CreateAddStream() { return LiveData.CreateAddStream(); }
 
 	template <CEqualityComparable<ValidType> ArgType>
 	TCancellableFuture<ValidType, EValueStreamError> If(ArgType&& OfThis)
