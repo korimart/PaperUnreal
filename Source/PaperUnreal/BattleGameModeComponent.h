@@ -139,7 +139,7 @@ private:
 			co_await ReadyState->GetbReady().If(true);
 
 			// 죽은 다음에 다시 스폰하는 경우에는 팀이 이미 있음
-			if (TeamComponent->GetTeamIndex().Get() >= 0)
+			if (TeamComponent->GetTeamIndex().Get() < 0)
 			{
 				if (TOptional<int32> NextTeamIndex = TeamAllocator.NextTeamIndex())
 				{
@@ -163,8 +163,6 @@ private:
 			if (!ThisPlayerArea)
 			{
 				ThisPlayerArea = AreaSpawner->SpawnAreaAtRandomEmptyLocation();
-				ThisPlayerArea->TeamComponent->SetTeamIndex(ThisPlayerTeamIndex);
-				ThisPlayerArea->SetAreaMaterial(AreaMaterials[ThisPlayerTeamIndex % AreaMaterials.Num()]);
 			}
 
 			// 월드가 꽉차서 새 영역을 선포할 수 없음
@@ -173,7 +171,10 @@ private:
 				// TODO 일단 이 팀은 플레이를 할 수 없는데 나중에 공간이 생길 수도 있음 그 때 스폰해주자
 				co_return;
 			}
-
+			
+			ThisPlayerArea->TeamComponent->SetTeamIndex(ThisPlayerTeamIndex);
+			ThisPlayerArea->SetAreaMaterial(AreaMaterials[ThisPlayerTeamIndex % AreaMaterials.Num()]);
+			
 			Inventory->SetHomeArea(ThisPlayerArea);
 			Inventory->SetTracerMaterial(TracerMaterials[ThisPlayerTeamIndex % TracerMaterials.Num()]);
 
@@ -198,10 +199,8 @@ private:
 				auto AreaStateTracker = NewObject<UAreaStateTrackerComponent>(GetOwner());
 				AreaStateTracker->SetSpawner(AreaSpawner);
 				AreaStateTracker->RegisterComponent();
-				
-				auto F = FinallyIfValid(AreaStateTracker, [AreaStateTracker](){ AreaStateTracker->DestroyComponent(); });
-
 				co_await AreaStateTracker->OnlyOneAreaIsSurviving();
+				AreaStateTracker->DestroyComponent();
 			}));
 		
 			const TOptional<int32> CompletedAwaitableIndex = co_await AnyOf(MoveTemp(Timeout), MoveTemp(OnlyOneTeamSurviving));

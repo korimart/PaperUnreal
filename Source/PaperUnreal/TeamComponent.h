@@ -28,7 +28,7 @@ private:
 	}
 
 	UFUNCTION()
-	void OnRep_TeamIndex() { TeamIndex = RepTeamIndex; }
+	void OnRep_TeamIndex() { TeamIndex.OnRep(); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{

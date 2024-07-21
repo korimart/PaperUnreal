@@ -292,23 +292,20 @@ public:
 	void SetValue() requires bVoidResult
 	{
 		check(!IsSet());
-		State->SetValue();
-		State = nullptr;
+		std::exchange(State, nullptr)->SetValue();
 	}
 
 	template <typename U>
 	void SetValue(U&& Value) requires IsConvertibleV<U, T, ErrorTypes...>
 	{
 		check(!IsSet());
-		State->SetValue(Forward<U>(Value));
-		State = nullptr;
+		std::exchange(State, nullptr)->SetValue(Forward<U>(Value));
 	}
 
 	void Cancel()
 	{
 		check(!IsSet());
-		State->SetValue(EDefaultFutureError::Cancelled);
-		State = nullptr;
+		std::exchange(State, nullptr)->SetValue(EDefaultFutureError::Cancelled);
 	}
 
 	TCancellableFuture<T, ErrorTypes...> GetFuture()

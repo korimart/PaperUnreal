@@ -79,13 +79,20 @@ protected:
 
 	void OnSomeConditionMaybeSatisfied()
 	{
+		TArray<TCancellablePromise<void>> PromisesToFulfill;
+		
 		for (int32 i = Promises.Num() - 1; i >= 0; --i)
 		{
 			if (Promises[i].Condition())
 			{
-				Promises[i].Promise.SetValue();
+				PromisesToFulfill.Add(MoveTemp(Promises[i].Promise));
 				Promises.RemoveAt(i);
 			}
+		}
+
+		for (auto& Each : PromisesToFulfill)
+		{
+			Each.SetValue();
 		}
 	}
 

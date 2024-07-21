@@ -31,7 +31,7 @@ private:
 	}
 
 	UFUNCTION()
-	void OnRep_bReady() { bReady = RepbReady; }
+	void OnRep_bReady() { bReady.OnRep(); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{

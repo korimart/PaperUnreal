@@ -40,7 +40,7 @@ private:
 	}
 
 	UFUNCTION()
-	void OnRep_AreaMaterial() { AreaMaterial = RepAreaMaterial; }
+	void OnRep_AreaMaterial() { AreaMaterial.OnRep(); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{

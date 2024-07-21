@@ -33,7 +33,7 @@ private:
 	void OnRep_HomeArea() { HomeArea.OnRep(); }
 
 	UFUNCTION()
-	void OnRep_TracerMaterial() { TracerMaterial = RepTracerMaterial; }
+	void OnRep_TracerMaterial() { TracerMaterial.OnRep(); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{
