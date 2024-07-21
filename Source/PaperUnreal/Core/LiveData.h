@@ -92,8 +92,8 @@ public:
 			: TArray<typename Derived::ValidType>{};
 
 		return CreateMulticastValueStream(InitArray, OnChanged,
-			[](const InternalStorageType& NewValue) { return Derived::IsValid(NewValue); },
-			[](const InternalStorageType& NewValue) { return Derived::ToValid(NewValue); });
+			[](const std::decay_t<InternalStorageType>& NewValue) { return Derived::IsValid(NewValue); },
+			[](const std::decay_t<InternalStorageType>& NewValue) { return Derived::ToValid(NewValue); });
 	}
 
 	// 이거 허용을 안 하면 LiveData 안에 들어있는 객체의 non const 함수를 호출할 수 없음
@@ -111,7 +111,7 @@ protected:
 	template <typename FuncType>
 	auto ToValidCheckingFunc(FuncType&& Func)
 	{
-		return [Func = Forward<FuncType>(Func)](const InternalStorageType& Target)
+		return [Func = Forward<FuncType>(Func)](const std::decay_t<InternalStorageType>& Target)
 		{
 			if (Derived::IsValid(Target))
 			{
@@ -129,7 +129,7 @@ public:
 	using Super = TLiveDataBase<TLiveData, InValueType>;
 	using ValueType = InValueType;
 	using ValidType = ValueType;
-	
+
 	using Super::Super;
 	using Super::operator=;
 
@@ -190,11 +190,62 @@ private:
 };
 
 
-template <typename InValueType>
-class TLiveData<InValueType*> : private TLiveDataBase<TLiveData<InValueType*>, InValueType*&>
+template <typename Derived, typename InValueType>
+class TBackedLiveDataBase : public TLiveDataBase<Derived, InValueType&>
 {
 public:
-	using Super = TLiveDataBase<TLiveData, InValueType*&>;
+	using Super = TLiveDataBase<Derived, InValueType&>;
+	using ValueType = InValueType;
+	using ValidType = InValueType;
+	
+	using Super::Super;
+
+	template <typename T> requires CInequalityComparable<ValidType> && std::is_convertible_v<T, ValidType>
+	TBackedLiveDataBase& operator=(T&& NewValue)
+	{
+		check(&Super::Get() != &NewValue);
+		Super::operator=(Forward<T>(NewValue));
+		return *this;
+	}
+};
+
+
+template <typename InValueType>
+class TBackedLiveData : private TBackedLiveDataBase<TBackedLiveData<InValueType>, InValueType>
+{
+public:
+	using Super = TBackedLiveDataBase<TBackedLiveData, InValueType>;
+	using ValueType = InValueType;
+	using ValidType = InValueType;
+
+	using Super::Super;
+	using Super::operator=;
+	using Super::SetValue;
+	using Super::SetValueSilent;
+	using Super::SetValueAlways;
+	using Super::Notify;
+	using Super::Observe;
+	using Super::CreateStream;
+	using Super::Get;
+
+	ValidType* operator->() const { return Super::Get(); }
+	const ValidType& operator*() const { return *Super::Get(); }
+
+	void OnRep() { Notify(); }
+
+private:
+	friend class Super::Super;
+
+	static bool IsValid(const ValueType&) { return true; }
+	static const ValidType& ToValid(const ValueType& Value [[msvc::lifetimebound]]) { return Value; }
+};
+
+
+template <typename InValueType>
+class TBackedLiveData<InValueType*> : private TBackedLiveDataBase<TBackedLiveData<InValueType*>, InValueType*>
+{
+public:
+	using Super = TBackedLiveDataBase<TBackedLiveData, InValueType*>;
 	using ValueType = InValueType*;
 	using ValidType = InValueType*;
 
@@ -211,7 +262,7 @@ public:
 	ValidType* operator->() const { return Super::Get(); }
 	const ValidType& operator*() const { return *Super::Get(); }
 
-	friend TCancellableFutureAwaitable<ValidType> operator co_await(TLiveData& LiveData)
+	friend TCancellableFutureAwaitable<ValidType> operator co_await(TBackedLiveData& LiveData)
 	{
 		return [&]() -> TCancellableFuture<ValidType>
 		{
@@ -226,23 +277,51 @@ public:
 		}();
 	}
 
+	void OnRep() { Notify(); }
+
 private:
-	friend class Super;
+	friend class Super::Super;
 
 	static bool IsValid(const ValueType& Value) { return ::IsValid(Value); }
 	static ValidType ToValid(const ValueType& Value) { return Value; }
 };
 
 
-template <typename ValueType>
+template <typename ElementType>
+class TBackedLiveData<TArray<ElementType>> : private TBackedLiveDataBase<TBackedLiveData<TArray<ElementType>>, TArray<ElementType>>
+{
+public:
+
+private:
+};
+
+
+template <typename LiveDataType>
 class TLiveDataView
 {
 public:
-	using ValidType = typename TLiveData<ValueType>::ValidType;
+	using ValidType = typename LiveDataType::ValidType;
 
-	TLiveDataView(TLiveData<ValueType>& InLiveData)
+	TLiveDataView(LiveDataType& InLiveData)
 		: LiveData(InLiveData)
 	{
+	}
+
+	template <typename... ArgTypes>
+	void Observe(ArgTypes&&... Args) { LiveData.Observe(Forward<ArgTypes>(Args)...); }
+
+	TValueStream<ValidType> CreateStream() { return LiveData.CreateStream(); }
+
+	template <CEqualityComparable<ValidType> ArgType>
+	TCancellableFuture<ValidType, EValueStreamError> If(ArgType&& OfThis)
+	{
+		return FirstInStream(CreateStream(), [OfThis = Forward<ArgType>(OfThis)](const ValidType& Value) { return Value == OfThis; });
+	}
+
+	template <CPredicate<ValidType> PredicateType>
+	TCancellableFuture<ValidType, EValueStreamError> If(PredicateType&& Predicate)
+	{
+		return FirstInStream(CreateStream(), [Predicate = Forward<PredicateType>(Predicate)](const ValidType& Value) { return Predicate(Value); });
 	}
 
 	friend TCancellableFutureAwaitable<ValidType> operator co_await(TLiveDataView LiveDataView)
@@ -250,51 +329,20 @@ public:
 		return operator co_await(LiveDataView.LiveData);
 	}
 
-	template <CEqualityComparable<ValueType> ArgType>
-	TCancellableFuture<ValidType, EValueStreamError> If(ArgType&& OfThis)
-	{
-		return FirstInStream(CreateStream(), [OfThis = Forward<ArgType>(OfThis)](const ValueType& Value) { return Value == OfThis; });
-	}
-
-	template <CPredicate<ValueType> PredicateType>
-	TCancellableFuture<ValidType, EValueStreamError> If(PredicateType&& Predicate)
-	{
-		return FirstInStream(CreateStream(), [Predicate = Forward<PredicateType>(Predicate)](const ValueType& Value) { return Predicate(Value); });
-	}
-
-	TValueStream<ValidType> CreateStream() { return LiveData.CreateStream(); }
-
 	decltype(auto) Get() { return LiveData.Get(); }
 	decltype(auto) Get() const { return LiveData.Get(); }
 	decltype(auto) operator*() { return *LiveData; }
 	decltype(auto) operator*() const { return *LiveData; }
 
-	template <typename... ArgTypes>
-	void Observe(ArgTypes&&... Args) { LiveData.Observe(Forward<ArgTypes>(Args)...); }
-
 private:
-	TLiveData<ValueType>& LiveData;
+	LiveDataType& LiveData;
 };
 
 
 // TLiveData Declarations
-#define DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(Type, Name)\
-	private: TLiveData<TOptional<Type>> Name;\
+#define DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(Type, Name, BackingField)\
+	private: TBackedLiveData<Type> Name{BackingField};\
 	public:\
-	TLiveDataView<TOptional<Type>> Get##Name() { return Name; };\
-	void Set##Name(const std::type_identity_t<Type>& NewValue) { DEFINE_REPPED_VAR_SETTER(Name, NewValue); }
-
-
-#define DECLARE_REPPED_LIVE_DATA_GETTER_SETTER_WITH_DEFAULT(Type, Name, Default)\
-	private: TLiveData<TOptional<Type>> Name{Default};\
-	public:\
-	TLiveDataView<TOptional<Type>> Get##Name() { return Name; };\
-	void Set##Name(const std::type_identity_t<Type>& NewValue) { DEFINE_REPPED_VAR_SETTER(Name, NewValue); }
-
-
-#define DECLARE_REPPED_UOBJECT_LIVE_DATA_GETTER_SETTER(Type, Name, BackingField)\
-	private: TLiveData<Type> Name{BackingField};\
-	public:\
-	TLiveDataView<Type> Get##Name() { return Name; };\
+	TLiveDataView<TBackedLiveData<Type>> Get##Name() { return Name; };\
 	void Set##Name(const std::type_identity_t<Type>& NewValue) { DEFINE_REPPED_VAR_SETTER(Name, NewValue); }
 // ~TLiveData Declarations

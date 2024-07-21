@@ -15,7 +15,7 @@ class UAreaBoundaryComponent : public UActorComponent2, public IAreaBoundaryStre
 	GENERATED_BODY()
 
 public:
-	virtual TLiveDataView<FLoopedSegmentArray2D> GetBoundaryStreamer() override
+	virtual TLiveDataView<TLiveData<FLoopedSegmentArray2D>> GetBoundaryStreamer() override
 	{
 		return AreaBoundary;
 	}

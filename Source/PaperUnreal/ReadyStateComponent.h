@@ -16,7 +16,7 @@ class UReadyStateComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER_WITH_DEFAULT(bool, bReady, false);
+	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(bool, bReady, RepbReady);
 
 	UFUNCTION(Server, Reliable)
 	void ServerSetReady(bool bNewReady);

@@ -24,7 +24,7 @@ public:
 	UPROPERTY()
 	UTeamComponent* TeamComponent;
 
-	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(TSoftObjectPtr<UMaterialInstance>, AreaMaterial);
+	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(TSoftObjectPtr<UMaterialInstance>, AreaMaterial, RepAreaMaterial);
 
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_AreaMaterial)

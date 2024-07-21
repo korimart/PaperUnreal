@@ -16,7 +16,7 @@ class UTeamComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(int32, TeamIndex);
+	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(int32, TeamIndex, RepTeamIndex);
 
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_TeamIndex)

@@ -14,8 +14,8 @@ class UInventoryComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	DECLARE_REPPED_UOBJECT_LIVE_DATA_GETTER_SETTER(AAreaActor*, HomeArea, RepHomeArea); // TODO move
-	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(TSoftObjectPtr<UMaterialInstance>, TracerMaterial);
+	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(AAreaActor*, HomeArea, RepHomeArea); // TODO move
+	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(TSoftObjectPtr<UMaterialInstance>, TracerMaterial, RepTracerMaterial);
 
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_HomeArea)
@@ -30,7 +30,7 @@ private:
 	}
 
 	UFUNCTION()
-	void OnRep_HomeArea() { HomeArea = RepHomeArea; }
+	void OnRep_HomeArea() { HomeArea.OnRep(); }
 
 	UFUNCTION()
 	void OnRep_TracerMaterial() { TracerMaterial = RepTracerMaterial; }

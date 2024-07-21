@@ -22,5 +22,5 @@ class IAreaBoundaryStream
 	GENERATED_BODY()
 
 public:
-	virtual TLiveDataView<FLoopedSegmentArray2D> GetBoundaryStreamer() = 0;
+	virtual TLiveDataView<TLiveData<FLoopedSegmentArray2D>> GetBoundaryStreamer() = 0;
 };

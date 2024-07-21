@@ -18,7 +18,7 @@ class UReadyStateTrackerComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	TLiveDataView<int32> GetReadyCount() { return ReadyCount; }
+	TLiveDataView<TLiveData<int32>> GetReadyCount() { return ReadyCount; }
 
 	TCancellableFuture<int32, EValueStreamError> ReadyCountIsAtLeast(int32 Least)
 	{
