@@ -60,7 +60,7 @@ private:
 		AddLifeDependency(Area);
 		AddLifeDependency(OverlapChecker);
 
-		Area->GetBoundaryStreamer().Observe(this, [this](const FLoopedSegmentArray2D& Boundary)
+		Area->GetBoundary().Observe(this, [this](const FLoopedSegmentArray2D& Boundary)
 		{
 			if (Tracer->GetTracerPath().IsValid())
 			{

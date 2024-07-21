@@ -66,7 +66,7 @@ private:
 	{
 		auto AreaBoundary = NewObject<UAreaBoundaryComponent>(this);
 		AreaBoundary->ResetToStartingBoundary(GetActorLocation());
-		AreaBoundary->GetBoundaryStreamer().Observe(this, [this](const FLoopedSegmentArray2D& Boundary)
+		AreaBoundary->GetBoundary().Observe(this, [this](const FLoopedSegmentArray2D& Boundary)
 		{
 			if (!Boundary.IsValid())
 			{
@@ -88,9 +88,9 @@ private:
 		auto AreaMesh = NewObject<UAreaMeshComponent>(this);
 		AreaMesh->RegisterComponent();
 
-		IAreaBoundaryStream* AreaBoundaryStream = GetNetMode() == NM_Client
-			? static_cast<IAreaBoundaryStream*>(FindComponentByClass<UReplicatedAreaBoundaryComponent>())
-			: static_cast<IAreaBoundaryStream*>(FindComponentByClass<UAreaBoundaryComponent>());
+		IAreaBoundaryProvider* AreaBoundaryStream = GetNetMode() == NM_Client
+			? static_cast<IAreaBoundaryProvider*>(FindComponentByClass<UReplicatedAreaBoundaryComponent>())
+			: static_cast<IAreaBoundaryProvider*>(FindComponentByClass<UAreaBoundaryComponent>());
 
 		// 클래스 서버 코드에서 뭔가 실수한 거임 고쳐야 됨
 		check(AreaBoundaryStream);

@@ -6,10 +6,10 @@
 #include "Core/LiveData.h"
 #include "Core/SegmentArray.h"
 #include "UObject/Interface.h"
-#include "AreaBoundaryStream.generated.h"
+#include "AreaBoundaryProvider.generated.h"
 
 UINTERFACE()
-class UAreaBoundaryStream : public UInterface
+class UAreaBoundaryProvider : public UInterface
 {
 	GENERATED_BODY()
 };
@@ -17,10 +17,10 @@ class UAreaBoundaryStream : public UInterface
 /**
  * 
  */
-class IAreaBoundaryStream
+class IAreaBoundaryProvider
 {
 	GENERATED_BODY()
 
 public:
-	virtual TLiveDataView<TLiveData<FLoopedSegmentArray2D>> GetBoundaryStreamer() = 0;
+	virtual TLiveDataView<TLiveData<FLoopedSegmentArray2D>> GetBoundary() = 0;
 };

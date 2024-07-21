@@ -3,19 +3,19 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AreaBoundaryStream.h"
+#include "AreaBoundaryProvider.h"
 #include "Core/SegmentArray.h"
 #include "Core/ActorComponent2.h"
 #include "AreaBoundaryComponent.generated.h"
 
 
 UCLASS()
-class UAreaBoundaryComponent : public UActorComponent2, public IAreaBoundaryStream
+class UAreaBoundaryComponent : public UActorComponent2, public IAreaBoundaryProvider
 {
 	GENERATED_BODY()
 
 public:
-	virtual TLiveDataView<TLiveData<FLoopedSegmentArray2D>> GetBoundaryStreamer() override
+	virtual TLiveDataView<TLiveData<FLoopedSegmentArray2D>> GetBoundary() override
 	{
 		return AreaBoundary;
 	}
@@ -90,7 +90,7 @@ public:
 	
 	bool IsInside(UAreaBoundaryComponent* Other) const
 	{
-		if (const TOptional<FLoopedSegmentArray2D>& OtherBoundary = Other->GetBoundaryStreamer().Get())
+		if (const TOptional<FLoopedSegmentArray2D>& OtherBoundary = Other->GetBoundary().Get())
 		{
 			return AreaBoundary->IsInside(*OtherBoundary);
 		}

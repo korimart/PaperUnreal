@@ -145,7 +145,7 @@ public:
 			for (AAreaActor* Each : RepSpawnedAreas)
 			{
 				const auto AreaBoundary = Each->FindComponentByClass<UAreaBoundaryComponent>();
-				SpawnLocationCalculator.OccupyGrid(AreaBoundary->GetBoundaryStreamer().Get());
+				SpawnLocationCalculator.OccupyGrid(AreaBoundary->GetBoundary().Get());
 			}
 			return SpawnLocationCalculator.GetRandomEmptyCell();
 		}();

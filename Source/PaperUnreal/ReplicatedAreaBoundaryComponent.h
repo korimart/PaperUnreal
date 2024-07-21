@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "AreaBoundaryComponent.h"
-#include "AreaBoundaryStream.h"
+#include "AreaBoundaryProvider.h"
 #include "Core/ActorComponent2.h"
 #include "Core/WeakCoroutine/WeakCoroutine.h"
 #include "Net/UnrealNetwork.h"
@@ -12,12 +12,12 @@
 
 
 UCLASS()
-class UReplicatedAreaBoundaryComponent : public UActorComponent2, public IAreaBoundaryStream
+class UReplicatedAreaBoundaryComponent : public UActorComponent2, public IAreaBoundaryProvider
 {
 	GENERATED_BODY()
 
 public:
-	virtual TLiveDataView<TLiveData<FLoopedSegmentArray2D>> GetBoundaryStreamer() override
+	virtual TLiveDataView<TLiveData<FLoopedSegmentArray2D>> GetBoundary() override
 	{
 		return AreaBoundary;
 	}
@@ -54,7 +54,7 @@ private:
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
 			Context.AbortIfNotValid(BoundarySource);
-			for (auto Boundaries = BoundarySource->GetBoundaryStreamer().CreateStream();;)
+			for (auto Boundaries = BoundarySource->GetBoundary().CreateStream();;)
 			{
 				RepPoints = (co_await AbortOnError(Boundaries)).GetPoints();
 			}

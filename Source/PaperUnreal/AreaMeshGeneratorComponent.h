@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AreaBoundaryStream.h"
+#include "AreaBoundaryProvider.h"
 #include "AreaMeshComponent.h"
 #include "Core/ActorComponent2.h"
 #include "Core/WeakCoroutine/WeakCoroutine.h"
@@ -16,7 +16,7 @@ class UAreaMeshGeneratorComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	void SetMeshSource(IAreaBoundaryStream* Source)
+	void SetMeshSource(IAreaBoundaryProvider* Source)
 	{
 		MeshSource = Cast<UObject>(Source);
 	}
@@ -28,7 +28,7 @@ public:
 
 private:
 	UPROPERTY()
-	TScriptInterface<IAreaBoundaryStream> MeshSource;
+	TScriptInterface<IAreaBoundaryProvider> MeshSource;
 	
 	UPROPERTY()
 	UAreaMeshComponent* MeshDest;
@@ -48,7 +48,7 @@ private:
 		{
 			Context.AbortIfNotValid(MeshSource);
 			Context.AbortIfNotValid(MeshDest);
-			for (auto BoundaryStream = MeshSource->GetBoundaryStreamer().CreateStream();;)
+			for (auto BoundaryStream = MeshSource->GetBoundary().CreateStream();;)
 			{
 				MeshDest->SetMeshByWorldBoundary(co_await AbortOnError(BoundaryStream));
 			}

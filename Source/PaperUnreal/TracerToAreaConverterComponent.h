@@ -65,7 +65,7 @@ private:
 			ConvertPathToArea();
 		});
 
-		ConversionDestination->GetBoundaryStreamer().Observe(this, [this](auto&)
+		ConversionDestination->GetBoundary().Observe(this, [this](auto&)
 		{
 			ConvertPathToArea();
 		});
