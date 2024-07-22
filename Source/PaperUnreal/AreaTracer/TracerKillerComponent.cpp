@@ -1,6 +1,6 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "PlayerKillerComponent.h"
+#include "TracerKillerComponent.h"
 
-DEFINE_LOG_CATEGORY(LogPlayerKiller);
+DEFINE_LOG_CATEGORY(LogTracerKiller);

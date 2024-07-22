@@ -14,7 +14,7 @@
 #include "GameFramework/GameStateBase.h"
 #include "PaperUnreal/AreaTracer/AreaSlasherComponent.h"
 #include "PaperUnreal/AreaTracer/AreaSpawnerComponent.h"
-#include "PaperUnreal/AreaTracer/PlayerKillerComponent.h"
+#include "PaperUnreal/AreaTracer/TracerKillerComponent.h"
 #include "PaperUnreal/AreaTracer/ReplicatedTracerPathComponent.h"
 #include "PaperUnreal/AreaTracer/TracerMeshComponent.h"
 #include "PaperUnreal/AreaTracer/TracerMeshGeneratorComponent.h"
@@ -158,7 +158,7 @@ void APVPBattleCharacter::AttachServerMachineComponents()
 			});
 		});
 
-		auto Killer = NewObject<UPlayerKillerComponent>(this);
+		auto Killer = NewObject<UTracerKillerComponent>(this);
 		Killer->SetTracer(TracerPath);
 		Killer->SetArea(HomeAreaBoundary);
 		Killer->SetOverlapChecker(TracerOverlapChecker);

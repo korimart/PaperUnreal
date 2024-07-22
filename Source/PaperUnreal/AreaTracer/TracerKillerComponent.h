@@ -7,14 +7,14 @@
 #include "TracerPathComponent.h"
 #include "PaperUnreal/GameFramework2/ActorComponent2.h"
 #include "PaperUnreal/ModeAgnostic/LifeComponent.h"
-#include "PlayerKillerComponent.generated.h"
+#include "TracerKillerComponent.generated.h"
 
 
-DECLARE_LOG_CATEGORY_EXTERN(LogPlayerKiller, Log, All);
+DECLARE_LOG_CATEGORY_EXTERN(LogTracerKiller, Log, All);
 
 
 UCLASS()
-class UPlayerKillerComponent : public UActorComponent2
+class UTracerKillerComponent : public UActorComponent2
 {
 	GENERATED_BODY()
 
@@ -47,7 +47,7 @@ private:
 	UPROPERTY()
 	UTracerOverlapCheckerComponent* OverlapChecker;
 
-	UPlayerKillerComponent()
+	UTracerKillerComponent()
 	{
 		bWantsInitializeComponent = true;
 	}
@@ -70,21 +70,21 @@ private:
 
 				if (!Boundary.IsInside(TracerOrigin))
 				{
-					UE_LOG(LogPlayerKiller, Log, TEXT("%p 내 트레이서의 시작점이 위치하던 영역이 없어져 사망합니다."), this);
+					UE_LOG(LogTracerKiller, Log, TEXT("%p 내 트레이서의 시작점이 위치하던 영역이 없어져 사망합니다."), this);
 					KillPlayer(GetOwner());
 				}
 			}
 
 			if (!Tracer->GetTracerPath().IsValid() && !Boundary.IsInside(FVector2D{GetOwner()->GetActorLocation()}))
 			{
-				UE_LOG(LogPlayerKiller, Log, TEXT("%p 내가 서 있던 영역이 없어져 사망합니다"), this);
+				UE_LOG(LogTracerKiller, Log, TEXT("%p 내가 서 있던 영역이 없어져 사망합니다"), this);
 				KillPlayer(GetOwner());
 			}
 		});
 
 		OverlapChecker->OnTracerBumpedInto.AddWeakLambda(this, [this](UTracerPathComponent* Bumpee)
 		{
-			UE_LOG(LogPlayerKiller, Log, TEXT("%p -> %p 트레이서 충돌로 인한 킬"), this, Bumpee);
+			UE_LOG(LogTracerKiller, Log, TEXT("%p -> %p 트레이서 충돌로 인한 킬"), this, Bumpee);
 			KillPlayer(Bumpee->GetOwner());
 		});
 	}
