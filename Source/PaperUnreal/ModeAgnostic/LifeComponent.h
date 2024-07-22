@@ -18,9 +18,6 @@ class ULifeComponent : public UActorComponent2
 public:
 	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(bool, bAlive, RepbAlive);
 
-	// TODO TCancellableFuture<void>를 반환할 방법이 없는지 고민해본다
-	TCancellableFuture<bool, EValueStreamError> WaitForDeath() { return GetbAlive().If(false); }
-	
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_bAlive)
 	bool RepbAlive = true;

@@ -25,6 +25,7 @@
 #include "PaperUnreal/ModeAgnostic/ComponentRegistry.h"
 #include "PaperUnreal/ModeAgnostic/InventoryComponent.h"
 #include "PaperUnreal/ModeAgnostic/PlayerSpawnerComponent.h"
+#include "PaperUnreal/WeakCoroutine/AwaitableWrappers.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 
 APVPBattleCharacter::APVPBattleCharacter()
@@ -69,7 +70,7 @@ void APVPBattleCharacter::PostInitializeComponents()
 
 	RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 	{
-		co_await LifeComponent->WaitForDeath();
+		co_await AbortOnError(LifeComponent->GetbAlive().If(false));
 
 		// 현재 얘만 파괴해주면 나머지 컴포넌트는 디펜던시가 사라짐에 따라 알아서 사라짐
 		// Path를 파괴해서 상호작용을 없애 게임에 영향을 미치지 않게 한다
@@ -145,8 +146,13 @@ void APVPBattleCharacter::AttachServerMachineComponents()
 		TracerOverlapChecker->SetTracer(TracerPath);
 		TracerOverlapChecker->RegisterComponent();
 
-		PlayerSpawner->GetSpawnedPlayers().ObserveAdd(TracerOverlapChecker, [TracerOverlapChecker](AActor* NewPlayer)
+		PlayerSpawner->GetSpawnedPlayers().ObserveAdd(TracerOverlapChecker, [TracerOverlapChecker](APawn* NewPlayer)
 		{
+			if (!IsValid(NewPlayer))
+			{
+				return;
+			}
+			
 			RunWeakCoroutine([NewPlayer, TracerOverlapChecker](FWeakCoroutineContext& Context) -> FWeakCoroutine
 			{
 				Context.AbortIfNotValid(TracerOverlapChecker);

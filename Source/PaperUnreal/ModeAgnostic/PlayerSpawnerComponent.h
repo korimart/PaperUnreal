@@ -17,12 +17,12 @@ class UPlayerSpawnerComponent : public UActorComponent2
 public:
 	auto GetSpawnedPlayers() { return ToLiveDataView(Players); }
 
-	AActor* SpawnAtLocation(UClass* Class, const FVector& Location)
+	APawn* SpawnAtLocation(UClass* Class, const FVector& Location)
 	{
 		check(GetNetMode() != NM_Client);
 		
-		AActor* Spawned = GetWorld()->SpawnActor(Class, &Location);
-		const TArray<AActor*> Prev = RepPlayers;
+		APawn* Spawned = CastChecked<APawn>(GetWorld()->SpawnActor(Class, &Location));
+		const TArray<APawn*> Prev = RepPlayers;
 		RepPlayers.Add(Spawned);
 		OnRep_SpawnedPlayers(Prev);
 
@@ -31,10 +31,10 @@ public:
 
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_SpawnedPlayers)
-	TArray<AActor*> RepPlayers;
+	TArray<APawn*> RepPlayers;
 	
 	TBackedLiveData<
-		TArray<AActor*>,
+		TArray<APawn*>,
 		ERepHandlingPolicy::CompareForAddOrRemove
 	> Players{RepPlayers};
 
@@ -44,7 +44,7 @@ private:
 	}
 
 	UFUNCTION()
-	void OnRep_SpawnedPlayers(const TArray<AActor*>& Prev) { Players.OnRep(Prev); }
+	void OnRep_SpawnedPlayers(const TArray<APawn*>& Prev) { Players.OnRep(Prev); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{

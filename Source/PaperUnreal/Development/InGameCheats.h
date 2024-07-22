@@ -77,6 +77,15 @@ private:
 	}
 	
 	UFUNCTION(Exec, BlueprintAuthorityOnly)
+	void SetAllReady(bool bReady)
+	{
+		for (APlayerState* Each : GetWorld()->GetGameState()->PlayerArray)
+		{
+			Each->FindComponentByClass<UReadyStateComponent>()->SetbReady(bReady);
+		}
+	}
+	
+	UFUNCTION(Exec, BlueprintAuthorityOnly)
 	void StartGame()
 	{
 		OnStartGameByCheat.Broadcast();

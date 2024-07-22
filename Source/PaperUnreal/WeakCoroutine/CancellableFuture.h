@@ -558,6 +558,20 @@ inline TCancellableFuture<AGameStateBase*> WaitForGameState(UWorld* World)
 }
 
 
+inline TCancellableFuture<void> WaitForSeconds(UWorld* World, float Seconds)
+{
+	check(IsValid(World));
+	
+	FTimerDelegate Delegate;
+	auto Ret = MakeFutureFromDelegate(Delegate);
+	
+	FTimerHandle Handle;
+	World->GetTimerManager().SetTimer(Handle, Delegate, Seconds, false);
+
+	return Ret;
+}
+
+
 #include "Engine/AssetManager.h"
 
 

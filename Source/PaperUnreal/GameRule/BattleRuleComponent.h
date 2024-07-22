@@ -69,7 +69,7 @@ public:
 		check(!HasBegunPlay());
 		PawnClass = Class;
 	}
-	
+
 	TCancellableFuture<FBattleRuleResult> Start(int32 TeamCount, int32 EachTeamMemberCount)
 	{
 		check(HasBegunPlay());
@@ -102,7 +102,7 @@ private:
 	
 	UPROPERTY()
 	UWorldTimerComponent* WorldTimer;
-	
+
 	UPROPERTY()
 	UAreaSpawnerComponent* AreaSpawner;
 
@@ -110,7 +110,7 @@ private:
 	UPlayerSpawnerComponent* PlayerSpawner;
 
 	FTeamAllocator TeamAllocator;
-	
+
 	const TSoftObjectPtr<UMaterialInstance> SoftSolidBlue{FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Blue.MI_Solid_Blue'")}};
 	const TSoftObjectPtr<UMaterialInstance> SoftSolidBlueLight{FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Blue_Light.MI_Solid_Blue_Light'")}};
 	const TSoftObjectPtr<UMaterialInstance> SoftSolidRed{FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Red.MI_Solid_Red'")}};
@@ -121,7 +121,7 @@ private:
 		SoftSolidBlue,
 		SoftSolidRed,
 	};
-	
+
 	const TArray<TSoftObjectPtr<UMaterialInstance>> TracerMaterials
 	{
 		SoftSolidBlueLight,
@@ -141,7 +141,7 @@ private:
 			// 이 컴포넌트들은 디펜던시: 이 컴포넌트들을 가지는 PlayerState에 대해서만 이 클래스를 사용할 수 있음
 			check(AllValid(TeamComponent, ReadyState, Inventory));
 
-			co_await ReadyState->GetbReady().If(true);
+			co_await AbortOnError(ReadyState->GetbReady().If(true));
 
 			// 죽은 다음에 다시 스폰하는 경우에는 팀이 이미 있음
 			if (TeamComponent->GetTeamIndex().Get() < 0)
@@ -156,18 +156,13 @@ private:
 					co_return;
 				}
 			}
-			
+
 			const int32 ThisPlayerTeamIndex = TeamComponent->GetTeamIndex().Get();
-
-			AAreaActor* ThisPlayerArea =
-				ValidOrNull(AreaSpawner->GetSpawnedAreas().Get().FindByPredicate([&](AAreaActor* Each)
-				{
-					return Each->TeamComponent->GetTeamIndex().Get() == ThisPlayerTeamIndex;
-				}));
-
+			AAreaActor* ThisPlayerArea = FindLivingAreaOfTeam(ThisPlayerTeamIndex);
+			
 			if (!ThisPlayerArea)
 			{
-				ThisPlayerArea = AreaSpawner->SpawnAreaAtRandomEmptyLocation();
+				ThisPlayerArea = InitializeNewAreaActor(ThisPlayerTeamIndex);
 			}
 
 			// 월드가 꽉차서 새 영역을 선포할 수 없음
@@ -176,15 +171,25 @@ private:
 				// TODO 일단 이 팀은 플레이를 할 수 없는데 나중에 공간이 생길 수도 있음 그 때 스폰해주자
 				co_return;
 			}
-			
-			ThisPlayerArea->TeamComponent->SetTeamIndex(ThisPlayerTeamIndex);
-			ThisPlayerArea->SetAreaMaterial(AreaMaterials[ThisPlayerTeamIndex % AreaMaterials.Num()]);
-			
+
 			Inventory->SetHomeArea(ThisPlayerArea);
 			Inventory->SetTracerMaterial(TracerMaterials[ThisPlayerTeamIndex % TracerMaterials.Num()]);
 
-			AActor* Pawn = PlayerSpawner->SpawnAtLocation(PawnClass, ThisPlayerArea->GetActorTransform().GetLocation());
-			ReadyPlayer->GetOwningController()->Possess(CastChecked<APawn>(Pawn));
+			// TODO 이거 area의 위치가 아니라 boundary 내의 랜덤 위치여야 함
+			APawn* Pawn = PlayerSpawner->SpawnAtLocation(PawnClass, ThisPlayerArea->GetActorTransform().GetLocation());
+			ReadyPlayer->GetOwningController()->Possess(Pawn);
+
+			// 위에까지 플레이어 스폰은 완료했고 여기부터는 플레이어 리스폰 로직
+			Context.AbortIfNotValid(Pawn);
+			co_await AbortOnError(Pawn->FindComponentByClass<ULifeComponent>()->GetbAlive().If(false));
+
+			KillAreaIfThisIsLastMan(ReadyPlayer);
+
+			constexpr float RespawnCool = 5.f;
+			co_await AbortOnError(WaitForSeconds(GetWorld(), RespawnCool));
+			Pawn->Destroy();
+
+			InitiatePlayerSpawnSequence(ReadyPlayer);
 		});
 	}
 
@@ -193,12 +198,12 @@ private:
 		return RunWeakCoroutine(this, [this](TWeakCoroutineContext<FBattleRuleResult>&) -> TWeakCoroutine<FBattleRuleResult>
 		{
 			UE_LOG(LogBattleRule, Log, TEXT("게임을 시작합니다"));
-			
+
 			auto Timeout = AbortOnError(RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 			{
 				co_await AbortOnError(WorldTimer->At(GetWorld()->GetTimeSeconds() + 60.f));
 			}));
-			
+
 			auto LastManStanding = AbortOnError(RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 			{
 				auto AreaStateTracker = NewObject<UAreaStateTrackerComponent>(GetOwner());
@@ -207,7 +212,7 @@ private:
 				co_await AbortOnError(AreaStateTracker->ZeroOrOneAreaIsSurviving());
 				AreaStateTracker->DestroyComponent();
 			}));
-		
+
 			const TOptional<int32> CompletedAwaitableIndex = co_await AnyOf(MoveTemp(Timeout), MoveTemp(LastManStanding));
 			if (!CompletedAwaitableIndex)
 			{
@@ -228,17 +233,83 @@ private:
 			FBattleRuleResult GameResult{};
 			for (auto Each : GetComponents<UAreaBoundaryComponent>(AreaSpawner->GetSpawnedAreas().Get()))
 			{
-				const float Area = Each->GetBoundary()->CalculateArea();
-				GameResult.SortedByRank.Emplace(Each->GetOwner<AAreaActor>()->TeamComponent->GetTeamIndex().Get(), Area);
+				if (Each->GetOwner<AAreaActor>()->LifeComponent->GetbAlive().Get())
+				{
+					const float Area = Each->GetBoundary()->CalculateArea();
+					GameResult.SortedByRank.Emplace(Each->GetOwner<AAreaActor>()->TeamComponent->GetTeamIndex().Get(), Area);
+				}
 			}
 
 			Algo::SortBy(GameResult.SortedByRank, &FBattleRuleResult::FTeamAndArea::Area);
 			std::reverse(GameResult.SortedByRank.begin(), GameResult.SortedByRank.end());
-			
-			DestroyComponent();
-			
-			co_return GameResult;
 
+			DestroyComponent();
+
+			co_return GameResult;
 		}).ReturnValue();
+	}
+
+	AAreaActor* InitializeNewAreaActor(int32 TeamIndex)
+	{
+		AAreaActor* Area = AreaSpawner->SpawnAreaAtRandomEmptyLocation();
+		if (!Area)
+		{
+			return nullptr;
+		}
+
+		Area->TeamComponent->SetTeamIndex(TeamIndex);
+		Area->SetAreaMaterial(AreaMaterials[TeamIndex % AreaMaterials.Num()]);
+
+		RunWeakCoroutine(this, [this, Area](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		{
+			Context.AbortIfNotValid(Area);
+
+			co_await AbortOnError(Area->LifeComponent->GetbAlive().If(false));
+
+			// TODO 이 에리어에 속하는 모든 플레이어를 죽인다
+
+			// 영역이 데스 애니메이션 등을 플레이하는데 충분한 시간을 준다
+			co_await AbortOnError(WaitForSeconds(GetWorld(), 10.f));
+			Area->Destroy();
+		});
+
+		return Area;
+	}
+
+	void KillAreaIfThisIsLastMan(APlayerState* Man) const
+	{
+		const int32 TeamIndex = Man->FindComponentByClass<UTeamComponent>()->GetTeamIndex().Get();
+
+		for (APawn* Each : PlayerSpawner->GetSpawnedPlayers().Get())
+		{
+			if (!IsValid(Each) || !Each->GetPlayerState())
+			{
+				continue;
+			}
+			
+			auto TeamComponent = Each->GetPlayerState()->FindComponentByClass<UTeamComponent>();
+			auto LifeComponent = Each->FindComponentByClass<ULifeComponent>();
+
+			if (LifeComponent->GetbAlive().Get() && TeamComponent->GetTeamIndex().Get() == TeamIndex)
+			{
+				// 살아있는 팀원이 한 명이라도 있으면 영역 파괴하지 않음
+				return;
+			}
+		}
+		
+		if (AAreaActor* ThisManArea = FindLivingAreaOfTeam(TeamIndex))
+		{
+			ThisManArea->LifeComponent->SetbAlive(false);
+		}
+	}
+
+	AAreaActor* FindLivingAreaOfTeam(int32 TeamIndex) const
+	{
+		return ValidOrNull(AreaSpawner->GetSpawnedAreas().Get().FindByPredicate([&](AAreaActor* Each)
+		{
+			return IsValid(Each)
+				&& Each->LifeComponent->GetbAlive().Get()
+				&& Each->TeamComponent->GetTeamIndex().Get() == TeamIndex;
+		}));
 	}
 };

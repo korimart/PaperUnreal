@@ -13,6 +13,7 @@
 #include "GameFramework/CheatManager.h"
 #include "PaperUnreal/Development/InGameCheats.h"
 #include "PaperUnreal/ModeAgnostic/LifeComponent.h"
+#include "PaperUnreal/WeakCoroutine/AwaitableWrappers.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -64,7 +65,7 @@ void APVPBattlePlayerController::BeginPlay()
 					Context.AbortIfNotValid(LifeComponent);
 					
 					Subsystem->AddMappingContext(DefaultMappingContext, 0);
-					co_await LifeComponent->WaitForDeath();
+					co_await AbortOnError(LifeComponent->GetbAlive().If(false));
 					Subsystem->RemoveMappingContext(DefaultMappingContext);
 				});
 			}

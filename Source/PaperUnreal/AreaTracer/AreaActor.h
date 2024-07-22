@@ -54,11 +54,9 @@ private:
 
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			co_await LifeComponent->WaitForDeath();
+			co_await AbortOnError(LifeComponent->GetbAlive().If(false));
 
 			// TODO play death animation
-
-			Destroy();
 		});
 	}
 

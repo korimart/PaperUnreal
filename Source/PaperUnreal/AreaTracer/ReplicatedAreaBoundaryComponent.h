@@ -6,6 +6,7 @@
 #include "AreaBoundaryComponent.h"
 #include "AreaBoundaryProvider.h"
 #include "Net/UnrealNetwork.h"
+#include "PaperUnreal/WeakCoroutine/AwaitableWrappers.h"
 #include "ReplicatedAreaBoundaryComponent.generated.h"
 
 

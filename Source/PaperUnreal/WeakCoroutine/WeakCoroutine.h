@@ -5,10 +5,10 @@
 #include <coroutine>
 
 #include "CoreMinimal.h"
-#include "AwaitableWrappers.h"
 #include "CancellableFuture.h"
 #include "TypeTraits.h"
 #include "Algo/AllOf.h"
+#include "PaperUnreal/GameFramework2/Utils.h"
 
 
 namespace WeakCoroutineDetails
@@ -200,6 +200,7 @@ public:
 	template <typename U>
 	decltype(auto) AbortIfNotValid(U&& Weak)
 	{
+		check(AllValid(Weak));
 		Handle.promise().AddToWeakList(Weak);
 		return Forward<U>(Weak);
 	}
