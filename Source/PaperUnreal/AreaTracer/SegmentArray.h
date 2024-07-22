@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "SegmentTypes.h"
 #include "Algo/Accumulate.h"
+#include "Algo/MaxElement.h"
 #include "PaperUnreal/GameFramework2/Utils.h"
 
 
@@ -297,7 +298,7 @@ public:
 
 	FBox2D CalculateBoundingBox() const
 	{
-		return { Points };
+		return {Points};
 	}
 
 	bool IsStraight() const
@@ -350,7 +351,7 @@ public:
 
 		return IntersectingXes.Num() % 2 == 1;
 	}
-	
+
 	bool IsInside(const TSegmentArray2D& Other) const requires bLoop
 	{
 		for (const FVector2D& Each : Other.GetPoints())
@@ -591,7 +592,7 @@ private:
 		}
 	};
 
-	void ForEachNonInterruptedPath(FSegmentArray2D Path, const auto& Func);
+	TArray<FSegmentArray2D> SplitIntoCleanPaths(FSegmentArray2D Path);
 	auto UnionAssumeTwoIntersections(FSegmentArray2D Path) requires bLoop;
 	void DifferenceAssumeTwoIntersections(FSegmentArray2D Path) requires bLoop;
 };
@@ -608,13 +609,13 @@ template <CSegmentArray2D SegmentArrayType>
 auto TSegmentArray2D<bLoop>::Union(SegmentArrayType&& Path) requires bLoop
 {
 	TArray<FUnionResult> Ret;
-	ForEachNonInterruptedPath(Forward<SegmentArrayType>(Path), [&]<typename T>(T&& CleanPath)
+	for (FSegmentArray2D& CleanPath : SplitIntoCleanPaths(Forward<SegmentArrayType>(Path)))
 	{
-		if (TOptional<FUnionResult> UnionResult = UnionAssumeTwoIntersections(Forward<T>(CleanPath)))
+		if (TOptional<FUnionResult> UnionResult = UnionAssumeTwoIntersections(MoveTemp(CleanPath)))
 		{
 			Ret.Add(MoveTemp(*UnionResult));
 		}
-	});
+	}
 	return Ret;
 }
 
@@ -623,15 +624,31 @@ template <bool bLoop>
 template <CSegmentArray2D SegmentArrayType>
 void TSegmentArray2D<bLoop>::Difference(SegmentArrayType&& Path) requires bLoop
 {
-	ForEachNonInterruptedPath(Forward<SegmentArrayType>(Path), [&]<typename T>(T&& Clean)
+	TArray<FSegmentArray2D> CleanPaths = SplitIntoCleanPaths(Forward<SegmentArrayType>(Path));
+	
+	TArray<FLoopedSegmentArray2D> Islands;
+	for (int32 i = 0; i < CleanPaths.Num(); i++)
 	{
-		DifferenceAssumeTwoIntersections(Forward<T>(Clean));
-	});
+		Islands.Add(*this);
+	}
+
+	for (int32 i = 0; i < Islands.Num(); ++i)
+	{
+		for (int32 j = 0; j < CleanPaths.Num(); ++j)
+		{
+			Islands[i].DifferenceAssumeTwoIntersections(CleanPaths[(i + j) % CleanPaths.Num()]);
+		}
+	}
+
+	if (FLoopedSegmentArray2D* LargestArea = Algo::MaxElementBy(Islands, &FLoopedSegmentArray2D::CalculateArea))
+	{
+		Points = MoveTemp(LargestArea->Points);
+	}
 }
 
 
 template <bool bLoop>
-void TSegmentArray2D<bLoop>::ForEachNonInterruptedPath(FSegmentArray2D Path, const auto& Func)
+TArray<FSegmentArray2D> TSegmentArray2D<bLoop>::SplitIntoCleanPaths(FSegmentArray2D Path)
 {
 	struct FPathIntersection
 	{
@@ -662,10 +679,16 @@ void TSegmentArray2D<bLoop>::ForEachNonInterruptedPath(FSegmentArray2D Path, con
 			const FVector2D SegmentStart = Path[Left.PathSegmentIndex].StartPoint();
 			return (Left.Point - SegmentStart).Length() < (Right.Point - SegmentStart).Length();
 		}
-		
+
 		return Left.PathSegmentIndex < Right.PathSegmentIndex;
 	});
 
+	if (AllIntersections.Num() < 2)
+	{
+		return {};
+	}
+
+	TArray<FSegmentArray2D> Ret;
 	for (int32 i = 0; i < AllIntersections.Num() - 1; i++)
 	{
 		const FPathIntersection& Intersection0 = AllIntersections[i];
@@ -674,15 +697,20 @@ void TSegmentArray2D<bLoop>::ForEachNonInterruptedPath(FSegmentArray2D Path, con
 		FSegmentArray2D Sub = Path.SubArray(Intersection0.PathSegmentIndex, Intersection1.PathSegmentIndex);
 		Sub.SetPoint(0, Intersection0.Point);
 		Sub.SetPoint(-1, Intersection1.Point);
-
-		Func(MoveTemp(Sub));
+		Ret.Add(MoveTemp(Sub));
 	}
+	
+	return Ret;
 }
-
 
 template <bool bLoop>
 auto TSegmentArray2D<bLoop>::UnionAssumeTwoIntersections(FSegmentArray2D Path) requires bLoop
 {
+	if (IsInside(Path[0].Center))
+	{
+		return TOptional<FUnionResult>{};
+	}
+	
 	const FIntersection BoundarySrcSegment = FindClosestPointTo(Path.GetPoints()[0]);
 	const FIntersection BoundaryDestSegment = FindClosestPointTo(Path.GetLastPoint());
 
@@ -700,14 +728,8 @@ auto TSegmentArray2D<bLoop>::UnionAssumeTwoIntersections(FSegmentArray2D Path) r
 		BoundarySrcSegment.SegmentIndex,
 		ReversedPath.GetPoints());
 
-	const float CurrentArea = CalculateArea();
 	const float Area0 = SrcToDestReplaced.CalculateArea();
 	const float Area1 = DestToSrcReplaced.CalculateArea();
-
-	if (CurrentArea > FMath::Max(Area0, Area1))
-	{
-		return TOptional<FUnionResult>{};
-	}
 
 	FSegmentArray2D& UsedPath = Area0 < Area1 ? ReversedPath : Path;
 	Points = Area0 < Area1 ? MoveTemp(DestToSrcReplaced.Points) : MoveTemp(SrcToDestReplaced.Points);
@@ -719,6 +741,11 @@ auto TSegmentArray2D<bLoop>::UnionAssumeTwoIntersections(FSegmentArray2D Path) r
 template <bool bLoop>
 void TSegmentArray2D<bLoop>::DifferenceAssumeTwoIntersections(FSegmentArray2D Path) requires bLoop
 {
+	if (!IsInside(Path[0].Center))
+	{
+		return;
+	}
+	
 	const FIntersection BoundarySrcSegment = FindClosestPointTo(Path.GetPoints()[0]);
 	const FIntersection BoundaryDestSegment = FindClosestPointTo(Path.GetLastPoint());
 
@@ -728,8 +755,5 @@ void TSegmentArray2D<bLoop>::DifferenceAssumeTwoIntersections(FSegmentArray2D Pa
 		BoundaryDestSegment.SegmentIndex,
 		Path.GetPoints());
 
-	if (SrcToDestReplaced.CalculateArea() < CalculateArea())
-	{
-		Points = MoveTemp(SrcToDestReplaced.Points);
-	}
+	Points = MoveTemp(SrcToDestReplaced.Points);
 }

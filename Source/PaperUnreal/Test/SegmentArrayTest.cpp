@@ -431,5 +431,48 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 			TestPointsEqual(TEXT("TestCase 8: Difference"), SegmentArray.GetPoints(), Difference);
 		}
 	}
+	
+	{
+		const TArray<FVector2D> VertexPositions
+		{
+			{-2.f, 3.f},
+			{-2.f, -2.f},
+			{4.f, -2.f},
+			{4.f, 3.f},
+		};
+
+		const TArray<FVector2D> Path
+		{
+			{-1.f, -5.f},
+			{-1.f, -1.f},
+			{-3.f, -1.f},
+			{-3.f, 5.f},
+			{3.f, 5.f},
+			{3.f, 2.f},
+			{5.f, 2.f},
+			{5.f, 1.f},
+			{2.f, 1.f},
+			{2.f, 4.f},
+			{1.f, 4.f},
+			{1.f, -5.f},
+		};
+
+		const TArray<FVector2D> Difference
+		{
+			{1.f, 3.f},
+			{1.f, -2.f},
+			{4.f, -2.f},
+			{4.f, 1.f},
+			{2.f, 1.f},
+			{2.f, 3.f},
+		};
+
+		{
+			FLoopedSegmentArray2D SegmentArray{VertexPositions};
+			SegmentArray.Difference(Path);
+			TestPointsEqual(TEXT("TestCase 9: 섬이 만들어지는 모양의 Difference"), SegmentArray.GetPoints(), Difference);
+		}
+	}
+	
 	return true;
 }
