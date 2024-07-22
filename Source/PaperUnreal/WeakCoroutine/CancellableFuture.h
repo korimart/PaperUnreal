@@ -523,7 +523,7 @@ auto MakeFutureFromDelegate(DelegateType& Delegate, PredicateType&& Predicate, T
 	return MoveTemp(Future);
 }
 
-template <CMulticastDelegate MulticastDelegateType>
+template <typename MulticastDelegateType>
 auto MakeFutureFromDelegate(MulticastDelegateType& MulticastDelegate)
 {
 	typename MulticastDelegateType::FDelegate Delegate;
@@ -539,6 +539,22 @@ auto MakeFutureFromDelegate(MulticastDelegateType& MulticastDelegate, PredicateT
 	auto Ret = MakeFutureFromDelegate<T>(Delegate, Forward<PredicateType>(Predicate), Forward<TransformFuncType>(TransformFunc));
 	MulticastDelegate.Add(Delegate);
 	return Ret;
+}
+
+
+#include "GameFramework/GameStateBase.h"
+
+
+inline TCancellableFuture<AGameStateBase*> WaitForGameState(UWorld* World)
+{
+	check(IsValid(World));
+
+	if (IsValid(World->GetGameState()))
+	{
+		return World->GetGameState();
+	}
+
+	return MakeFutureFromDelegate(World->GameStateSetEvent);
 }
 
 

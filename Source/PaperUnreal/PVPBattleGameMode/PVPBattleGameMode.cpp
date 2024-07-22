@@ -4,6 +4,7 @@
 
 #include "PVPBattlePlayerController.h"
 #include "PVPBattleGameState.h"
+#include "PVPBattleHUD.h"
 #include "PVPBattlePlayerState.h"
 #include "PaperUnreal/Development/InGameCheats.h"
 #include "PaperUnreal/GameRule/BattleRuleComponent.h"
@@ -17,11 +18,10 @@ DEFINE_LOG_CATEGORY(LogPVPBattleGameMode);
 APVPBattleGameMode::APVPBattleGameMode()
 {
 	GameStateClass = APVPBattleGameState::StaticClass();
-
-	// use our custom PlayerController class
 	PlayerControllerClass = APVPBattlePlayerController::StaticClass();
-
 	PlayerStateClass = APVPBattlePlayerState::StaticClass();
+	SpectatorClass = AFixedCameraPawn::StaticClass();
+	HUDClass = APVPBattleHUD::StaticClass();
 
 	// set default pawn class to our Blueprinted character
 	static ConstructorHelpers::FClassFinder<APawn> PlayerPawnBPClass(TEXT("/Game/TopDown/Blueprints/BP_TopDownCharacter"));
@@ -36,8 +36,6 @@ APVPBattleGameMode::APVPBattleGameMode()
 	{
 		PlayerControllerClass = PlayerControllerBPClass.Class;
 	}
-
-	SpectatorClass = AFixedCameraPawn::StaticClass();
 
 	bStartPlayersAsSpectators = true;
 }
@@ -65,6 +63,8 @@ void APVPBattleGameMode::BeginPlay()
 		BattleMode->RegisterComponent();
 		
 		const FBattleRuleResult GameResult = co_await AbortOnError(BattleMode->Start(2, 2));
+
+		GetGameState<APVPBattleGameState>()->StageComponent->SetCurrentStage(PVPBattleStage::Result);
 
 		for (const auto& Each : GameResult.SortedByRank)
 		{
