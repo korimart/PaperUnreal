@@ -1,7 +1,6 @@
 ﻿#include "Misc/AutomationTest.h"
-#include "PaperUnreal/Core/WeakCoroutine/CancellableFuture.h"
-#include "PaperUnreal/Core/WeakCoroutine/ValueStream.h"
-#include "PaperUnreal/Core/WeakCoroutine/WeakCoroutine.h"
+#include "PaperUnreal/WeakCoroutine/CancellableFuture.h"
+#include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAwaitableWrapperTest, "PaperUnreal.PaperUnreal.Test.AwaitableWrapperTest", EAutomationTestFlags::EditorContext | EAutomationTestFlags::SmokeFilter)
 

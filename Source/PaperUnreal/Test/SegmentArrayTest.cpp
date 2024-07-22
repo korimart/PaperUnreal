@@ -1,5 +1,5 @@
 ﻿#include "Misc/AutomationTest.h"
-#include "PaperUnreal/Core/SegmentArray.h"
+#include "PaperUnreal/AreaTracer/SegmentArray.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(SegmentArrayTest, "PaperUnreal.PaperUnreal.Test.SegmentArrayTest", EAutomationTestFlags::EditorContext | EAutomationTestFlags::SmokeFilter)
 

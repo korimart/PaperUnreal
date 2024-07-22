@@ -1,6 +1,6 @@
 ﻿#include "Misc/AutomationTest.h"
-#include "PaperUnreal/Core/WeakCoroutine/CancellableFuture.h"
-#include "PaperUnreal/Core/WeakCoroutine/WeakCoroutine.h"
+#include "PaperUnreal/WeakCoroutine/CancellableFuture.h"
+#include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWeakCoroutineTest, "PaperUnreal.PaperUnreal.Test.WeakCoroutineTest", EAutomationTestFlags::EditorContext | EAutomationTestFlags::SmokeFilter)
 

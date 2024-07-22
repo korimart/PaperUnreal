@@ -5,9 +5,9 @@
 #include "CoreMinimal.h"
 #include "EngineUtils.h"
 #include "GameFramework/CheatManager.h"
-#include "PaperUnreal/PaperUnrealGameState.h"
-#include "PaperUnreal/ReplicatedTracerPathComponent.h"
-#include "PaperUnreal/Core/Character2.h"
+#include "PaperUnreal/AreaTracer/TracerPathComponent.h"
+#include "PaperUnreal/BattleGameMode/PaperUnrealGameState.h"
+#include "PaperUnreal/GameFramework2/Character2.h"
 #include "InGameCheats.generated.h"
 
 
