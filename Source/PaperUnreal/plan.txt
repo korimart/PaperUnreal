@@ -148,4 +148,7 @@ ReplicatedAreaExpander
     f. 제한 시간이 지나거나 더 이상 에리어를 스폰할 자리가 없으면 게임 종료
     g. 결과창
     h. 처음부터 반복
-2. Coroutine 리팩토링
+2. coroutine 에러 핸들링 abort를 기본으로 변경
+3. live data weak pointer handling 방식 변경 observe/create stream valid 버전 분리
+4. value streamer 제거
+5. byte streamer 제거 및 tracer path 방식 좀 변경
