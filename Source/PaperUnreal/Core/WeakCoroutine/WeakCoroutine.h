@@ -35,8 +35,8 @@ public:
 	using promise_type = TWeakCoroutinePromiseType<T, ErrorTypes...>;
 	using ContextType = TWeakCoroutineContext<T, ErrorTypes...>;
 
-	TWeakCoroutine(std::coroutine_handle<promise_type> InHandle)
-		: Handle(InHandle)
+	TWeakCoroutine(std::coroutine_handle<promise_type> InHandle, const TSharedRef<bool>& bFinished)
+		: Handle(InHandle), bCoroutineFinished(bFinished)
 	{
 	}
 
@@ -47,11 +47,13 @@ public:
 
 	void Resume();
 
+	void Abort();
+
 	TCancellableFuture<T, ErrorTypes...> ReturnValue()
 	{
-		check(Future.IsSet());
-		auto Ret = MoveTemp(*Future);
-		Future.Reset();
+		check(CoroutineRet.IsSet());
+		auto Ret = MoveTemp(*CoroutineRet);
+		CoroutineRet.Reset();
 		return Ret;
 	}
 
@@ -63,7 +65,8 @@ public:
 
 private:
 	std::coroutine_handle<promise_type> Handle;
-	TOptional<TCancellableFuture<T, ErrorTypes...>> Future;
+	TSharedRef<bool> bCoroutineFinished;
+	TOptional<TCancellableFuture<T, ErrorTypes...>> CoroutineRet;
 };
 
 
@@ -75,7 +78,11 @@ public:
 
 	ReturnObjectType get_return_object()
 	{
-		return std::coroutine_handle<Derived>::from_promise(*static_cast<Derived*>(this));
+		return
+		{
+			std::coroutine_handle<Derived>::from_promise(*static_cast<Derived*>(this)),
+			bCoroutineFinished,
+		};
 	}
 
 	std::suspend_always initial_suspend() const
@@ -85,6 +92,7 @@ public:
 
 	std::suspend_never final_suspend() const noexcept
 	{
+		*bCoroutineFinished = true;
 		return {};
 	}
 
@@ -101,9 +109,14 @@ public:
 	template <CAwaitable AwaitableType>
 	auto await_transform(AwaitableType&& Awaitable);
 
+	void Abort()
+	{
+		*bCoroutineFinished = true;
+	}
+
 	bool IsValid() const
 	{
-		return Algo::AllOf(WeakList, [](const auto& Each) { return Each(); });
+		return !*bCoroutineFinished && Algo::AllOf(WeakList, [](const auto& Each) { return Each(); });
 	}
 
 	void AddToWeakList(UObject* Object)
@@ -148,6 +161,7 @@ protected:
 	TUniquePtr<TWeakCoroutineContext<T, ErrorTypes...>> Context;
 	TUniquePtr<TUniqueFunction<ReturnObjectType(TWeakCoroutineContext<T, ErrorTypes...>&)>> Captures;
 	TOptional<TCancellablePromise<T, ErrorTypes...>> Promise;
+	TSharedRef<bool> bCoroutineFinished = MakeShared<bool>(false);
 };
 
 
@@ -182,7 +196,7 @@ public:
 	TWeakCoroutineContext() = default;
 	TWeakCoroutineContext(const TWeakCoroutineContext&) = delete;
 	TWeakCoroutineContext& operator=(const TWeakCoroutineContext&) = delete;
-	
+
 	template <typename U>
 	decltype(auto) AbortIfNotValid(U&& Weak)
 	{
@@ -236,7 +250,7 @@ public:
 		{
 			return false;
 		}
-		
+
 		WrappedAwaitable.await_suspend(FWeakCheckingHandle{Handle});
 		return true;
 	}
@@ -272,13 +286,22 @@ void TWeakCoroutine<T, ErrorTypes...>::Init(
 
 	auto [NewPromise, NewFuture] = MakePromise<T, ErrorTypes...>();
 	Handle.promise().Promise.Emplace(MoveTemp(NewPromise));
-	Future.Emplace(MoveTemp(NewFuture));
+	CoroutineRet.Emplace(MoveTemp(NewFuture));
 }
 
 template <typename T, typename... ErrorTypes>
 void TWeakCoroutine<T, ErrorTypes...>::Resume()
 {
 	Handle.resume();
+}
+
+template <typename T, typename... ErrorTypes>
+void TWeakCoroutine<T, ErrorTypes...>::Abort()
+{
+	if (!*bCoroutineFinished)
+	{
+		Handle.promise().Abort();
+	}
 }
 
 

@@ -10,6 +10,7 @@
 #include "PaperUnreal/Core/Character2.h"
 #include "InGameCheats.generated.h"
 
+
 /**
  * 
  */
@@ -17,6 +18,9 @@ UCLASS()
 class UInGameCheats : public UCheatManagerExtension
 {
 	GENERATED_BODY()
+
+public:
+	inline static FSimpleMulticastDelegate OnStartGameByCheat{};
 
 private:
 	UFUNCTION(Exec, BlueprintAuthorityOnly)
@@ -51,9 +55,30 @@ private:
 		}
 	}
 	
+	UFUNCTION(Exec, BlueprintAuthorityOnly)
+	void KillArea(int32 TeamIndex)
+	{
+		for (TActorIterator<AAreaActor> It{GetWorld()}; It; ++It)
+		{
+			if (UTeamComponent* Team = It->FindComponentByClass<UTeamComponent>())
+			{
+				if (Team->GetTeamIndex().Get() == TeamIndex)
+				{
+					It->LifeComponent->SetbAlive(false);
+				}
+			}
+		}
+	}
+	
 	UFUNCTION(Exec)
 	void SetReady(bool bReady)
 	{
 		GetPlayerController()->PlayerState->FindComponentByClass<UReadyStateComponent>()->ServerSetReady(bReady);
+	}
+	
+	UFUNCTION(Exec, BlueprintAuthorityOnly)
+	void StartGame()
+	{
+		OnStartGameByCheat.Broadcast();
 	}
 };

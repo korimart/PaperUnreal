@@ -296,7 +296,7 @@ public:
 	}
 
 	template <typename U>
-	void SetValue(U&& Value) requires IsConvertibleV<U, T, ErrorTypes...>
+	void SetValue(U&& Value) requires IsConvertibleV<U, T, EDefaultFutureError, ErrorTypes...>
 	{
 		check(!IsSet());
 		std::exchange(State, nullptr)->SetValue(Forward<U>(Value));

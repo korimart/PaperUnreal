@@ -28,14 +28,14 @@ public:
 		AreaSpawner = Spawner;
 	}
 
-	TCancellableFuture<void> OnlyOneAreaIsSurviving()
+	TCancellableFuture<void> ZeroOrOneAreaIsSurviving()
 	{
 		return MakeConditionedPromise([this]()
 		{
 			return Algo::TransformAccumulate(
 				GetComponents<ULifeComponent>(AreaSpawner->GetSpawnedAreas().Get()),
 				[](auto Each) { return Each->GetbAlive().Get() ? 1 : 0; },
-				0) == 1;
+				0) <= 1;
 		});
 	}
 

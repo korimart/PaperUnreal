@@ -48,7 +48,7 @@ private:
 	{
 		Super::InitializeComponent();
 
-		check(AllValid(NoPathArea));
+		AddLifeDependency(NoPathArea);
 	}
 
 	virtual void UninitializeComponent() override

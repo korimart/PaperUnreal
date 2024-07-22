@@ -89,11 +89,7 @@ public:
 			InitiatePlayerSpawnSequence(PC->PlayerState);
 		});
 
-		InitiateGameFlow();
-
-		auto [Promise, Future] = MakePromise<FBattleModeGameResult>();
-		ResultPromise.Emplace(MoveTemp(Promise));
-		return MoveTemp(Future);
+		return InitiateGameFlow();
 	}
 
 private:
@@ -110,9 +106,6 @@ private:
 	UPlayerSpawnerComponent* PlayerSpawner;
 
 	FTeamAllocator TeamAllocator;
-	bool bEndedWithAResult = false;
-	FBattleModeGameResult GameResult{};
-	TOptional<TCancellablePromise<FBattleModeGameResult>> ResultPromise;
 	
 	const TSoftObjectPtr<UMaterialInstance> SoftSolidBlue{FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Blue.MI_Solid_Blue'")}};
 	const TSoftObjectPtr<UMaterialInstance> SoftSolidBlueLight{FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Blue_Light.MI_Solid_Blue_Light'")}};
@@ -191,9 +184,9 @@ private:
 		});
 	}
 
-	void InitiateGameFlow()
+	TCancellableFuture<FBattleModeGameResult> InitiateGameFlow()
 	{
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		return RunWeakCoroutine(this, [this](TWeakCoroutineContext<FBattleModeGameResult>&) -> TWeakCoroutine<FBattleModeGameResult>
 		{
 			UE_LOG(LogBattleGameMode, Log, TEXT("게임을 시작합니다"));
 			
@@ -202,19 +195,19 @@ private:
 				co_await AbortOnError(WorldTimer->At(GetWorld()->GetTimeSeconds() + 60.f));
 			}));
 			
-			auto OnlyOneTeamSurviving = AbortOnError(RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+			auto LastManStanding = AbortOnError(RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 			{
 				auto AreaStateTracker = NewObject<UAreaStateTrackerComponent>(GetOwner());
 				AreaStateTracker->SetSpawner(AreaSpawner);
 				AreaStateTracker->RegisterComponent();
-				co_await AbortOnError(AreaStateTracker->OnlyOneAreaIsSurviving());
+				co_await AbortOnError(AreaStateTracker->ZeroOrOneAreaIsSurviving());
 				AreaStateTracker->DestroyComponent();
 			}));
 		
-			const TOptional<int32> CompletedAwaitableIndex = co_await AnyOf(MoveTemp(Timeout), MoveTemp(OnlyOneTeamSurviving));
+			const TOptional<int32> CompletedAwaitableIndex = co_await AnyOf(MoveTemp(Timeout), MoveTemp(LastManStanding));
 			if (!CompletedAwaitableIndex)
 			{
-				co_return;
+				co_return EDefaultFutureError::PromiseNotFulfilled;
 			}
 
 			if (CompletedAwaitableIndex == 0)
@@ -223,9 +216,12 @@ private:
 			}
 			else if (CompletedAwaitableIndex == 1)
 			{
-				UE_LOG(LogBattleGameMode, Log, TEXT("팀이 하나 밖에 남지 않아 게임을 종료합니다"));
+				UE_LOG(LogBattleGameMode, Log, TEXT("팀의 수가 1이하이므로 게임을 종료합니다"));
 			}
 
+			// 모종의 이유로 에리어 두 개가 동시에 파괴돼서 무승부가 될 수도 있음 무승부면 결과가 빔
+			// TODO 마지막까지 남은 에리어들을 알아내서 이기게 해줘야 됨
+			FBattleModeGameResult GameResult{};
 			for (auto Each : GetComponents<UAreaBoundaryComponent>(AreaSpawner->GetSpawnedAreas().Get()))
 			{
 				const float Area = Each->GetBoundary()->CalculateArea();
@@ -234,21 +230,11 @@ private:
 
 			Algo::SortBy(GameResult.SortedByRank, &FBattleModeGameResult::FTeamAndArea::Area);
 			std::reverse(GameResult.SortedByRank.begin(), GameResult.SortedByRank.end());
-
-			bEndedWithAResult = true;
+			
 			DestroyComponent();
-		});
-	}
+			
+			co_return GameResult;
 
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override
-	{
-		Super::EndPlay(EndPlayReason);
-
-		if (ResultPromise && bEndedWithAResult)
-		{
-			ResultPromise->SetValue(MoveTemp(GameResult));
-		}
-
-		ResultPromise.Reset();
+		}).ReturnValue();
 	}
 };

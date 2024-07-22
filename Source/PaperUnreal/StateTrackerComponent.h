@@ -72,6 +72,11 @@ protected:
 
 	TCancellableFuture<void> MakeConditionedPromise(const TFunction<bool()>& Condition)
 	{
+		if (Condition())
+		{
+			return {};
+		}
+		
 		auto [Promise, Future] = MakePromise<void>();
 		Promises.Add({.Promise = MoveTemp(Promise), .Condition = Condition,});
 		return MoveTemp(Future);

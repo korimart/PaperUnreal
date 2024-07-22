@@ -8,6 +8,7 @@
 #include "PaperUnrealPlayerController.h"
 #include "PaperUnrealGameState.h"
 #include "PaperUnrealPlayerState.h"
+#include "Development/InGameCheats.h"
 #include "UObject/ConstructorHelpers.h"
 
 
@@ -51,8 +52,14 @@ void APaperUnrealGameMode::BeginPlay()
 		// TODO 자유 행동 game mode 설정
 		
 		// TODO 방설정 완료될 때까지 대기
-		
-		co_await AbortOnError(GetGameState<APaperUnrealGameState>()->ReadyStateTrackerComponent->ReadyCountIsAtLeast(2));
+
+		auto AtLeast2Ready = AbortOnError(GetGameState<APaperUnrealGameState>()->ReadyStateTrackerComponent->ReadyCountIsAtLeast(2));
+		auto ReadyByCheat = AbortOnError(MakeFutureFromDelegate(UInGameCheats::OnStartGameByCheat));
+
+		if (!co_await AnyOf(MoveTemp(AtLeast2Ready), MoveTemp(ReadyByCheat)))
+		{
+			co_return;
+		}
 
 		auto BattleMode = NewObject<UBattleGameModeComponent>(this);
 		BattleMode->SetPawnClass(DefaultPawnClass);
@@ -65,7 +72,11 @@ void APaperUnrealGameMode::BeginPlay()
 			UE_LOG(LogPaperUnrealGameMode, Log, TEXT("게임 결과 팀 : %d / 면적 : %f"), Each.TeamIndex, Each.Area);
 		}
 
-		// TODO 플레이어들을 경기장을 내려다보는 스펙테이터로 바꾼다
+		for (APlayerState* Each : GetWorld()->GetGameState()->PlayerArray)
+		{
+			Each->GetPlayerController()->ChangeState(NAME_Spectating);
+			Each->GetPlayerController()->ClientGotoState(NAME_Spectating);
+		}
 
 		// TODO replicate game result
 

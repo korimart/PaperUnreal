@@ -35,25 +35,39 @@ void APaperUnrealPlayerController::BeginPlay()
 	{
 		RunWeakCoroutine(this, [this, Subsystem](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			for (auto PawnStream = CreatePossessedPawnStream();;)
+			TOptional<FWeakCoroutine> WaitingForDeath;
+
+			for (auto PawnStream = GetPossessedPawn().CreateStream();;)
 			{
-				APawn* PossessedPawn = co_await AbortOnError(PawnStream);
+				auto PossessedPawn = co_await PawnStream;
+
+				if (WaitingForDeath)
+				{
+					WaitingForDeath->Abort();
+					WaitingForDeath.Reset();
+				}
+
 				if (!PossessedPawn)
 				{
 					Subsystem->RemoveMappingContext(DefaultMappingContext);
 					continue;
 				}
-				
-				ULifeComponent* LifeComponent = PossessedPawn->FindComponentByClass<ULifeComponent>();
+
+				ULifeComponent* LifeComponent = PossessedPawn.Get()->FindComponentByClass<ULifeComponent>();
 				if (!LifeComponent)
 				{
 					Subsystem->RemoveMappingContext(DefaultMappingContext);
 					continue;
 				}
-				
-				Subsystem->AddMappingContext(DefaultMappingContext, 0);
-				co_await LifeComponent->WaitForDeath();
-				Subsystem->RemoveMappingContext(DefaultMappingContext);
+
+				WaitingForDeath = RunWeakCoroutine(this, [this, LifeComponent, Subsystem](FWeakCoroutineContext& Context) -> FWeakCoroutine
+				{
+					Context.AbortIfNotValid(LifeComponent);
+					
+					Subsystem->AddMappingContext(DefaultMappingContext, 0);
+					co_await LifeComponent->WaitForDeath();
+					Subsystem->RemoveMappingContext(DefaultMappingContext);
+				});
 			}
 		});
 	}
