@@ -9,13 +9,13 @@
 #include "PaperUnreal/ModeAgnostic/ReadyStateTrackerComponent.h"
 #include "PaperUnreal/ModeAgnostic/StageComponent.h"
 #include "PaperUnreal/ModeAgnostic/WorldTimerComponent.h"
-#include "PaperUnrealGameState.generated.h"
+#include "PVPBattleGameState.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class APaperUnrealGameState : public AGameStateBase2
+class APVPBattleGameState : public AGameStateBase2
 {
 	GENERATED_BODY()
 
@@ -36,7 +36,7 @@ public:
 	UReadyStateTrackerComponent* ReadyStateTrackerComponent;
 
 private:
-	APaperUnrealGameState()
+	APVPBattleGameState()
 	{
 		StageComponent = CreateDefaultSubobject<UStageComponent>(TEXT("StageComponent"));
 		WorldTimerComponent = CreateDefaultSubobject<UWorldTimerComponent>(TEXT("WorldTimerComponent"));

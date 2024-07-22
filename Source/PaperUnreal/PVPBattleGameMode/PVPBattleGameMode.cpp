@@ -1,27 +1,27 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "PaperUnrealGameMode.h"
+#include "PVPBattleGameMode.h"
 
-#include "PaperUnrealPlayerController.h"
-#include "PaperUnrealGameState.h"
-#include "PaperUnrealPlayerState.h"
+#include "PVPBattlePlayerController.h"
+#include "PVPBattleGameState.h"
+#include "PVPBattlePlayerState.h"
 #include "PaperUnreal/Development/InGameCheats.h"
 #include "PaperUnreal/GameRule/BattleRuleComponent.h"
 #include "PaperUnreal/ModeAgnostic/FixedCameraPawn.h"
 #include "UObject/ConstructorHelpers.h"
 
 
-DEFINE_LOG_CATEGORY(LogPaperUnrealGameMode);
+DEFINE_LOG_CATEGORY(LogPVPBattleGameMode);
 
 
-APaperUnrealGameMode::APaperUnrealGameMode()
+APVPBattleGameMode::APVPBattleGameMode()
 {
-	GameStateClass = APaperUnrealGameState::StaticClass();
+	GameStateClass = APVPBattleGameState::StaticClass();
 
 	// use our custom PlayerController class
-	PlayerControllerClass = APaperUnrealPlayerController::StaticClass();
+	PlayerControllerClass = APVPBattlePlayerController::StaticClass();
 
-	PlayerStateClass = APaperUnrealPlayerState::StaticClass();
+	PlayerStateClass = APVPBattlePlayerState::StaticClass();
 
 	// set default pawn class to our Blueprinted character
 	static ConstructorHelpers::FClassFinder<APawn> PlayerPawnBPClass(TEXT("/Game/TopDown/Blueprints/BP_TopDownCharacter"));
@@ -42,7 +42,7 @@ APaperUnrealGameMode::APaperUnrealGameMode()
 	bStartPlayersAsSpectators = true;
 }
 
-void APaperUnrealGameMode::BeginPlay()
+void APVPBattleGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
@@ -52,7 +52,7 @@ void APaperUnrealGameMode::BeginPlay()
 		
 		// TODO 방설정 완료될 때까지 대기
 
-		auto AtLeast2Ready = AbortOnError(GetGameState<APaperUnrealGameState>()->ReadyStateTrackerComponent->ReadyCountIsAtLeast(2));
+		auto AtLeast2Ready = AbortOnError(GetGameState<APVPBattleGameState>()->ReadyStateTrackerComponent->ReadyCountIsAtLeast(2));
 		auto ReadyByCheat = AbortOnError(MakeFutureFromDelegate(UInGameCheats::OnStartGameByCheat));
 
 		if (!co_await AnyOf(MoveTemp(AtLeast2Ready), MoveTemp(ReadyByCheat)))
@@ -68,7 +68,7 @@ void APaperUnrealGameMode::BeginPlay()
 
 		for (const auto& Each : GameResult.SortedByRank)
 		{
-			UE_LOG(LogPaperUnrealGameMode, Log, TEXT("게임 결과 팀 : %d / 면적 : %f"), Each.TeamIndex, Each.Area);
+			UE_LOG(LogPVPBattleGameMode, Log, TEXT("게임 결과 팀 : %d / 면적 : %f"), Each.TeamIndex, Each.Area);
 		}
 
 		for (APlayerState* Each : GetWorld()->GetGameState()->PlayerArray)

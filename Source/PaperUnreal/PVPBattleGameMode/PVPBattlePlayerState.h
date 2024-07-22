@@ -7,13 +7,13 @@
 #include "PaperUnreal/ModeAgnostic/InventoryComponent.h"
 #include "PaperUnreal/ModeAgnostic/ReadyStateComponent.h"
 #include "PaperUnreal/ModeAgnostic/TeamComponent.h"
-#include "PaperUnrealPlayerState.generated.h"
+#include "PVPBattlePlayerState.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class APaperUnrealPlayerState : public APlayerState
+class APVPBattlePlayerState : public APlayerState
 {
 	GENERATED_BODY()
 
@@ -28,7 +28,7 @@ public:
 	UInventoryComponent* InventoryComponent;
 
 private:
-	APaperUnrealPlayerState()
+	APVPBattlePlayerState()
 	{
 		ReadyStateComponent = CreateDefaultSubobject<UReadyStateComponent>(TEXT("ReadyStateComponent"));
 		TeamComponent = CreateDefaultSubobject<UTeamComponent>(TEXT("TeamComponent"));

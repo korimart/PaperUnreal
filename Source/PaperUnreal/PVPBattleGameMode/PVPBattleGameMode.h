@@ -4,19 +4,19 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
-#include "PaperUnrealGameMode.generated.h"
+#include "PVPBattleGameMode.generated.h"
 
 
-DECLARE_LOG_CATEGORY_EXTERN(LogPaperUnrealGameMode, Log, All);
+DECLARE_LOG_CATEGORY_EXTERN(LogPVPBattleGameMode, Log, All);
 
 
 UCLASS(minimalapi)
-class APaperUnrealGameMode : public AGameModeBase
+class APVPBattleGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
 
 private:
-	APaperUnrealGameMode();
+	APVPBattleGameMode();
 
 	virtual void BeginPlay() override;
 };

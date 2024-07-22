@@ -4,10 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "PaperUnreal/GameFramework2/Character2.h"
-#include "PaperUnrealCharacter.generated.h"
+#include "PVPBattleCharacter.generated.h"
 
 UCLASS(Blueprintable)
-class APaperUnrealCharacter : public ACharacter2
+class APVPBattleCharacter : public ACharacter2
 {
 	GENERATED_BODY()
 
@@ -15,7 +15,7 @@ public:
 	UPROPERTY()
 	class ULifeComponent* LifeComponent;
 
-	APaperUnrealCharacter();
+	APVPBattleCharacter();
 
 	/** Returns TopDownCameraComponent subobject **/
 	FORCEINLINE class UCameraComponent* GetTopDownCameraComponent() const { return TopDownCameraComponent; }

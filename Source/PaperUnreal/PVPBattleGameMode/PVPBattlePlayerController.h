@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "PaperUnreal/GameFramework2/PlayerController2.h"
 #include "Templates/SubclassOf.h"
-#include "PaperUnrealPlayerController.generated.h"
+#include "PVPBattlePlayerController.generated.h"
 
 /** Forward declaration to improve compiling times */
 class UNiagaraSystem;
@@ -15,12 +15,12 @@ class UInputAction;
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 UCLASS()
-class APaperUnrealPlayerController : public APlayerController2
+class APVPBattlePlayerController : public APlayerController2
 {
 	GENERATED_BODY()
 
 public:
-	APaperUnrealPlayerController();
+	APVPBattlePlayerController();
 
 	/** Time Threshold to know if it was a short press */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input)
@@ -64,5 +64,3 @@ private:
 	bool bIsTouch; // Is it a touch device
 	float FollowTime; // For how long it has been pressed
 };
-
-

@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "PaperUnrealPlayerController.h"
+#include "PVPBattlePlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Blueprint/AIBlueprintHelperLibrary.h"
 #include "NiagaraSystem.h"
@@ -16,7 +16,7 @@
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
-APaperUnrealPlayerController::APaperUnrealPlayerController()
+APVPBattlePlayerController::APVPBattlePlayerController()
 {
 	bShowMouseCursor = true;
 	DefaultMouseCursor = EMouseCursor::Default;
@@ -24,7 +24,7 @@ APaperUnrealPlayerController::APaperUnrealPlayerController()
 	FollowTime = 0.f;
 }
 
-void APaperUnrealPlayerController::BeginPlay()
+void APVPBattlePlayerController::BeginPlay()
 {
 	// Call the base class  
 	Super::BeginPlay();
@@ -75,7 +75,7 @@ void APaperUnrealPlayerController::BeginPlay()
 	CheatManager->AddCheatManagerExtension(NewObject<UInGameCheats>(CheatManager));
 }
 
-void APaperUnrealPlayerController::SetupInputComponent()
+void APVPBattlePlayerController::SetupInputComponent()
 {
 	// set up gameplay key bindings
 	Super::SetupInputComponent();
@@ -84,16 +84,16 @@ void APaperUnrealPlayerController::SetupInputComponent()
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent))
 	{
 		// Setup mouse input events
-		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Started, this, &APaperUnrealPlayerController::OnInputStarted);
-		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Triggered, this, &APaperUnrealPlayerController::OnSetDestinationTriggered);
-		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Completed, this, &APaperUnrealPlayerController::OnSetDestinationReleased);
-		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Canceled, this, &APaperUnrealPlayerController::OnSetDestinationReleased);
+		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Started, this, &APVPBattlePlayerController::OnInputStarted);
+		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Triggered, this, &APVPBattlePlayerController::OnSetDestinationTriggered);
+		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Completed, this, &APVPBattlePlayerController::OnSetDestinationReleased);
+		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Canceled, this, &APVPBattlePlayerController::OnSetDestinationReleased);
 
 		// Setup touch input events
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Started, this, &APaperUnrealPlayerController::OnInputStarted);
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Triggered, this, &APaperUnrealPlayerController::OnTouchTriggered);
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Completed, this, &APaperUnrealPlayerController::OnTouchReleased);
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Canceled, this, &APaperUnrealPlayerController::OnTouchReleased);
+		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Started, this, &APVPBattlePlayerController::OnInputStarted);
+		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Triggered, this, &APVPBattlePlayerController::OnTouchTriggered);
+		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Completed, this, &APVPBattlePlayerController::OnTouchReleased);
+		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Canceled, this, &APVPBattlePlayerController::OnTouchReleased);
 	}
 	else
 	{
@@ -101,13 +101,13 @@ void APaperUnrealPlayerController::SetupInputComponent()
 	}
 }
 
-void APaperUnrealPlayerController::OnInputStarted()
+void APVPBattlePlayerController::OnInputStarted()
 {
 	StopMovement();
 }
 
 // Triggered every frame when the input is held down
-void APaperUnrealPlayerController::OnSetDestinationTriggered()
+void APVPBattlePlayerController::OnSetDestinationTriggered()
 {
 	// We flag that the input is being pressed
 	FollowTime += GetWorld()->GetDeltaSeconds();
@@ -139,7 +139,7 @@ void APaperUnrealPlayerController::OnSetDestinationTriggered()
 	}
 }
 
-void APaperUnrealPlayerController::OnSetDestinationReleased()
+void APVPBattlePlayerController::OnSetDestinationReleased()
 {
 	// If it was a short press
 	if (FollowTime <= ShortPressThreshold)
@@ -153,13 +153,13 @@ void APaperUnrealPlayerController::OnSetDestinationReleased()
 }
 
 // Triggered every frame when the input is held down
-void APaperUnrealPlayerController::OnTouchTriggered()
+void APVPBattlePlayerController::OnTouchTriggered()
 {
 	bIsTouch = true;
 	OnSetDestinationTriggered();
 }
 
-void APaperUnrealPlayerController::OnTouchReleased()
+void APVPBattlePlayerController::OnTouchReleased()
 {
 	bIsTouch = false;
 	OnSetDestinationReleased();

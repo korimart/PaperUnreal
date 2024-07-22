@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "PaperUnrealCharacter.h"
+#include "PVPBattleCharacter.h"
 
 #include "UObject/ConstructorHelpers.h"
 #include "Camera/CameraComponent.h"
@@ -27,7 +27,7 @@
 #include "PaperUnreal/ModeAgnostic/PlayerSpawnerComponent.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 
-APaperUnrealCharacter::APaperUnrealCharacter()
+APVPBattleCharacter::APVPBattleCharacter()
 {
 	// Set size for player capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
@@ -63,7 +63,7 @@ APaperUnrealCharacter::APaperUnrealCharacter()
 	LifeComponent = CreateDefaultSubobject<ULifeComponent>(TEXT("LifeComponent"));
 }
 
-void APaperUnrealCharacter::PostInitializeComponents()
+void APVPBattleCharacter::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
 
@@ -85,7 +85,7 @@ void APaperUnrealCharacter::PostInitializeComponents()
 	});
 }
 
-void APaperUnrealCharacter::AttachServerMachineComponents()
+void APVPBattleCharacter::AttachServerMachineComponents()
 {
 	RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
 	{
@@ -200,7 +200,7 @@ void APaperUnrealCharacter::AttachServerMachineComponents()
 	});
 }
 
-void APaperUnrealCharacter::AttachPlayerMachineComponents()
+void APVPBattleCharacter::AttachPlayerMachineComponents()
 {
 	RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
 	{

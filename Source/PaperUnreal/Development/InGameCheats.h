@@ -6,7 +6,7 @@
 #include "EngineUtils.h"
 #include "GameFramework/CheatManager.h"
 #include "PaperUnreal/AreaTracer/TracerPathComponent.h"
-#include "PaperUnreal/BattleGameMode/PaperUnrealGameState.h"
+#include "PaperUnreal/BattleGameMode/PVPBattleGameState.h"
 #include "PaperUnreal/GameFramework2/Character2.h"
 #include "InGameCheats.generated.h"
 
@@ -27,7 +27,7 @@ private:
 	void SpawnAreaForTeam(int32 TeamIndex)
 	{
 		auto Spawned = GetWorld()
-		               ->GetGameState<APaperUnrealGameState>()
+		               ->GetGameState<APVPBattleGameState>()
 		               ->AreaSpawnerComponent
 		               ->SpawnAreaAtRandomEmptyLocation();
 		
