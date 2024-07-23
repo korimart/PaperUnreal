@@ -243,7 +243,7 @@ private:
 			// TODO 마지막까지 남은 에리어들을 알아내서 이기게 해줘야 됨
 			FBattleRuleResult GameResult{};
 
-			ForEach<ULifeComponent, UTeamComponent, UAreaBoundaryComponent>
+			ForEachComponent<ULifeComponent, UTeamComponent, UAreaBoundaryComponent>
 			(AreaSpawner->GetSpawnedAreas().Get(), [&](auto Life, auto Team, auto Boundary)
 			{
 				if (Life->GetbAlive().Get())
@@ -273,13 +273,17 @@ private:
 		Area->TeamComponent->SetTeamIndex(TeamIndex);
 		Area->SetAreaMaterial(AreaMaterials[TeamIndex % AreaMaterials.Num()]);
 
-		RunWeakCoroutine(this, [this, Area](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this, Area, TeamIndex](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
 			Context.AbortIfNotValid(Area);
 
 			co_await AbortOnError(Area->LifeComponent->GetbAlive().If(false));
-
-			// TODO 이 에리어에 속하는 모든 플레이어를 죽인다
+			
+			UE_LOG(LogBattleRule, Log, TEXT("영역이 파괴됨에 따라 팀 %d의 모든 유저를 죽입니다."), TeamIndex);
+			for (ULifeComponent* Each : GetPawnLivesOfTeam(TeamIndex))
+			{
+				Each->SetbAlive(false);
+			}
 
 			// 영역이 데스 애니메이션 등을 플레이하는데 충분한 시간을 준다
 			co_await AbortOnError(WaitForSeconds(GetWorld(), 10.f));
@@ -291,17 +295,9 @@ private:
 
 	void KillAreaIfNobodyAlive(int32 TeamIndex) const
 	{
-		for (APawn* Each : PlayerSpawner->GetSpawnedPlayers().Get())
+		for (ULifeComponent* Each : GetPawnLivesOfTeam(TeamIndex))
 		{
-			if (!IsValid(Each) || !Each->GetPlayerState())
-			{
-				continue;
-			}
-
-			auto TeamComponent = Each->GetPlayerState()->FindComponentByClass<UTeamComponent>();
-			auto LifeComponent = Each->FindComponentByClass<ULifeComponent>();
-
-			if (LifeComponent->GetbAlive().Get() && TeamComponent->GetTeamIndex().Get() == TeamIndex)
+			if (Each->GetbAlive().Get())
 			{
 				// 살아있는 팀원이 한 명이라도 있으면 영역 파괴하지 않음
 				return;
@@ -323,5 +319,25 @@ private:
 				&& Each->LifeComponent->GetbAlive().Get()
 				&& Each->TeamComponent->GetTeamIndex().Get() == TeamIndex;
 		}));
+	}
+
+	TArray<ULifeComponent*> GetPawnLivesOfTeam(int32 TeamIndex) const
+	{
+		TArray<ULifeComponent*> Ret;
+		for (APawn* Each : PlayerSpawner->GetSpawnedPlayers().Get())
+		{
+			if (!IsValid(Each) || !Each->GetPlayerState())
+			{
+				continue;
+			}
+
+			auto TeamComponent = Each->GetPlayerState()->FindComponentByClass<UTeamComponent>();
+			
+			if (TeamComponent->GetTeamIndex().Get() == TeamIndex)
+			{
+				Ret.Add(Each->FindComponentByClass<ULifeComponent>());
+			}
+		}
+		return Ret;
 	}
 };

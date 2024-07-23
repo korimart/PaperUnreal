@@ -155,7 +155,7 @@ TArray<T*> GetComponents(const TArray<U>& Actors)
 
 
 template <typename... ComponentTypes, typename ActorType, typename FuncType>
-void ForEach(const TArray<ActorType*>& Actors, const FuncType& Func)
+void ForEachComponent(const TArray<ActorType*>& Actors, const FuncType& Func)
 {
 	const auto FindComponentsAndInvokeFunc
 		= [&]<typename ToFind, typename... Rest>(auto& Self, TTypeList<ToFind, Rest...>, ActorType* Actor, auto&... Found)
@@ -175,7 +175,10 @@ void ForEach(const TArray<ActorType*>& Actors, const FuncType& Func)
 
 	for (ActorType* Each : Actors)
 	{
-		FindComponentsAndInvokeFunc(FindComponentsAndInvokeFunc, TTypeList<ComponentTypes...>{}, Each);
+		if (IsValid(Each))
+		{
+			FindComponentsAndInvokeFunc(FindComponentsAndInvokeFunc, TTypeList<ComponentTypes...>{}, Each);
+		}
 	}
 }
 
