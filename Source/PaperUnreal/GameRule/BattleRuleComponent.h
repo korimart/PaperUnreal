@@ -210,6 +210,8 @@ private:
 		{
 			UE_LOG(LogBattleRule, Log, TEXT("게임을 시작합니다"));
 
+			auto F = FinallyIfValid(this, [this]() { DestroyComponent(); });
+
 			auto Timeout = AbortOnError(RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 			{
 				co_await AbortOnError(WorldTimer->At(GetWorld()->GetTimeSeconds() + 60.f));
@@ -255,8 +257,6 @@ private:
 
 			Algo::SortBy(GameResult.SortedByRank, &FBattleRuleResult::FTeamAndArea::Area);
 			std::reverse(GameResult.SortedByRank.begin(), GameResult.SortedByRank.end());
-
-			DestroyComponent();
 
 			co_return GameResult;
 		}).ReturnValue();
