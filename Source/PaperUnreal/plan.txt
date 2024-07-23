@@ -149,6 +149,7 @@ ReplicatedAreaExpander
     g. 결과창
     h. 처음부터 반복
 2. coroutine 에러 핸들링 abort를 기본으로 변경
-3. live data weak pointer handling 방식 변경 observe/create stream valid 버전 분리
-4. value streamer 제거
-5. byte streamer 제거 및 tracer path 방식 좀 변경
+3. live data weak pointer handling 방식 변경 observe/create stream valid 버전 분리, raw 접근 제한
+-> derived class로 자꾸 만들지 말고 type traits로 관련 정보 look up 하게 구현하자
+4. value streamer 제거, byte streamer 제거 및 tracer path 방식 좀 변경 <-- 크래시 발생하므로 1순위
+5. TracerToAreaConverter가 live data 콜백이 원본을 수정하는 circular 관계이므로 교통정리하는 클래스 구현
