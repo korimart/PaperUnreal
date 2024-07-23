@@ -96,6 +96,30 @@ public:
 		return false;
 	}
 
+	FVector GetRandomPointInside() const
+	{
+		// 그냥 적당히 좋은 구현
+		// 영역의 바운딩 박스를 가로 세로 10등분해서 랜덤 셀을 하나 고른다음에
+		// 그 중심이 영역 안에 있으면 그걸 반환 아니면 거기서 가장 가까운 영역 내 위치 반환
+		
+		const FBox2D BoundingBox = AreaBoundary->CalculateBoundingBox();
+		const float CellWidth = BoundingBox.GetSize().X;
+		const float CellHeight = BoundingBox.GetSize().Y;
+		const int32 CellX = FMath::RandRange(0, 9);
+		const int32 CellY = FMath::RandRange(0, 9);
+		const float X = BoundingBox.Min.X + CellWidth / 2.f + CellWidth * CellX;
+		const float Y = BoundingBox.Min.Y + CellHeight / 2.f + CellHeight * CellY;
+
+		const FVector2D RandomCellCenter{X, Y};
+
+		if (AreaBoundary->IsInside(RandomCellCenter))
+		{
+			return FVector{RandomCellCenter, GetOwner()->GetActorLocation().Z};
+		}
+
+		return FVector{FindClosestPointOnBoundary2D(RandomCellCenter).GetPoint(), GetOwner()->GetActorLocation().Z};
+	}
+	
 	struct FPointOnBoundary
 	{
 		FSegment2D Segment;

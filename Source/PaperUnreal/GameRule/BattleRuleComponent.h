@@ -183,12 +183,12 @@ private:
 			Inventory->SetHomeArea(ThisPlayerArea);
 			Inventory->SetTracerMaterial(TracerMaterials[ThisPlayerTeamIndex % TracerMaterials.Num()]);
 
-			// TODO 이거 area의 위치가 아니라 boundary 내의 랜덤 위치여야 함
 			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어 폰을 스폰합니다"), ReadyPlayer);
-			APawn* Pawn = PlayerSpawner->SpawnAtLocation(PawnClass, ThisPlayerArea->GetActorTransform().GetLocation());
+			auto AreaBoundary = ThisPlayerArea->FindComponentByClass<UAreaBoundaryComponent>();
+			APawn* Pawn = PlayerSpawner->SpawnAtLocation(PawnClass, AreaBoundary->GetRandomPointInside());
 			ReadyPlayer->GetOwningController()->Possess(Pawn);
 
-			// 위에까지 플레이어 스폰은 완료했고 여기부터는 플레이어 리스폰 로직
+			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어의 사망을 기다리는 중"), ReadyPlayer);
 			Context.AbortIfNotValid(Pawn);
 			co_await AbortOnError(Pawn->FindComponentByClass<ULifeComponent>()->GetbAlive().If(false));
 
