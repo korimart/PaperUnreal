@@ -182,7 +182,10 @@ public:
 		auto ReceiversCopy = Receivers;
 		for (auto& Each : ReceiversCopy)
 		{
-			Each.Pin()->ReceiveValue(NewValue);
+			if (auto Pinned = Each.Pin())
+			{
+				Pinned->ReceiveValue(NewValue);
+			}
 		}
 	}
 

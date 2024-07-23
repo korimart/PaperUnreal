@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "BattlePlayerAttacherComponent.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
 #include "PaperUnreal/AreaTracer/AreaSpawnerComponent.h"
@@ -74,6 +75,7 @@ public:
 	{
 		check(HasBegunPlay());
 
+		// TODO spawn
 		WorldTimer = GetWorld()->GetGameState()->FindComponentByClass<UWorldTimerComponent>();
 		AreaSpawner = GetWorld()->GetGameState()->FindComponentByClass<UAreaSpawnerComponent>();
 		PlayerSpawner = GetWorld()->GetGameState()->FindComponentByClass<UPlayerSpawnerComponent>();
@@ -184,8 +186,12 @@ private:
 			Inventory->SetTracerMaterial(TracerMaterials[ThisPlayerTeamIndex % TracerMaterials.Num()]);
 
 			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어 폰을 스폰합니다"), ReadyPlayer);
-			auto AreaBoundary = ThisPlayerArea->FindComponentByClass<UAreaBoundaryComponent>();
-			APawn* Pawn = PlayerSpawner->SpawnAtLocation(PawnClass, AreaBoundary->GetRandomPointInside());
+			APawn* Pawn = PlayerSpawner->SpawnAtLocation(PawnClass, ThisPlayerArea->ServerAreaBoundary->GetRandomPointInside(), [&](APawn* ToInit)
+			{
+				auto Attacher = NewObject<UBattlePlayerAttacherComponent>(ToInit);
+				Attacher->SetDependencies(AreaSpawner, PlayerSpawner, ThisPlayerArea);
+				Attacher->RegisterComponent();
+			});
 			ReadyPlayer->GetOwningController()->Possess(Pawn);
 
 			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어의 사망을 기다리는 중"), ReadyPlayer);
@@ -264,33 +270,28 @@ private:
 
 	AAreaActor* InitializeNewAreaActor(int32 TeamIndex)
 	{
-		AAreaActor* Area = AreaSpawner->SpawnAreaAtRandomEmptyLocation();
-		if (!Area)
+		return AreaSpawner->SpawnAreaAtRandomEmptyLocation([&](AAreaActor* Area)
 		{
-			return nullptr;
-		}
+			Area->TeamComponent->SetTeamIndex(TeamIndex);
+			Area->SetAreaMaterial(AreaMaterials[TeamIndex % AreaMaterials.Num()]);
 
-		Area->TeamComponent->SetTeamIndex(TeamIndex);
-		Area->SetAreaMaterial(AreaMaterials[TeamIndex % AreaMaterials.Num()]);
-
-		RunWeakCoroutine(this, [this, Area, TeamIndex](FWeakCoroutineContext& Context) -> FWeakCoroutine
-		{
-			Context.AbortIfNotValid(Area);
-
-			co_await AbortOnError(Area->LifeComponent->GetbAlive().If(false));
-			
-			UE_LOG(LogBattleRule, Log, TEXT("영역이 파괴됨에 따라 팀 %d의 모든 유저를 죽입니다."), TeamIndex);
-			for (ULifeComponent* Each : GetPawnLivesOfTeam(TeamIndex))
+			RunWeakCoroutine(this, [this, Area, TeamIndex](FWeakCoroutineContext& Context) -> FWeakCoroutine
 			{
-				Each->SetbAlive(false);
-			}
+				Context.AbortIfNotValid(Area);
 
-			// 영역이 데스 애니메이션 등을 플레이하는데 충분한 시간을 준다
-			co_await AbortOnError(WaitForSeconds(GetWorld(), 10.f));
-			Area->Destroy();
+				co_await AbortOnError(Area->LifeComponent->GetbAlive().If(false));
+
+				UE_LOG(LogBattleRule, Log, TEXT("영역이 파괴됨에 따라 팀 %d의 모든 유저를 죽입니다."), TeamIndex);
+				for (ULifeComponent* Each : GetPawnLivesOfTeam(TeamIndex))
+				{
+					Each->SetbAlive(false);
+				}
+
+				// 영역이 데스 애니메이션 등을 플레이하는데 충분한 시간을 준다
+				co_await AbortOnError(WaitForSeconds(GetWorld(), 10.f));
+				Area->Destroy();
+			});
 		});
-
-		return Area;
 	}
 
 	void KillAreaIfNobodyAlive(int32 TeamIndex) const
@@ -332,7 +333,7 @@ private:
 			}
 
 			auto TeamComponent = Each->GetPlayerState()->FindComponentByClass<UTeamComponent>();
-			
+
 			if (TeamComponent->GetTeamIndex().Get() == TeamIndex)
 			{
 				Ret.Add(Each->FindComponentByClass<ULifeComponent>());

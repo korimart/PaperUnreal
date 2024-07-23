@@ -58,6 +58,7 @@ public:
 		if (TArray<FUnionResult> UnionResult
 			= AreaBoundary->Union(Forward<SegmentArrayType>(Path)); !UnionResult.IsEmpty())
 		{
+			// TODO lock으로 고쳐야됨
 			AreaBoundary.Notify();
 
 			TArray<FExpansionResult> Ret;

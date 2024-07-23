@@ -17,11 +17,14 @@ class UPlayerSpawnerComponent : public UActorComponent2
 public:
 	auto GetSpawnedPlayers() { return ToLiveDataView(Players); }
 
-	APawn* SpawnAtLocation(UClass* Class, const FVector& Location)
+	template <typename FuncType>
+	APawn* SpawnAtLocation(UClass* Class, const FVector& Location, const FuncType& Initializer)
 	{
 		check(GetNetMode() != NM_Client);
 		
 		APawn* Spawned = CastChecked<APawn>(GetWorld()->SpawnActor(Class, &Location));
+		Initializer(Spawned);
+		
 		const TArray<APawn*> Prev = RepPlayers;
 		RepPlayers.Add(Spawned);
 		OnRep_SpawnedPlayers(Prev);

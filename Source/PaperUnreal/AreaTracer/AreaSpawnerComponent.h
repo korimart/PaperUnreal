@@ -134,7 +134,8 @@ class UAreaSpawnerComponent : public UActorComponent2
 public:
 	auto GetSpawnedAreas() { return ToLiveDataView(SpawnedAreas); }
 
-	AAreaActor* SpawnAreaAtRandomEmptyLocation()
+	template <typename FuncType>
+	AAreaActor* SpawnAreaAtRandomEmptyLocation(const FuncType& Initializer)
 	{
 		check(GetNetMode() != NM_Client);
 
@@ -156,6 +157,8 @@ public:
 
 		const FVector SpawnLocation{CellToSpawnAreaIn->GetCenter(), 50.f};
 		AAreaActor* Ret = GetWorld()->SpawnActor<AAreaActor>(SpawnLocation, {});
+		Initializer(Ret);
+		
 		const TArray<AAreaActor*> Prev = RepSpawnedAreas;
 		RepSpawnedAreas.Add(Ret);
 		OnRep_SpawnedAreas(Prev);

@@ -1,4 +1,5 @@
 ﻿#include "Misc/AutomationTest.h"
+#include "PaperUnreal/WeakCoroutine/AwaitableWrappers.h"
 #include "PaperUnreal/WeakCoroutine/CancellableFuture.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 
@@ -54,6 +55,24 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 		});
 
 		TestTrue(TEXT("AnyOf 테스트: 이미 완료 거를 기다리기 시작해도 잘 되는지 테스트"), bOver);
+	}
+	
+	{
+		FStreamableDelegate Delegate;
+		auto Ret = MakeFutureFromDelegate<UObject*>(
+			Delegate,
+			[]() { return true; },
+			[]() { return nullptr; });
+		Delegate.Execute();
+		
+		bool bOver = false;
+		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			UObject* Loaded = co_await AbortOnError(MoveTemp(Ret));
+			bOver = Loaded == nullptr;
+		});
+
+		TestFalse(TEXT("AbortOnError 이미 에러가 발생해 있는 걸 기다릴 때 Abort 하는지"), bOver);
 	}
 
 	return true;

@@ -12,9 +12,6 @@ class APVPBattleCharacter : public ACharacter2
 	GENERATED_BODY()
 
 public:
-	UPROPERTY()
-	class ULifeComponent* LifeComponent;
-
 	APVPBattleCharacter();
 
 	/** Returns TopDownCameraComponent subobject **/
@@ -30,8 +27,4 @@ private:
 	/** Camera boom positioning the camera above the character */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	class USpringArmComponent* CameraBoom;
-
-	virtual void PostInitializeComponents() override;
-	virtual void AttachServerMachineComponents() override;
-	virtual void AttachPlayerMachineComponents() override;
 };

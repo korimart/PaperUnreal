@@ -26,14 +26,15 @@ private:
 	UFUNCTION(Exec, BlueprintAuthorityOnly)
 	void SpawnAreaForTeam(int32 TeamIndex)
 	{
-		auto Spawned = GetWorld()
-		               ->GetGameState<APVPBattleGameState>()
-		               ->AreaSpawnerComponent
-		               ->SpawnAreaAtRandomEmptyLocation();
-		
-		Spawned->TeamComponent->SetTeamIndex(TeamIndex);
+		GetWorld()
+			->GetGameState<APVPBattleGameState>()
+			->AreaSpawnerComponent
+			->SpawnAreaAtRandomEmptyLocation([&](auto Spawned)
+			{
+				Spawned->TeamComponent->SetTeamIndex(TeamIndex);
+			});
 	}
-	
+
 	UFUNCTION(Exec, BlueprintAuthorityOnly)
 	void DestroyAllCharacters()
 	{
@@ -42,7 +43,7 @@ private:
 			It->Destroy();
 		}
 	}
-	
+
 	UFUNCTION(Exec, BlueprintAuthorityOnly)
 	void DestroyAllTracerPaths()
 	{
@@ -54,7 +55,7 @@ private:
 			}
 		}
 	}
-	
+
 	UFUNCTION(Exec, BlueprintAuthorityOnly)
 	void KillArea(int32 TeamIndex)
 	{
@@ -69,13 +70,13 @@ private:
 			}
 		}
 	}
-	
+
 	UFUNCTION(Exec)
 	void SetReady(bool bReady)
 	{
 		GetPlayerController()->PlayerState->FindComponentByClass<UReadyStateComponent>()->ServerSetReady(bReady);
 	}
-	
+
 	UFUNCTION(Exec, BlueprintAuthorityOnly)
 	void SetAllReady(bool bReady)
 	{
@@ -84,7 +85,7 @@ private:
 			Each->FindComponentByClass<UReadyStateComponent>()->SetbReady(bReady);
 		}
 	}
-	
+
 	UFUNCTION(Exec, BlueprintAuthorityOnly)
 	void StartGame()
 	{

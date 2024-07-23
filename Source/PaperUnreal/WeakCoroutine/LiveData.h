@@ -17,19 +17,19 @@ public:
 	}
 
 	template <typename T> requires std::is_convertible_v<T, InternalStorageType>
-	TLiveDataBase(T&& Init)
+	explicit TLiveDataBase(T&& Init)
 		: Value(Forward<T>(Init))
 	{
 	}
 
-	template <typename T> requires CInequalityComparable<InternalStorageType> && std::is_convertible_v<T, InternalStorageType>
+	template <typename T> requires CInequalityComparable<InternalStorageType> && std::is_assignable_v<InternalStorageType&, T>
 	TLiveDataBase& operator=(T&& NewValue)
 	{
 		SetValue(Forward<T>(NewValue));
 		return *this;
 	}
 
-	template <typename T> requires CInequalityComparable<InternalStorageType> && std::is_convertible_v<T, InternalStorageType>
+	template <typename T> requires CInequalityComparable<InternalStorageType> && std::is_assignable_v<InternalStorageType&, T>
 	void SetValue(T&& Right)
 	{
 		check(!bExecutingCallbacks);
@@ -39,7 +39,7 @@ public:
 		}
 	}
 
-	template <typename T> requires CInequalityComparable<InternalStorageType> && std::is_convertible_v<T, InternalStorageType>
+	template <typename T> requires CInequalityComparable<InternalStorageType> && std::is_assignable_v<InternalStorageType&, T>
 	bool SetValueSilent(T&& Right)
 	{
 		check(!bExecutingCallbacks);
@@ -51,7 +51,7 @@ public:
 		return false;
 	}
 
-	template <typename T> requires std::is_convertible_v<T, InternalStorageType>
+	template <typename T> requires std::is_assignable_v<InternalStorageType&, T>
 	void SetValueAlways(T&& Right)
 	{
 		Value = Forward<T>(Right);
@@ -84,7 +84,7 @@ public:
 		ValidCheckingFunc(Get());
 		OnChanged.Add(FOnChanged::FDelegate::CreateSPLambda(Lifetime, ValidCheckingFunc));
 	}
-	
+
 	template <typename FuncType>
 	UE_NODISCARD FDelegateSPHandle Observe(FuncType&& Func)
 	{
@@ -213,15 +213,18 @@ class TBackedLiveDataBase : public TLiveDataBase<Derived, InValueType&>
 {
 public:
 	using Super = TLiveDataBase<Derived, InValueType&>;
-	using ValueType = InValueType;
-	using ValidType = InValueType;
 
 	using Super::Super;
 
-	template <typename T> requires CInequalityComparable<ValidType> && std::is_convertible_v<T, ValidType>
+	template <typename T>
+		requires CInequalityComparable<InValueType> && std::is_assignable_v<InValueType&, T>
 	TBackedLiveDataBase& operator=(T&& NewValue)
 	{
-		check(&Super::Get() != &NewValue);
+		if constexpr (std::is_same_v<InValueType&, T>)
+		{
+			check(&Super::Get() != &NewValue);
+		}
+		
 		Super::operator=(Forward<T>(NewValue));
 		return *this;
 	}
@@ -240,7 +243,8 @@ class TBackedLiveData;
 
 
 template <typename InValueType>
-class TBackedLiveData<InValueType, ERepHandlingPolicy::AlwaysNotify> : private TBackedLiveDataBase<TBackedLiveData<InValueType>, InValueType>
+class TBackedLiveData<InValueType, ERepHandlingPolicy::AlwaysNotify>
+	: private TBackedLiveDataBase<TBackedLiveData<InValueType>, InValueType>
 {
 public:
 	using Super = TBackedLiveDataBase<TBackedLiveData, InValueType>;
@@ -270,7 +274,8 @@ private:
 
 
 template <typename InValueType>
-class TBackedLiveData<InValueType*, ERepHandlingPolicy::AlwaysNotify> : private TBackedLiveDataBase<TBackedLiveData<InValueType*>, InValueType*>
+class TBackedLiveData<InValueType*, ERepHandlingPolicy::AlwaysNotify>
+	: private TBackedLiveDataBase<TBackedLiveData<InValueType*>, InValueType*>
 {
 public:
 	using Super = TBackedLiveDataBase<TBackedLiveData, InValueType*>;
@@ -287,25 +292,25 @@ public:
 	using Super::CreateStream;
 	using Super::Get;
 
-	ValidType* operator->() const { return Super::Get(); }
-	const ValidType& operator*() const { return *Super::Get(); }
+	ValidType operator->() const { return Super::Get(); }
+	const InValueType& operator*() const { return *Super::Get(); }
 
+	void OnRep() { Notify(); }
+	
 	friend TCancellableFutureAwaitable<ValidType> operator co_await(TBackedLiveData& LiveData)
 	{
 		return [&]() -> TCancellableFuture<ValidType>
 		{
-			if (::IsValid(LiveData.Get()))
+			if (TBackedLiveData::IsValid(LiveData.Get()))
 			{
-				return LiveData.Get();
+				return TBackedLiveData::ToValid(LiveData.Get());
 			}
 
 			return MakeFutureFromDelegate<ValidType>(LiveData.OnChanged,
-				[](const ValueType& Value) { return ::IsValid(Value); },
-				[](const ValueType& Value) { return Value; });
+				[](const ValueType& Value) { return TBackedLiveData::IsValid(Value); },
+				[](const ValueType& Value) { return TBackedLiveData::ToValid(Value); });
 		}();
 	}
-
-	void OnRep() { Notify(); }
 
 private:
 	friend class Super::Super;
@@ -314,8 +319,57 @@ private:
 };
 
 
+template <typename InValueType>
+class TBackedLiveData<TScriptInterface<InValueType>, ERepHandlingPolicy::AlwaysNotify>
+	: private TBackedLiveDataBase<TBackedLiveData<TScriptInterface<InValueType>>, TScriptInterface<InValueType>>
+{
+public:
+	using Super = TBackedLiveDataBase<TBackedLiveData, TScriptInterface<InValueType>>;
+	using ValueType = TScriptInterface<InValueType>;
+	using ValidType = TScriptInterface<InValueType>;
+
+	using Super::Super;
+	using Super::operator=;
+	using Super::SetValue;
+	using Super::SetValueSilent;
+	using Super::SetValueAlways;
+	using Super::Notify;
+	using Super::Observe;
+	using Super::CreateStream;
+	using Super::Get;
+
+	InValueType* operator->() const { return Super::Get().GetInterface(); }
+	const InValueType& operator*() const { return *Super::Get().GetInterface(); }
+
+	void OnRep() { Notify(); }
+	
+	friend TCancellableFutureAwaitable<ValidType> operator co_await(TBackedLiveData& LiveData)
+	{
+		return [&]() -> TCancellableFuture<ValidType>
+		{
+			if (TBackedLiveData::IsValid(LiveData.Get()))
+			{
+				return TBackedLiveData::ToValid(LiveData.Get());
+			}
+
+			return MakeFutureFromDelegate<ValidType>(LiveData.OnChanged,
+				[](const ValueType& Value) { return TBackedLiveData::IsValid(Value); },
+				[](const ValueType& Value) { return TBackedLiveData::ToValid(Value); });
+		}();
+	}
+
+	InValueType* GetInterface() const { return Super::Get().GetInterface(); }
+
+private:
+	friend class Super::Super;
+	static bool IsValid(const ValueType& Value) { return ::IsValid(Value.GetObject()); }
+	static ValidType ToValid(const ValueType& Value) { return Value; }
+};
+
+
 template <typename ElementType>
-class TBackedLiveData<TArray<ElementType>, ERepHandlingPolicy::CompareForAddOrRemove> : public TBackedLiveDataBase<TBackedLiveData<TArray<ElementType>>, TArray<ElementType>>
+class TBackedLiveData<TArray<ElementType>, ERepHandlingPolicy::CompareForAddOrRemove>
+	: public TBackedLiveDataBase<TBackedLiveData<TArray<ElementType>>, TArray<ElementType>>
 {
 public:
 	using Super = TBackedLiveDataBase<TBackedLiveData<TArray<ElementType>>, TArray<ElementType>>;
@@ -389,13 +443,13 @@ public:
 		this->GuardCallbackInvocation([&]() { OnElementAdded.Broadcast(Element); });
 		Super::Notify();
 	}
-	
+
 	void NotifyRemove(const ElementType& Element)
 	{
 		this->GuardCallbackInvocation([&]() { OnElementRemoved.Broadcast(Element); });
 		Super::Notify();
 	}
-	
+
 	template <typename FuncType>
 	void ObserveAdd(UObject* Lifetime, FuncType&& Func)
 	{
@@ -403,7 +457,7 @@ public:
 		{
 			this->GuardCallbackInvocation([&]() { Func(Each); });
 		}
-		
+
 		OnElementAdded.AddWeakLambda(Lifetime, Forward<FuncType>(Func));
 	}
 
@@ -414,10 +468,10 @@ public:
 		{
 			this->GuardCallbackInvocation([&]() { Func(Each); });
 		}
-		
+
 		OnElementAdded.Add(FElementEvent::FDelegate::CreateSPLambda(Lifetime, Forward<FuncType>(Func)));
 	}
-	
+
 	template <typename FuncType>
 	UE_NODISCARD FDelegateSPHandle ObserveAdd(FuncType&& Func)
 	{
@@ -425,7 +479,7 @@ public:
 		ObserveAdd(Ret.ToShared(), Forward<FuncType>(Func));
 		return Ret;
 	}
-	
+
 	template <typename FuncType>
 	void ObserveRemove(UObject* Lifetime, FuncType&& Func)
 	{
@@ -437,7 +491,7 @@ public:
 	{
 		OnElementRemoved.Add(FElementEvent::FDelegate::CreateSPLambda(Lifetime, Forward<FuncType>(Func)));
 	}
-	
+
 	template <typename FuncType>
 	UE_NODISCARD FDelegateSPHandle ObserveRemove(FuncType&& Func)
 	{
@@ -445,7 +499,7 @@ public:
 		ObserveRemove(Ret.ToShared(), Forward<FuncType>(Func));
 		return Ret;
 	}
-	
+
 	TValueStream<ElementType> CreateAddStream()
 	{
 		return CreateMulticastValueStream(this->Value, OnElementAdded);
@@ -475,10 +529,10 @@ public:
 
 	template <typename... ArgTypes>
 	decltype(auto) Observe(ArgTypes&&... Args) { return LiveData.Observe(Forward<ArgTypes>(Args)...); }
-	
+
 	template <typename... ArgTypes>
 	decltype(auto) ObserveAdd(ArgTypes&&... Args) { return LiveData.ObserveAdd(Forward<ArgTypes>(Args)...); }
-	
+
 	template <typename... ArgTypes>
 	decltype(auto) ObserveRemove(ArgTypes&&... Args) { return LiveData.ObserveRemove(Forward<ArgTypes>(Args)...); }
 

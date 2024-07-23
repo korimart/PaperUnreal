@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <coroutine>
 #include <source_location>
 
 #include "CoreMinimal.h"
@@ -92,7 +93,7 @@ public:
 
 	bool await_ready() const
 	{
-		return FutureAwaitable.await_ready();
+		return false;
 	}
 
 	template <typename HandleType>

@@ -25,7 +25,4 @@ public:
 
 	virtual void NotifyControllerChanged() override;
 	virtual void OnPlayerStateChanged(APlayerState* NewPlayerState, APlayerState* OldPlayerState) override;
-	virtual void BeginPlay() override;
-	virtual void AttachServerMachineComponents() {}
-	virtual void AttachPlayerMachineComponents() {}
 };

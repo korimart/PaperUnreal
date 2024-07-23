@@ -25,6 +25,12 @@ public:
 	UTeamComponent* TeamComponent;
 
 	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(TSoftObjectPtr<UMaterialInstance>, AreaMaterial, RepAreaMaterial);
+	
+	UPROPERTY()
+	UAreaBoundaryComponent* ServerAreaBoundary;
+	
+	UPROPERTY()
+	UAreaMeshComponent* ClientAreaMesh;
 
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_AreaMaterial)
@@ -62,49 +68,48 @@ private:
 
 	virtual void AttachServerMachineComponents() override
 	{
-		auto AreaBoundary = NewObject<UAreaBoundaryComponent>(this);
-		AreaBoundary->ResetToStartingBoundary(GetActorLocation());
-		AreaBoundary->GetBoundary().Observe(this, [this](const FLoopedSegmentArray2D& Boundary)
+		ServerAreaBoundary = NewObject<UAreaBoundaryComponent>(this);
+		ServerAreaBoundary->ResetToStartingBoundary(GetActorLocation());
+		ServerAreaBoundary->GetBoundary().Observe(this, [this](const FLoopedSegmentArray2D& Boundary)
 		{
 			if (!Boundary.IsValid())
 			{
 				LifeComponent->SetbAlive(false);
 			}
 		});
-		AreaBoundary->RegisterComponent();
+		ServerAreaBoundary->RegisterComponent();
 
 		if (GetNetMode() != NM_Standalone)
 		{
 			auto ReplicatedAreaBoundary = NewObject<UReplicatedAreaBoundaryComponent>(this);
-			ReplicatedAreaBoundary->SetAreaBoundarySource(AreaBoundary);
+			ReplicatedAreaBoundary->SetAreaBoundarySource(ServerAreaBoundary);
 			ReplicatedAreaBoundary->RegisterComponent();
 		}
 	}
 
 	virtual void AttachPlayerMachineComponents() override
 	{
-		auto AreaMesh = NewObject<UAreaMeshComponent>(this);
-		AreaMesh->RegisterComponent();
+		ClientAreaMesh = NewObject<UAreaMeshComponent>(this);
+		ClientAreaMesh->RegisterComponent();
 
-		IAreaBoundaryProvider* AreaBoundaryStream = GetNetMode() == NM_Client
+		IAreaBoundaryProvider* AreaBoundaryProvider = GetNetMode() == NM_Client
 			? static_cast<IAreaBoundaryProvider*>(FindComponentByClass<UReplicatedAreaBoundaryComponent>())
 			: static_cast<IAreaBoundaryProvider*>(FindComponentByClass<UAreaBoundaryComponent>());
 
 		// 클래스 서버 코드에서 뭔가 실수한 거임 고쳐야 됨
-		check(AreaBoundaryStream);
+		check(AreaBoundaryProvider);
 
 		auto AreaMeshGenerator = NewObject<UAreaMeshGeneratorComponent>(this);
-		AreaMeshGenerator->SetMeshSource(AreaBoundaryStream);
-		AreaMeshGenerator->SetMeshDestination(AreaMesh);
+		AreaMeshGenerator->SetMeshSource(AreaBoundaryProvider);
+		AreaMeshGenerator->SetMeshDestination(ClientAreaMesh);
 		AreaMeshGenerator->RegisterComponent();
 
-		RunWeakCoroutine(this, [this, AreaMesh](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
-			Context.AbortIfNotValid(AreaMesh);
 			for (auto AreaMaterialStream = AreaMaterial.CreateStream();;)
 			{
 				auto SoftAreaMaterial = co_await AbortOnError(AreaMaterialStream);
-				AreaMesh->ConfigureMaterialSet({co_await AbortOnError(RequestAsyncLoad(SoftAreaMaterial))});
+				ClientAreaMesh->ConfigureMaterialSet({co_await AbortOnError(RequestAsyncLoad(SoftAreaMaterial))});
 			}
 		});
 	}
