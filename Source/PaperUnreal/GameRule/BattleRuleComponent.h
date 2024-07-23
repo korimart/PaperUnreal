@@ -83,14 +83,21 @@ public:
 
 		TeamAllocator.Configure(TeamCount, EachTeamMemberCount);
 
-		for (APlayerState* Each : GetWorld()->GetGameState()->PlayerArray)
-		{
-			InitiatePlayerSpawnSequence(Each);
-		}
+		auto PlayerStateArray = GetWorld()->GetGameState<AGameStateBase2>()->GetPlayerStateArray();
 
-		FGameModeEvents::OnGameModePostLoginEvent().AddWeakLambda(this, [this](auto, APlayerController* PC)
+		PlayerStateArray.ObserveAdd(this, [this](APlayerState* Player)
 		{
-			InitiatePlayerSpawnSequence(PC->PlayerState);
+			InitiatePlayerSpawnSequence(Player);
+		});
+
+		PlayerStateArray.ObserveRemove(this, [this](APlayerState* Player)
+		{
+			const int32 TeamIndex = Player->FindComponentByClass<UTeamComponent>()->GetTeamIndex().Get();
+			if (TeamIndex >= 0)
+			{
+				UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어가 접속을 종료함에 따라 영역 파괴를 검토하는 중"), Player);
+				KillAreaIfNobodyAlive(TeamIndex);
+			}
 		});
 
 		return InitiateGameFlow();
@@ -99,7 +106,7 @@ public:
 private:
 	UPROPERTY()
 	UClass* PawnClass;
-	
+
 	UPROPERTY()
 	UWorldTimerComponent* WorldTimer;
 
@@ -141,6 +148,7 @@ private:
 			// 이 컴포넌트들은 디펜던시: 이 컴포넌트들을 가지는 PlayerState에 대해서만 이 클래스를 사용할 수 있음
 			check(AllValid(TeamComponent, ReadyState, Inventory));
 
+			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어의 준비 완료를 기다리는 중"), ReadyPlayer);
 			co_await AbortOnError(ReadyState->GetbReady().If(true));
 
 			// 죽은 다음에 다시 스폰하는 경우에는 팀이 이미 있음
@@ -159,7 +167,7 @@ private:
 
 			const int32 ThisPlayerTeamIndex = TeamComponent->GetTeamIndex().Get();
 			AAreaActor* ThisPlayerArea = FindLivingAreaOfTeam(ThisPlayerTeamIndex);
-			
+
 			if (!ThisPlayerArea)
 			{
 				ThisPlayerArea = InitializeNewAreaActor(ThisPlayerTeamIndex);
@@ -176,6 +184,7 @@ private:
 			Inventory->SetTracerMaterial(TracerMaterials[ThisPlayerTeamIndex % TracerMaterials.Num()]);
 
 			// TODO 이거 area의 위치가 아니라 boundary 내의 랜덤 위치여야 함
+			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어 폰을 스폰합니다"), ReadyPlayer);
 			APawn* Pawn = PlayerSpawner->SpawnAtLocation(PawnClass, ThisPlayerArea->GetActorTransform().GetLocation());
 			ReadyPlayer->GetOwningController()->Possess(Pawn);
 
@@ -183,12 +192,14 @@ private:
 			Context.AbortIfNotValid(Pawn);
 			co_await AbortOnError(Pawn->FindComponentByClass<ULifeComponent>()->GetbAlive().If(false));
 
-			KillAreaIfThisIsLastMan(ReadyPlayer);
+			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어가 사망함에 따라 영역 파괴를 검토하는 중"), ReadyPlayer);
+			KillAreaIfNobodyAlive(ThisPlayerTeamIndex);
 
 			constexpr float RespawnCool = 5.f;
 			co_await AbortOnError(WaitForSeconds(GetWorld(), RespawnCool));
 			Pawn->Destroy();
 
+			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어 리스폰 시퀀스를 시작합니다"), ReadyPlayer);
 			InitiatePlayerSpawnSequence(ReadyPlayer);
 		});
 	}
@@ -231,14 +242,16 @@ private:
 			// 모종의 이유로 에리어 두 개가 동시에 파괴돼서 무승부가 될 수도 있음 무승부면 결과가 빔
 			// TODO 마지막까지 남은 에리어들을 알아내서 이기게 해줘야 됨
 			FBattleRuleResult GameResult{};
-			for (auto Each : GetComponents<UAreaBoundaryComponent>(AreaSpawner->GetSpawnedAreas().Get()))
+
+			ForEach<ULifeComponent, UTeamComponent, UAreaBoundaryComponent>
+			(AreaSpawner->GetSpawnedAreas().Get(), [&](auto Life, auto Team, auto Boundary)
 			{
-				if (Each->GetOwner<AAreaActor>()->LifeComponent->GetbAlive().Get())
+				if (Life->GetbAlive().Get())
 				{
-					const float Area = Each->GetBoundary()->CalculateArea();
-					GameResult.SortedByRank.Emplace(Each->GetOwner<AAreaActor>()->TeamComponent->GetTeamIndex().Get(), Area);
+					const float Area = Boundary->GetBoundary()->CalculateArea();
+					GameResult.SortedByRank.Emplace(Team->GetTeamIndex().Get(), Area);
 				}
-			}
+			});
 
 			Algo::SortBy(GameResult.SortedByRank, &FBattleRuleResult::FTeamAndArea::Area);
 			std::reverse(GameResult.SortedByRank.begin(), GameResult.SortedByRank.end());
@@ -276,17 +289,15 @@ private:
 		return Area;
 	}
 
-	void KillAreaIfThisIsLastMan(APlayerState* Man) const
+	void KillAreaIfNobodyAlive(int32 TeamIndex) const
 	{
-		const int32 TeamIndex = Man->FindComponentByClass<UTeamComponent>()->GetTeamIndex().Get();
-
 		for (APawn* Each : PlayerSpawner->GetSpawnedPlayers().Get())
 		{
 			if (!IsValid(Each) || !Each->GetPlayerState())
 			{
 				continue;
 			}
-			
+
 			auto TeamComponent = Each->GetPlayerState()->FindComponentByClass<UTeamComponent>();
 			auto LifeComponent = Each->FindComponentByClass<ULifeComponent>();
 
@@ -296,9 +307,10 @@ private:
 				return;
 			}
 		}
-		
+
 		if (AAreaActor* ThisManArea = FindLivingAreaOfTeam(TeamIndex))
 		{
+			UE_LOG(LogBattleRule, Log, TEXT("팀 %d에 살아있는 유저가 없어 파괴합니다"), TeamIndex);
 			ThisManArea->LifeComponent->SetbAlive(false);
 		}
 	}

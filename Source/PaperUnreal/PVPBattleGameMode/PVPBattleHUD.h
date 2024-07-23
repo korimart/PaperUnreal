@@ -6,6 +6,7 @@
 #include "PVPBattleGameMode.h"
 #include "GameFramework/HUD.h"
 #include "PaperUnreal/ModeAgnostic/StageComponent.h"
+#include "PaperUnreal/WeakCoroutine/AwaitableWrappers.h"
 #include "PVPBattleHUD.generated.h"
 
 /**

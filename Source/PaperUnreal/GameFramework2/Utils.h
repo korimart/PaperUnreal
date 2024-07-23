@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "PaperUnreal/WeakCoroutine/TypeTraits.h"
 #include "Utils.generated.h"
 
 
@@ -67,7 +68,7 @@ USTRUCT()
 struct FDelegateSPHandle
 {
 	GENERATED_BODY()
-	
+
 	const TSharedRef<bool>& ToShared() const { return Life; }
 
 private:
@@ -150,6 +151,32 @@ TArray<T*> GetComponents(const TArray<U>& Actors)
 		}
 	}
 	return Ret;
+}
+
+
+template <typename... ComponentTypes, typename ActorType, typename FuncType>
+void ForEach(const TArray<ActorType*>& Actors, const FuncType& Func)
+{
+	const auto FindComponentsAndInvokeFunc
+		= [&]<typename ToFind, typename... Rest>(auto& Self, TTypeList<ToFind, Rest...>, ActorType* Actor, auto&... Found)
+	{
+		if (auto Component = Actor->template FindComponentByClass<ToFind>())
+		{
+			if constexpr (sizeof...(Rest) == 0)
+			{
+				Func(Found..., Component);
+			}
+			else
+			{
+				Self(Self, TTypeList<Rest...>{}, Actor, Found..., Component);
+			}
+		}
+	};
+
+	for (ActorType* Each : Actors)
+	{
+		FindComponentsAndInvokeFunc(FindComponentsAndInvokeFunc, TTypeList<ComponentTypes...>{}, Each);
+	}
 }
 
 

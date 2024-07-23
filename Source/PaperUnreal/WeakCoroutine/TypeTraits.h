@@ -12,6 +12,12 @@ struct TFalse
 };
 
 
+template <typename...>
+struct TTypeList
+{
+};
+
+
 template <typename, template <typename...> typename>
 struct TIsInstantiationOf : std::false_type
 {
@@ -91,7 +97,7 @@ private:
 
 	template <typename F, typename Ret, typename... ArgTypes>
 	static Ret Helper(Ret (F::*)(ArgTypes...) const);
-	
+
 public:
 	using Type = decltype(Helper(&FuncType::operator()));
 };
@@ -107,7 +113,7 @@ template <typename AwaitableType>
 concept CAwaitable = requires(AwaitableType Awaitable) { Awaitable.await_resume(); };
 
 template <typename T>
-concept CAwaitableConvertible = requires (T Arg) { operator co_await(Arg); };
+concept CAwaitableConvertible = requires(T Arg) { operator co_await(Arg); };
 
 template <typename T, typename U>
 concept CEqualityComparable = requires(T Arg0, U Arg1) { Arg0 == Arg1; };
