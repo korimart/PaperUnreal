@@ -75,5 +75,26 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 		TestFalse(TEXT("AbortOnError 이미 에러가 발생해 있는 걸 기다릴 때 Abort 하는지"), bOver);
 	}
 
+	{
+		TValueStream<int32> Stream;
+		auto Receiver = Stream.GetReceiver();
+
+		int32 Received = 0;
+		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			auto Result = co_await Filter(Stream, [](int32 Value) { return Value > 3; });
+			Received = Result.Get();
+		});
+
+		Receiver.Pin()->ReceiveValue(1);
+		TestEqual(TEXT("Filter 함수 테스트"), Received, 0);
+		Receiver.Pin()->ReceiveValue(2);
+		TestEqual(TEXT("Filter 함수 테스트"), Received, 0);
+		Receiver.Pin()->ReceiveValue(3);
+		TestEqual(TEXT("Filter 함수 테스트"), Received, 0);
+		Receiver.Pin()->ReceiveValue(4);
+		TestEqual(TEXT("Filter 함수 테스트"), Received, 4);
+	}
+
 	return true;
 }

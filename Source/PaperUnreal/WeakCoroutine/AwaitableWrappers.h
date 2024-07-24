@@ -8,6 +8,7 @@
 #include "CoreMinimal.h"
 #include "CancellableFuture.h"
 #include "TypeTraits.h"
+#include "ValueStream.h"
 
 
 struct FMinimalCoroutine
@@ -246,6 +247,56 @@ private:
 };
 
 
+template <typename ValueStreamType, typename PredicateType>
+class TFilteringAwaitable
+{
+public:
+	template <typename Stream, typename Pred>
+	TFilteringAwaitable(Stream&& ValueStream, Pred&& Predicate)
+		: ValueStream(Forward<Stream>(ValueStream)), Predicate(Forward<Pred>(Predicate))
+	{
+	}
+	
+	bool await_ready() const
+	{
+		return false;
+	}
+
+	void await_suspend(auto Handle)
+	{
+		[](TFilteringAwaitable& This, auto Handle) -> FMinimalCoroutine
+		{
+			while (true)
+			{
+				auto Result = co_await This.ValueStream;
+				if (!Result || This.Predicate(Result.Get()))
+				{
+					This.Ret = MoveTemp(Result);
+					break;
+				}
+			}
+
+			Handle.resume();
+			
+		}(*this, Handle);
+	}
+
+	auto await_resume()
+	{
+		return MoveTemp(Ret.GetValue());
+	}
+
+private:
+	ValueStreamType ValueStream;
+	PredicateType Predicate;
+	TOptional<decltype(operator co_await(std::declval<std::decay_t<ValueStreamType>&>()).await_resume())> Ret;
+};
+
+template <typename Stream, typename Pred>
+TFilteringAwaitable(Stream&& ValueStream, Pred&& Predicate)
+	-> TFilteringAwaitable<std::conditional_t<std::is_lvalue_reference_v<Stream>, Stream, std::decay_t<Stream>>, std::decay_t<Pred>>;
+
+
 namespace AwaitableWrapperDetails
 {
 	template <typename T>
@@ -287,4 +338,11 @@ auto AnyOf(MaybeAwaitableTypes&&... MaybeAwaitables)
 {
 	using namespace AwaitableWrapperDetails;
 	return AnyOfImpl(AwaitableOrIdentity(Forward<MaybeAwaitableTypes>(MaybeAwaitables))...);
+}
+
+
+template <typename ValueStreamType, typename PredicateType>
+auto Filter(ValueStreamType&& Stream, PredicateType&& Predicate)
+{
+	return TFilteringAwaitable{Forward<ValueStreamType>(Stream), Forward<PredicateType>(Predicate)};
 }
