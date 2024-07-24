@@ -154,6 +154,10 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 		TArray<UDummy*> BackingField;
 		TLiveData<TArray<UDummy*>&> LiveData{BackingField};
 
+		// 컴파일 되는지 테스트
+		LiveData.CreateAddStream();
+		LiveData.CreateStrictAddStream();
+
 		TArray<UDummy*> Added;
 		auto Handle = LiveData.ObserveAddIfValid([&](UDummy* Value)
 		{
@@ -200,6 +204,40 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 		LiveData.Remove(Garbage);
 		TestEqual(TEXT(""), Added.Num(), 3);
 		TestEqual(TEXT(""), Removed.Num(), 2);
+	}
+
+	{
+		TLiveData<TArray<int32>> LiveData;
+
+		TArray<int32> Received;
+		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			for (auto Stream = LiveData.CreateStrictAddStream();;)
+			{
+				Received.Add(co_await AbortOnError(Stream));
+			}
+		});
+
+		// 구현 디테일 중에 Delegate의 복사가 발생하면 안 되도록 땜빵한 게 있어서
+		// 멀티캐스트 델리게이트의 내부 Delegate Array가 커질 때 복사 안 하는지 테스트
+		for (int32 i = 0; i < 50; i++)
+		{
+			LiveData.CreateStrictAddStream();
+		}
+
+		TestEqual(TEXT(""), Received.Num(), 0);
+		LiveData.Add(0);
+		TestEqual(TEXT(""), Received.Num(), 1);
+		LiveData.Add(0);
+		TestEqual(TEXT(""), Received.Num(), 2);
+		LiveData.Add(0);
+		TestEqual(TEXT(""), Received.Num(), 3);
+		LiveData.Remove(0);
+		TestEqual(TEXT(""), Received.Num(), 3);
+		LiveData.Add(0);
+		TestEqual(TEXT(""), Received.Num(), 3);
+		LiveData.Add(0);
+		TestEqual(TEXT(""), Received.Num(), 3);
 	}
 
 	return true;

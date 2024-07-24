@@ -28,14 +28,14 @@ public:
 
 	TCancellableFuture<T, EValueStreamError, ErrorTypes...> NextValue()
 	{
-		if (bEnded)
-		{
-			return EValueStreamError::StreamEnded;
-		}
-
 		if (UnclaimedFutures.Num() > 0)
 		{
 			return PopFront(UnclaimedFutures);
+		}
+		
+		if (bEnded)
+		{
+			return EValueStreamError::StreamEnded;
 		}
 
 		auto [Promise, Future] = MakePromise<T, EValueStreamError, ErrorTypes...>();
@@ -60,7 +60,6 @@ public:
 	void End()
 	{
 		bEnded = true;
-		UnclaimedFutures.Empty();
 
 		while (Promises.Num() > 0)
 		{
@@ -247,7 +246,7 @@ private:
 
 
 template <typename T, typename DelegateType>
-TValueStream<T> CreateMulticastValueStream(
+TTuple<TValueStream<T>, FDelegateHandle> CreateMulticastValueStream(
 	const TArray<T>& ReadyValues,
 	DelegateType& MulticastDelegate)
 {
@@ -258,7 +257,7 @@ TValueStream<T> CreateMulticastValueStream(
 
 
 template <typename T, typename DelegateType, typename PredicateType, typename TransformFuncType>
-TValueStream<T> CreateMulticastValueStream(
+TTuple<TValueStream<T>, FDelegateHandle> CreateMulticastValueStream(
 	const TArray<T>& ReadyValues,
 	DelegateType& MulticastDelegate,
 	PredicateType&& Predicate,
@@ -272,11 +271,35 @@ TValueStream<T> CreateMulticastValueStream(
 		Receiver.Pin()->ReceiveValue(Each);
 	}
 
-	MulticastDelegate.Add(DelegateType::FDelegate::CreateSPLambda(Receiver.Pin().ToSharedRef(),
+	struct FCopyChecker
+	{
+		TWeakPtr<TValueStreamValueReceiver<T>> Receiver;
+		
+		FCopyChecker(TWeakPtr<TValueStreamValueReceiver<T>> InReceiver) : Receiver(InReceiver) {}
+		FCopyChecker(const FCopyChecker&) { AssertNoCopy(); }
+		FCopyChecker& operator=(const FCopyChecker&) { AssertNoCopy(); return *this; }
+		FCopyChecker(FCopyChecker&&) = default;
+		FCopyChecker& operator=(FCopyChecker&&) = default;
+
+		~FCopyChecker()
+		{
+			if (auto Pinned = Receiver.Pin())
+			{
+				Pinned->End();
+			}
+		}
+
+		// MulticastDelegate를 복사하는 경우 여러 곳에서 Receiver에 값을 넣을 수 있게 됨
+		// 이것에 대한 처리를 구현하지 않았으므로 실수로 델리게이트를 복사하지 않도록 막아둠
+		void AssertNoCopy() { check(false); }
+	};
+
+	FDelegateHandle Handle = MulticastDelegate.Add(DelegateType::FDelegate::CreateSPLambda(Receiver.Pin().ToSharedRef(),
 		[
 			Receiver,
 			Predicate = Forward<PredicateType>(Predicate),
-			TransformFunc = Forward<TransformFuncType>(TransformFunc)
+			TransformFunc = Forward<TransformFuncType>(TransformFunc),
+			CopyChecker = FCopyChecker{ Receiver }
 		]<typename... ArgTypes>(ArgTypes&&... NewValues)
 		{
 			if (Predicate(Forward<ArgTypes>(NewValues)...))
@@ -285,7 +308,7 @@ TValueStream<T> CreateMulticastValueStream(
 			}
 		}));
 
-	return Ret;
+	return MakeTuple(MoveTemp(Ret), Handle);
 }
 
 

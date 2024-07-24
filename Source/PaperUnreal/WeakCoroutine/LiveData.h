@@ -237,7 +237,7 @@ public:
 
 	TValueStream<DecayedValueType> CreateStream()
 	{
-		return CreateMulticastValueStream(TArray<DecayedValueType>{Value}, OnChanged);
+		return CreateMulticastValueStream(TArray<DecayedValueType>{Value}, OnChanged).template Get<0>();
 	}
 
 private:
@@ -407,7 +407,14 @@ public:
 
 	TValueStream<ElementType> CreateAddStream()
 	{
-		return CreateMulticastValueStream(Array, OnElementAdded);
+		return CreateMulticastValueStream(Array, OnElementAdded).template Get<0>();
+	}
+
+	TValueStream<ElementType> CreateStrictAddStream()
+	{
+		auto [ValueStream, Handle] = CreateMulticastValueStream(Array, OnElementAdded);
+		StrictAddStreamHandles.Add(Handle);
+		return MoveTemp(ValueStream);
 	}
 
 	const ArrayType& Get() const { return Array; }
@@ -419,6 +426,8 @@ private:
 	FElementEvent OnElementAdded;
 	FElementEvent OnElementRemoved;
 
+	TArray<FDelegateHandle> StrictAddStreamHandles;
+
 	void NotifyAdd(const ElementType& Element)
 	{
 		this->GuardCallbackInvocation([&]() { OnElementAdded.Broadcast(Element); });
@@ -427,6 +436,12 @@ private:
 	void NotifyRemove(const ElementType& Element)
 	{
 		this->GuardCallbackInvocation([&]() { OnElementRemoved.Broadcast(Element); });
+
+		for (FDelegateHandle Each : StrictAddStreamHandles)
+		{
+			OnElementAdded.Remove(Each);
+		}
+		StrictAddStreamHandles.Empty();
 	}
 };
 
@@ -451,6 +466,7 @@ public:
 
 	decltype(auto) CreateStream() { return LiveData.CreateStream(); }
 	decltype(auto) CreateAddStream() { return LiveData.CreateAddStream(); }
+	decltype(auto) CreateStrictAddStream() { return LiveData.CreateStrictAddStream(); }
 
 	friend decltype(auto) operator co_await(TLiveDataView LiveDataView) { return operator co_await(LiveDataView.LiveData); }
 

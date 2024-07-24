@@ -42,12 +42,18 @@ namespace Utils_Private
 
 		TFinally(const TFinally&) = delete;
 		TFinally& operator=(const TFinally&) = delete;
-		TFinally& operator=(TFinally&&) = delete;
 
-		TFinally(TFinally&& Other)
+		TFinally(TFinally&& Other) noexcept
 		{
 			Func = Other.Func;
 			Other.Func.Reset();
+		}
+		
+		TFinally& operator=(TFinally&& Other) noexcept
+		{
+			Func = Other.Func;
+			Other.Func.Reset();
+			return *this;
 		}
 
 		~TFinally()
