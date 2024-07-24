@@ -108,8 +108,8 @@ private:
 		{
 			for (auto AreaMaterialStream = AreaMaterial.CreateStream();;)
 			{
-				auto SoftAreaMaterial = co_await AbortOnError(AreaMaterialStream);
-				ClientAreaMesh->ConfigureMaterialSet({co_await AbortOnError(RequestAsyncLoad(SoftAreaMaterial))});
+				auto SoftAreaMaterial = co_await AreaMaterialStream;
+				ClientAreaMesh->ConfigureMaterialSet({co_await RequestAsyncLoad(SoftAreaMaterial)});
 			}
 		});
 	}

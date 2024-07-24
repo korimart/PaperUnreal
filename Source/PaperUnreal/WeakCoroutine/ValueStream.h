@@ -6,15 +6,23 @@
 #include "CancellableFuture.h"
 #include "WeakCoroutine.h"
 #include "PaperUnreal/GameFramework2/Utils.h"
+#include "ValueStream.generated.h"
 
 
-enum class EValueStreamError
+UCLASS()
+class UValueStreamError : public UFailableResultError
 {
-	StreamEnded,
+	GENERATED_BODY()
+
+public:
+	static UValueStreamError* StreamClosed()
+	{
+		return NewError<UValueStreamError>(TEXT("StreamClosed"));
+	}
 };
 
 
-template <typename T, typename... ErrorTypes>
+template <typename T>
 class TValueStreamValueReceiver
 {
 public:
@@ -26,7 +34,7 @@ public:
 	TValueStreamValueReceiver(TValueStreamValueReceiver&&) = default;
 	TValueStreamValueReceiver& operator=(TValueStreamValueReceiver&&) = default;
 
-	TCancellableFuture<T, EValueStreamError, ErrorTypes...> NextValue()
+	TCancellableFuture<T> NextValue()
 	{
 		if (UnclaimedFutures.Num() > 0)
 		{
@@ -35,10 +43,10 @@ public:
 		
 		if (bEnded)
 		{
-			return EValueStreamError::StreamEnded;
+			return UValueStreamError::StreamClosed();
 		}
 
-		auto [Promise, Future] = MakePromise<T, EValueStreamError, ErrorTypes...>();
+		auto [Promise, Future] = MakePromise<T>();
 		Promises.Add(MoveTemp(Promise));
 		return MoveTemp(Future);
 	}
@@ -50,7 +58,7 @@ public:
 
 		if (Promises.Num() == 0)
 		{
-			UnclaimedFutures.Add(MakeReadyFuture<T, EValueStreamError, ErrorTypes...>(Forward<U>(Value)));
+			UnclaimedFutures.Add(TCancellableFuture<T>{Forward<U>(Value)});
 			return;
 		}
 
@@ -63,22 +71,22 @@ public:
 
 		while (Promises.Num() > 0)
 		{
-			PopFront(Promises).SetValue(EValueStreamError::StreamEnded);
+			PopFront(Promises).SetValue(UValueStreamError::StreamClosed());
 		}
 	}
 
 private:
 	bool bEnded = false;
-	TArray<TCancellableFuture<T, EValueStreamError, ErrorTypes...>> UnclaimedFutures;
-	TArray<TCancellablePromise<T, EValueStreamError, ErrorTypes...>> Promises;
+	TArray<TCancellableFuture<T>> UnclaimedFutures;
+	TArray<TCancellablePromise<T>> Promises;
 };
 
 
-template <typename T, typename... ErrorTypes>
+template <typename T>
 class TValueStream
 {
 public:
-	using ReceiverType = TValueStreamValueReceiver<T, ErrorTypes...>;
+	using ReceiverType = TValueStreamValueReceiver<T>;
 
 	TValueStream() = default;
 
@@ -95,7 +103,7 @@ public:
 		return Receiver;
 	}
 
-	friend TCancellableFutureAwaitable<T, EValueStreamError, ErrorTypes...>
+	friend TCancellableFutureAwaitable<T>
 	operator co_await(TValueStream& Stream) { return operator co_await(Stream.Receiver->NextValue()); }
 
 private:
@@ -151,6 +159,7 @@ public:
 		OnValueReceivedDelegate.AddWeakLambda(Object, Forward<FuncType>(Func));
 	}
 
+	// TODO rename
 	template <typename FuncType>
 	void OnStreamEnd(UObject* Object, FuncType&& Func) const
 	{
@@ -309,36 +318,4 @@ TTuple<TValueStream<T>, FDelegateHandle> CreateMulticastValueStream(
 		}));
 
 	return MakeTuple(MoveTemp(Ret), Handle);
-}
-
-
-template <typename T, typename PredicateType>
-TCancellableFuture<T, EValueStreamError> FirstInStream(TValueStream<T>&& Stream, PredicateType&& Predicate)
-{
-	// 이거 NoCapture 버전 안 쓰고 그냥 람다 캡쳐로 하면 컴파일이 안 됨 컴파일러 버그인 듯
-	return RunWeakCoroutineNoCaptures([](
-		TWeakCoroutineContext<T, EValueStreamError>& Context,
-		TValueStream<T> Stream,
-		std::decay_t<PredicateType> Predicate
-	) -> TWeakCoroutine<T, EValueStreamError>
-		{
-			while (true)
-			{
-				auto Value = co_await Stream;
-				if (Value && Invoke(Predicate, Value.Get()))
-				{
-					co_return Value.Get();
-				}
-
-				if (auto* Error = Value.template TryGet<EDefaultFutureError>())
-				{
-					continue;
-				}
-
-				if (auto* Error = Value.template TryGet<EValueStreamError>())
-				{
-					co_return *Error;
-				}
-			}
-		}, MoveTemp(Stream), Forward<PredicateType>(Predicate)).ReturnValue();
 }

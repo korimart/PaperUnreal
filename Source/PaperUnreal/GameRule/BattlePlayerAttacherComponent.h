@@ -155,8 +155,8 @@ private:
 	{
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
-			co_await AbortOnError(HomeArea);
-			co_await AbortOnError(TracerPathProvider);
+			co_await HomeArea;
+			co_await TracerPathProvider;
 
 			auto TracerMesh = NewObject<UTracerMeshComponent>(GetOwner());
 			TracerMesh->RegisterComponent();
@@ -168,8 +168,8 @@ private:
 			TracerMeshGenerator->RegisterComponent();
 
 			// 일단 위에까지 완료했으면 플레이는 가능한 거임 여기부터는 미적인 요소들을 준비한다
-			auto PlayerState = co_await AbortOnError(GetOuterACharacter2()->WaitForPlayerState());
-			auto Inventory = co_await AbortOnError(WaitForComponent<UInventoryComponent>(PlayerState));
+			auto PlayerState = co_await GetOuterACharacter2()->WaitForPlayerState();
+			auto Inventory = co_await WaitForComponent<UInventoryComponent>(PlayerState);
 
 			Inventory->GetTracerMaterial().Observe(TracerMesh, [this, TracerMesh](auto SoftMaterial)
 			{
@@ -177,7 +177,7 @@ private:
 				{
 					RunWeakCoroutine(TracerMesh, [TracerMesh, SoftMaterial](FWeakCoroutineContext&) -> FWeakCoroutine
 					{
-						auto Material = co_await AbortOnError(RequestAsyncLoad(SoftMaterial));
+						auto Material = co_await RequestAsyncLoad(SoftMaterial);
 						TracerMesh->ConfigureMaterialSet({Material});
 					});
 				}

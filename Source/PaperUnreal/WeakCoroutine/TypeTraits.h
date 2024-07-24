@@ -32,8 +32,12 @@ template <typename T, template <typename...> typename Template>
 inline constexpr bool TIsInstantiationOf_V = TIsInstantiationOf<std::decay_t<T>, Template>::value;
 
 
+template <typename T, template <typename...> typename Template>
+concept CInstantiationOf = TIsInstantiationOf_V<T, Template>;
+
+
 template <typename FromType, typename... ToTypes>
-constexpr bool IsConvertibleV = (std::is_convertible_v<FromType, ToTypes> || ...);
+constexpr bool TIsConvertible_V = (std::is_convertible_v<FromType, ToTypes> || ...);
 
 
 template <template <typename...> typename TypeList, typename SignatureType>

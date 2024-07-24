@@ -3,12 +3,10 @@
 #pragma once
 
 #include <coroutine>
-#include <source_location>
 
 #include "CoreMinimal.h"
 #include "CancellableFuture.h"
 #include "TypeTraits.h"
-#include "ValueStream.h"
 
 
 struct FMinimalCoroutine
@@ -77,67 +75,7 @@ private:
 };
 
 
-template <typename FutureAwaitableType>
-class TErrorRemovedCancellableFutureAwaitable
-{
-public:
-	TErrorRemovedCancellableFutureAwaitable(FutureAwaitableType&& Awaitable, std::source_location Location)
-		: FutureAwaitable(MoveTemp(Awaitable)), SourceLocation(Location)
-	{
-	}
-
-	TErrorRemovedCancellableFutureAwaitable(const TErrorRemovedCancellableFutureAwaitable&) = delete;
-	TErrorRemovedCancellableFutureAwaitable& operator=(const TErrorRemovedCancellableFutureAwaitable&) = delete;
-
-	TErrorRemovedCancellableFutureAwaitable(TErrorRemovedCancellableFutureAwaitable&&) = default;
-	TErrorRemovedCancellableFutureAwaitable& operator=(TErrorRemovedCancellableFutureAwaitable&&) = delete;
-
-	bool await_ready() const
-	{
-		return false;
-	}
-
-	template <typename HandleType>
-	void await_suspend(HandleType&& Handle)
-	{
-		struct FErrorCheckingHandle
-		{
-			TErrorRemovedCancellableFutureAwaitable* This;
-			std::decay_t<HandleType> Handle;
-
-			void resume() const
-			{
-				if (This->FutureAwaitable.Peek())
-				{
-					Handle.resume();
-				}
-				else
-				{
-					UE_LOG(LogTemp, Warning, TEXT("AbortOnError %hs %hs %d %d"),
-						This->SourceLocation.file_name(),
-						This->SourceLocation.function_name(),
-						This->SourceLocation.line(),
-						This->SourceLocation.column());
-					
-					Handle.destroy();
-				}
-			}
-		};
-
-		FutureAwaitable.await_suspend(FErrorCheckingHandle{this, Forward<HandleType>(Handle)});
-	}
-
-	auto await_resume()
-	{
-		return FutureAwaitable.await_resume().Get();
-	}
-
-private:
-	FutureAwaitableType FutureAwaitable;
-	std::source_location SourceLocation;
-};
-
-
+// TODO 필터 대상이 NonErrorReporting인지 체크
 template <typename... AwaitableTypes>
 class TAnyOfAwaitable
 {
@@ -145,6 +83,8 @@ public:
 	TAnyOfAwaitable(AwaitableTypes&&... InAwaitables)
 		: Awaitables(MoveTemp(InAwaitables)...)
 	{
+		// TODO 이거 만족시켜야 됨
+		// static_assert(CErrorReportingAwaitable<TAnyOfAwaitable>);
 	}
 
 	TAnyOfAwaitable(const TAnyOfAwaitable&) = delete;
@@ -153,7 +93,7 @@ public:
 	TAnyOfAwaitable(TAnyOfAwaitable&&) = default;
 	TAnyOfAwaitable& operator=(TAnyOfAwaitable&&) = delete;
 
-	bool await_ready()
+	bool await_ready() const
 	{
 		const auto FindReadyAwaitable = [&]<std::size_t Index, std::size_t... Indices>(
 			auto& Self, std::index_sequence<Index, Indices...>) -> TOptional<int32>
@@ -243,10 +183,11 @@ public:
 
 private:
 	TTuple<AwaitableTypes...> Awaitables;
-	TOptional<int32> ReturnValue;
+	mutable TOptional<int32> ReturnValue;
 };
 
 
+// TODO 필터 대상이 NonErrorReporting인지 체크
 template <typename ValueStreamType, typename PredicateType>
 class TFilteringAwaitable
 {
@@ -255,6 +196,7 @@ public:
 	TFilteringAwaitable(Stream&& ValueStream, Pred&& Predicate)
 		: ValueStream(Forward<Stream>(ValueStream)), Predicate(Forward<Pred>(Predicate))
 	{
+		static_assert(CErrorReportingAwaitable<TFilteringAwaitable>);
 	}
 	
 	bool await_ready() const
@@ -269,7 +211,7 @@ public:
 			while (true)
 			{
 				auto Result = co_await This.ValueStream;
-				if (!Result || This.Predicate(Result.Get()))
+				if (Result.Failed() || This.Predicate(Result.GetResult()))
 				{
 					This.Ret = MoveTemp(Result);
 					break;
@@ -284,6 +226,11 @@ public:
 	auto await_resume()
 	{
 		return MoveTemp(Ret.GetValue());
+	}
+	
+	bool Failed() const
+	{
+		return Ret->Failed();
 	}
 
 private:
@@ -317,19 +264,6 @@ namespace AwaitableWrapperDetails
 	{
 		return {MoveTemp(Awaitables)...};
 	}
-}
-
-
-template <typename AnyType>
-auto AbortOnError(AnyType&& Awaitable, std::source_location Location = std::source_location::current())
-{
-	return AbortOnError(operator co_await(Forward<AnyType>(Awaitable)), Location);
-}
-
-template <typename... Types>
-auto AbortOnError(TCancellableFutureAwaitable<Types...>&& Awaitable, std::source_location Location = std::source_location::current())
-{
-	return TErrorRemovedCancellableFutureAwaitable<TCancellableFutureAwaitable<Types...>>{MoveTemp(Awaitable), Location};
 }
 
 

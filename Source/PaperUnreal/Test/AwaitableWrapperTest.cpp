@@ -1,6 +1,7 @@
 ﻿#include "Misc/AutomationTest.h"
 #include "PaperUnreal/WeakCoroutine/AwaitableWrappers.h"
 #include "PaperUnreal/WeakCoroutine/CancellableFuture.h"
+#include "PaperUnreal/WeakCoroutine/ValueStream.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAwaitableWrapperTest, "PaperUnreal.PaperUnreal.Test.AwaitableWrapperTest", EAutomationTestFlags::EditorContext | EAutomationTestFlags::SmokeFilter)
@@ -68,11 +69,11 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 		bool bOver = false;
 		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			UObject* Loaded = co_await AbortOnError(MoveTemp(Ret));
+			UObject* Loaded = co_await MoveTemp(Ret);
 			bOver = Loaded == nullptr;
 		});
 
-		TestFalse(TEXT("AbortOnError 이미 에러가 발생해 있는 걸 기다릴 때 Abort 하는지"), bOver);
+		TestFalse(TEXT("이미 에러가 발생해 있는 걸 기다릴 때 Abort 하는지"), bOver);
 	}
 
 	{
@@ -83,7 +84,7 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
 			auto Result = co_await Filter(Stream, [](int32 Value) { return Value > 3; });
-			Received = Result.Get();
+			Received = Result;
 		});
 
 		Receiver.Pin()->ReceiveValue(1);

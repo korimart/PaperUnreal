@@ -202,7 +202,7 @@ private:
 			KillAreaIfNobodyAlive(ThisPlayerTeamIndex);
 
 			constexpr float RespawnCool = 5.f;
-			co_await AbortOnError(WaitForSeconds(GetWorld(), RespawnCool));
+			co_await WaitForSeconds(GetWorld(), RespawnCool);
 			Pawn->Destroy();
 
 			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어 리스폰 시퀀스를 시작합니다"), ReadyPlayer);
@@ -218,24 +218,25 @@ private:
 
 			auto F = FinallyIfValid(this, [this]() { DestroyComponent(); });
 
-			auto Timeout = AbortOnError(RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+			auto Timeout = RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 			{
-				co_await AbortOnError(WorldTimer->At(GetWorld()->GetTimeSeconds() + 60.f));
-			}));
+				co_await WorldTimer->At(GetWorld()->GetTimeSeconds() + 60.f);
+			});
 
-			auto LastManStanding = AbortOnError(RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+			auto LastManStanding = RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 			{
 				auto AreaStateTracker = NewObject<UAreaStateTrackerComponent>(GetOwner());
 				AreaStateTracker->SetSpawner(AreaSpawner);
 				AreaStateTracker->RegisterComponent();
-				co_await AbortOnError(AreaStateTracker->ZeroOrOneAreaIsSurviving());
+				co_await AreaStateTracker->ZeroOrOneAreaIsSurviving();
 				AreaStateTracker->DestroyComponent();
-			}));
+			});
 
+			// TODO replace
 			const TOptional<int32> CompletedAwaitableIndex = co_await AnyOf(MoveTemp(Timeout), MoveTemp(LastManStanding));
 			if (!CompletedAwaitableIndex)
 			{
-				co_return EDefaultFutureError::PromiseNotFulfilled;
+				co_return UCancellableFutureError::PromiseNotFulfilled();
 			}
 
 			if (CompletedAwaitableIndex == 0)
@@ -288,7 +289,7 @@ private:
 				}
 
 				// 영역이 데스 애니메이션 등을 플레이하는데 충분한 시간을 준다
-				co_await AbortOnError(WaitForSeconds(GetWorld(), 10.f));
+				co_await WaitForSeconds(GetWorld(), 10.f);
 				Area->Destroy();
 			});
 		});

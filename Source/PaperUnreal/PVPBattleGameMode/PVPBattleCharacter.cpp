@@ -10,23 +10,6 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Materials/Material.h"
 #include "Engine/World.h"
-#include "GameFramework/PlayerState.h"
-#include "GameFramework/GameStateBase.h"
-#include "PaperUnreal/AreaTracer/AreaSlasherComponent.h"
-#include "PaperUnreal/AreaTracer/AreaSpawnerComponent.h"
-#include "PaperUnreal/AreaTracer/TracerKillerComponent.h"
-#include "PaperUnreal/AreaTracer/ReplicatedTracerPathComponent.h"
-#include "PaperUnreal/AreaTracer/TracerMeshComponent.h"
-#include "PaperUnreal/AreaTracer/TracerMeshGeneratorComponent.h"
-#include "PaperUnreal/AreaTracer/TracerOverlapCheckerComponent.h"
-#include "PaperUnreal/AreaTracer/TracerPathComponent.h"
-#include "PaperUnreal/AreaTracer/TracerToAreaConverterComponent.h"
-#include "PaperUnreal/GameFramework2/Utils.h"
-#include "PaperUnreal/ModeAgnostic/ComponentRegistry.h"
-#include "PaperUnreal/ModeAgnostic/InventoryComponent.h"
-#include "PaperUnreal/ModeAgnostic/PlayerSpawnerComponent.h"
-#include "PaperUnreal/WeakCoroutine/AwaitableWrappers.h"
-#include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 
 APVPBattleCharacter::APVPBattleCharacter()
 {

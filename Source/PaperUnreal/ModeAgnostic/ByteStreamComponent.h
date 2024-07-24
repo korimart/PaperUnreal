@@ -266,44 +266,44 @@ public:
 	template <typename StreamerType>
 	void SetInputStream([[msvc::lifetimebound]] StreamerType& Streamer)
 	{
-		RunWeakCoroutine(this, [this, &Streamer](FWeakCoroutineContext&) -> FWeakCoroutine
-		{
-			while (true)
-			{
-				OpenStream();
-				auto PathEvents = Streamer.CreateStream();
-				while (auto PathEvent = co_await PathEvents)
-				{
-					TriggerEvent(PathEvent.Get().Serialize());
-				}
-				CloseStream();
-			}
-		});
+		// RunWeakCoroutine(this, [this, &Streamer](FWeakCoroutineContext&) -> FWeakCoroutine
+		// {
+		// 	while (true)
+		// 	{
+		// 		OpenStream();
+		// 		auto PathEvents = Streamer.CreateStream();
+		// 		while (auto PathEvent = co_await PathEvents)
+		// 		{
+		// 			TriggerEvent(PathEvent.Get().Serialize());
+		// 		}
+		// 		CloseStream();
+		// 	}
+		// });
 	}
 	
 	template <typename StreamerType>
 	void SetOutputStream([[msvc::lifetimebound]] StreamerType& Streamer)
 	{
-		RunWeakCoroutine(this, [this, &Streamer](FWeakCoroutineContext&) -> FWeakCoroutine
-		{
-			auto F = Finally([&](){ Streamer.EndStreams(); });
-			while (true)
-			{
-				auto ByteEvents = GetByteStreamer().CreateStream();
-				while (true)
-				{
-					// 아래 5줄 while 조건문 안으로 옮기면 컴파일이 안 됨 컴파일러 버그인 듯
-					auto ByteEvent = co_await ByteEvents;
-					if (!ByteEvent)
-					{
-						break;
-					}
-					
-					Streamer.ReceiveValue(ByteEvent.Get().template Deserialize<typename StreamerType::ValueType>());
-				}
-				Streamer.EndStreams();
-			}
-		});
+		// RunWeakCoroutine(this, [this, &Streamer](FWeakCoroutineContext&) -> FWeakCoroutine
+		// {
+		// 	auto F = Finally([&](){ Streamer.EndStreams(); });
+		// 	while (true)
+		// 	{
+		// 		auto ByteEvents = GetByteStreamer().CreateStream();
+		// 		while (true)
+		// 		{
+		// 			// 아래 5줄 while 조건문 안으로 옮기면 컴파일이 안 됨 컴파일러 버그인 듯
+		// 			auto ByteEvent = co_await ByteEvents;
+		// 			if (!ByteEvent)
+		// 			{
+		// 				break;
+		// 			}
+		// 			
+		// 			Streamer.ReceiveValue(ByteEvent.Get().template Deserialize<typename StreamerType::ValueType>());
+		// 		}
+		// 		Streamer.EndStreams();
+		// 	}
+		// });
 	}
 
 private:

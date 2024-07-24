@@ -3,7 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "ErrorReporting.h"
 #include "TypeTraits.h"
+#include "GameFramework/GameStateBase.h"
+#include "Engine/AssetManager.h"
+#include "CancellableFuture.generated.h"
 
 
 namespace FutureDetails
@@ -29,24 +33,31 @@ namespace FutureDetails
 }
 
 
-enum class EDefaultFutureError
+UCLASS()
+class UCancellableFutureError : public UFailableResultError
 {
-	PromiseNotFulfilled,
-	Cancelled,
-	InvalidObject,
+	GENERATED_BODY()
+
+public:
+	static UCancellableFutureError* PromiseNotFulfilled()
+	{
+		return NewError<UCancellableFutureError>(TEXT("PromiseNotFulfilled"));
+	}
+	
+	static UCancellableFutureError* Cancelled()
+	{
+		return NewError<UCancellableFutureError>(TEXT("Cancelled"));
+	}
 };
 
 
-template <typename T, typename... ErrorTypes>
+template <typename T>
 class TCancellableFutureState
 {
 	static constexpr bool bVoid = std::is_same_v<T, void>;
-	static constexpr bool bUObject = std::is_base_of_v<UObject, std::remove_pointer_t<std::decay_t<T>>>;
-	using WeakResultType = TWeakObjectPtr<std::remove_pointer_t<T>>;
 
 public:
 	using ResultType = std::conditional_t<bVoid, std::monostate, T>;
-	using ReturnType = TVariant<ResultType, ErrorTypes...>;
 
 	TCancellableFutureState() = default;
 	TCancellableFutureState(const TCancellableFutureState&) = delete;
@@ -58,29 +69,14 @@ public:
 	}
 
 	template <typename U>
-	void SetValue(U&& Value) requires IsConvertibleV<U, ResultType, ErrorTypes...>
+	void SetValue(U&& Value)
+		requires std::is_constructible_v<TFailableResult<ResultType>, U> || std::is_constructible_v<UFailableResultError*, U>
 	{
-		constexpr bool bSettingNonError = std::is_convertible_v<U, ResultType>;
-
-		if constexpr (bUObject && bSettingNonError)
-		{
-			if (!IsValid(Value))
-			{
-				SetValue(EDefaultFutureError::InvalidObject);
-				return;
-			}
-		}
-
-		using ReturnInPlaceType = typename TFirstConvertibleType<U, ResultType, ErrorTypes...>::Type;
-		using ReturnStorageInPlaceType = std::conditional_t<bUObject && bSettingNonError, WeakResultType, ReturnInPlaceType>;
-
+		Ret.Emplace(TFailableResult<ResultType>{Forward<U>(Value)});
+		
 		if (Callback)
 		{
-			Callback(ReturnType{TInPlaceType<ReturnInPlaceType>{}, Forward<U>(Value)});
-		}
-		else
-		{
-			Ret.Emplace(ReturnStorageType{TInPlaceType<ReturnStorageInPlaceType>{}, Forward<U>(Value)});
+			Callback(PeekValue());
 		}
 	}
 
@@ -89,106 +85,39 @@ public:
 		return Ret.IsSet();
 	}
 
-	ReturnType&& ConsumeValue() [[msvc::lifetimebound]] requires !bUObject
+	const TFailableResult<ResultType>& PeekValue() const
+	{
+		check(!bResultConsumed);
+		return *Ret;
+	}
+	
+	TFailableResult<ResultType> ConsumeValue() &&
 	{
 		check(!bResultConsumed);
 		bResultConsumed = true;
 		return MoveTemp(*Ret);
 	}
 
-	ReturnType ConsumeValue() requires bUObject
-	{
-		check(!bResultConsumed);
-		bResultConsumed = true;
-		return CreateReturnTypeFromStorageType(MoveTemp(*Ret));
-	}
-
 	template <typename FuncType>
-	void ConsumeValueOnArrival(FuncType&& Func)
+	void OnArrival(FuncType&& Func)
 	{
 		check(!bResultConsumed && !Callback);
-		bResultConsumed = true;
 		Callback = Forward<FuncType>(Func);
 	}
 
 private:
-	using ReturnStorageType = std::conditional_t<bUObject, TVariant<WeakResultType, ErrorTypes...>, ReturnType>;
-
 	bool bResultConsumed = false;
-	TOptional<ReturnStorageType> Ret;
-	TUniqueFunction<void(ReturnType&&)> Callback;
-
-	static ReturnType CreateReturnTypeFromStorageType(ReturnStorageType&& Storage)
-	{
-		if (auto* WeakPtr = Storage.template TryGet<WeakResultType>())
-		{
-			if (WeakPtr->IsValid())
-			{
-				return ReturnType{TInPlaceType<ResultType>{}, WeakPtr->Get()};
-			}
-			else
-			{
-				return ReturnType{TInPlaceType<EDefaultFutureError>{}, EDefaultFutureError::InvalidObject};
-			}
-		}
-		return CreateReturnTypeFromStorageType<ErrorTypes...>(MoveTemp(Storage));
-	}
-
-	template <typename CheckTarget, typename... RemainingTypes>
-	static ReturnType CreateReturnTypeFromStorageType(ReturnStorageType&& Storage)
-	{
-		if (auto* Found = Storage.template TryGet<CheckTarget>())
-		{
-			return ReturnType{TInPlaceType<CheckTarget>{}, MoveTemp(*Found)};
-		}
-
-		if constexpr (sizeof...(RemainingTypes) > 0)
-		{
-			return CreateReturnTypeFromStorageType<RemainingTypes...>(MoveTemp(Storage));
-		}
-		else
-		{
-			check(false);
-			return {};
-		}
-	}
+	TOptional<TFailableResult<ResultType>> Ret;
+	TUniqueFunction<void(const TFailableResult<ResultType>&)> Callback;
 };
 
 
-template <typename ResultVariantType>
-class TCancellableFutureReturn
-{
-	using NonErrorType = typename TFirstInTypeList<ResultVariantType>::Type;
-
-public:
-	TCancellableFutureReturn(ResultVariantType&& ResultVariant)
-		: Variant(MoveTemp(ResultVariant))
-	{
-	}
-
-	explicit operator bool() const
-	{
-		return Variant.GetIndex() == 0;
-	}
-
-	const auto& Get() const & { return Variant.template Get<NonErrorType>(); }
-	auto& Get() & { return Variant.template Get<NonErrorType>(); }
-
-	template <typename T>
-	auto TryGet() const { return Variant.template TryGet<T>(); }
-
-private:
-	ResultVariantType Variant;
-};
-
-
-template <typename T, typename... ErrorTypes>
+template <typename T>
 class TCancellableFuture
 {
 public:
-	using StateType = TCancellableFutureState<T, EDefaultFutureError, ErrorTypes...>;
+	using StateType = TCancellableFutureState<T>;
 	using ResultType = typename StateType::ResultType;
-	using ReturnType = TCancellableFutureReturn<typename StateType::ReturnType>;
 
 	TCancellableFuture(const TSharedRef<StateType>& InState)
 		: State(InState)
@@ -202,7 +131,8 @@ public:
 	}
 
 	template <typename U>
-	TCancellableFuture(U&& ReadyValue) requires IsConvertibleV<U, T, ErrorTypes...>
+	TCancellableFuture(U&& ReadyValue)
+		requires std::is_constructible_v<TFailableResult<ResultType>, U> || std::is_constructible_v<UFailableResultError*, U>
 		: State(MakeShared<StateType>())
 	{
 		State->SetValue(Forward<U>(ReadyValue));
@@ -226,33 +156,32 @@ public:
 	}
 
 	template <typename FuncType>
-	void Then(FuncType&& Func)
+	void Then(FuncType&& Func) const
 	{
 		check(!IsConsumed());
 
-		auto FuncTakingFutureReturn = [Func = Forward<FuncType>(Func)]<typename U>(U&& FromState)
-		{
-			Func(ReturnType{Forward<U>(FromState)});
-		};
-
 		if (State->HasValue())
 		{
-			FuncTakingFutureReturn(State->ConsumeValue());
+			Func(State->PeekValue());
 		}
 		else
 		{
-			State->ConsumeValueOnArrival(MoveTemp(FuncTakingFutureReturn));
+			State->OnArrival(Forward<FuncType>(Func));
 		}
-
-		State = nullptr;
 	}
 
-	ReturnType ConsumeValue()
+	TFailableResult<ResultType> ConsumeValue() &&
 	{
 		check(IsReady());
-		ReturnType Ret = State->ConsumeValue();
+		TFailableResult<ResultType> Ret = MoveTemp(*State).ConsumeValue();
 		State = nullptr;
 		return Ret;
+	}
+	
+	const TFailableResult<ResultType>& PeekValue() const
+	{
+		check(IsReady());
+		return State->PeekValue();
 	}
 
 private:
@@ -260,13 +189,13 @@ private:
 };
 
 
-template <typename T, typename... ErrorTypes>
+template <typename T>
 class TCancellablePromise
 {
 	static constexpr bool bVoidResult = std::is_same_v<T, void>;
 
 public:
-	using StateType = TCancellableFutureState<T, EDefaultFutureError, ErrorTypes...>;
+	using StateType = TCancellableFutureState<T>;
 
 	TCancellablePromise() = default;
 
@@ -280,7 +209,7 @@ public:
 	{
 		if (State)
 		{
-			State->SetValue(EDefaultFutureError::PromiseNotFulfilled);
+			State->SetValue(UCancellableFutureError::PromiseNotFulfilled());
 		}
 	}
 
@@ -296,7 +225,8 @@ public:
 	}
 
 	template <typename U>
-	void SetValue(U&& Value) requires IsConvertibleV<U, T, EDefaultFutureError, ErrorTypes...>
+	void SetValue(U&& Value)
+		requires std::is_constructible_v<T, U> || std::is_constructible_v<UFailableResultError*, U>
 	{
 		check(!IsSet());
 		std::exchange(State, nullptr)->SetValue(Forward<U>(Value));
@@ -305,10 +235,10 @@ public:
 	void Cancel()
 	{
 		check(!IsSet());
-		std::exchange(State, nullptr)->SetValue(EDefaultFutureError::Cancelled);
+		std::exchange(State, nullptr)->SetValue(UCancellableFutureError::Cancelled());
 	}
 
-	TCancellableFuture<T, ErrorTypes...> GetFuture()
+	TCancellableFuture<T> GetFuture()
 	{
 		// 이미 값이 준비가 되어 있다면 Promise를 통하는 것이 아니라 Ready Future를 만들어야 됨
 		check(!bMadeFuture && !IsSet());
@@ -322,12 +252,12 @@ private:
 };
 
 
-template <typename T, typename... ErrorTypes>
+template <typename T>
 class TShareableCancellablePromise
 {
 public:
 	static constexpr bool bVoidResult = std::is_same_v<T, void>;
-	using PromiseType = TCancellablePromise<T, ErrorTypes...>;
+	using PromiseType = TCancellablePromise<T>;
 
 	TShareableCancellablePromise() = default;
 
@@ -344,7 +274,7 @@ public:
 	}
 
 	template <typename U>
-	void SetValue(U&& Value) requires IsConvertibleV<U, T, ErrorTypes...>
+	void SetValue(U&& Value) requires std::is_constructible_v<T, U>
 	{
 		check(!HasThisInstanceSet());
 
@@ -368,7 +298,7 @@ public:
 		Promise = nullptr;
 	}
 
-	TCancellableFuture<T, ErrorTypes...> GetFuture()
+	TCancellableFuture<T> GetFuture()
 	{
 		check(!HasThisInstanceSet());
 		return Promise->GetFuture();
@@ -384,17 +314,17 @@ private:
 };
 
 
-template <typename T, typename... ErrorTypes>
+template <typename T>
 class TCancellableFutureAwaitable
 {
 public:
-	using FutureType = TCancellableFuture<T, ErrorTypes...>;
+	using FutureType = TCancellableFuture<T>;
 	using ResultType = typename FutureType::ResultType;
-	using ReturnType = typename FutureType::ReturnType;
 
 	TCancellableFutureAwaitable(FutureType&& InFuture)
 		: Future(MoveTemp(InFuture))
 	{
+		static_assert(CErrorReportingAwaitable<TCancellableFutureAwaitable>);
 	}
 
 	TCancellableFutureAwaitable(const TCancellableFutureAwaitable&) = delete;
@@ -413,56 +343,47 @@ public:
 	template <typename HandleType>
 	void await_suspend(HandleType&& Handle)
 	{
-		Future.Then([this, Handle = Forward<HandleType>(Handle)](typename FutureType::ReturnType&& Arg)
+		Future.Then([this, Handle = Forward<HandleType>(Handle)](auto&)
 		{
-			Ret.Emplace(MoveTemp(Arg));
 			Handle.resume();
 		});
 	}
 
-	ReturnType await_resume()
+	TFailableResult<ResultType> await_resume()
 	{
-		return Ret ? MoveTemp(*Ret) : Future.ConsumeValue();
+		return MoveTemp(Future).ConsumeValue();
 	}
 
-	const ReturnType& Peek() const
+	bool Failed() const
 	{
-		return *Ret;
+		return Future.PeekValue().Failed();
 	}
 
 private:
 	FutureType Future;
-	TOptional<ReturnType> Ret;
 };
 
 
-template <typename... Types>
-TCancellableFutureAwaitable<Types...> operator co_await(TCancellableFuture<Types...>&& Future)
+template <typename T>
+TCancellableFutureAwaitable<T> operator co_await(TCancellableFuture<T>&& Future)
 {
 	return {MoveTemp(Future)};
 }
 
 
-template <typename T, typename... ErrorTypes, typename U>
-TCancellableFuture<T, ErrorTypes...> MakeReadyFuture(U&& ReadyValue) requires IsConvertibleV<U, T, ErrorTypes...>
+template <typename T>
+TTuple<TCancellablePromise<T>, TCancellableFuture<T>> MakePromise()
 {
-	return TCancellableFuture<T, ErrorTypes...>{Forward<U>(ReadyValue)};
-}
-
-
-template <typename... Types>
-TTuple<TCancellablePromise<Types...>, TCancellableFuture<Types...>> MakePromise()
-{
-	TCancellablePromise<Types...> Ret;
-	TCancellableFuture<Types...> Future = Ret.GetFuture();
+	TCancellablePromise<T> Ret;
+	TCancellableFuture<T> Future = Ret.GetFuture();
 	return MakeTuple(MoveTemp(Ret), MoveTemp(Future));
 }
 
 
-template <typename... Types>
-TTuple<TShareableCancellablePromise<Types...>, TCancellableFuture<Types...>> MakeShareablePromise()
+template <typename T>
+TTuple<TShareableCancellablePromise<T>, TCancellableFuture<T>> MakeShareablePromise()
 {
-	TShareableCancellablePromise<Types...> Ret;
+	TShareableCancellablePromise<T> Ret;
 	return MakeTuple(Ret, Ret.GetFuture());
 }
 
@@ -542,9 +463,6 @@ auto MakeFutureFromDelegate(MulticastDelegateType& MulticastDelegate, PredicateT
 }
 
 
-#include "GameFramework/GameStateBase.h"
-
-
 inline TCancellableFuture<AGameStateBase*> WaitForGameState(UWorld* World)
 {
 	check(IsValid(World));
@@ -561,18 +479,15 @@ inline TCancellableFuture<AGameStateBase*> WaitForGameState(UWorld* World)
 inline TCancellableFuture<void> WaitForSeconds(UWorld* World, float Seconds)
 {
 	check(IsValid(World));
-	
+
 	FTimerDelegate Delegate;
 	auto Ret = MakeFutureFromDelegate(Delegate);
-	
+
 	FTimerHandle Handle;
 	World->GetTimerManager().SetTimer(Handle, Delegate, Seconds, false);
 
 	return Ret;
 }
-
-
-#include "Engine/AssetManager.h"
 
 
 // TODO 바로 수령하지 않으면 nullptr를 반환할 수 있음

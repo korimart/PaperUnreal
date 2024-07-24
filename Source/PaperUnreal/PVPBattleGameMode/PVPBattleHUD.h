@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "PVPBattleGameMode.h"
 #include "GameFramework/HUD.h"
+#include "GameFramework/GameStateBase.h"
 #include "PaperUnreal/ModeAgnostic/StageComponent.h"
 #include "PaperUnreal/WeakCoroutine/AwaitableWrappers.h"
 #include "PVPBattleHUD.generated.h"
@@ -24,7 +25,7 @@ private:
 
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			AGameStateBase* GameState = co_await AbortOnError(WaitForGameState(GetWorld()));
+			AGameStateBase* GameState = co_await WaitForGameState(GetWorld());
 			UStageComponent* StageComponent = GameState->FindComponentByClass<UStageComponent>();
 			check(IsValid(StageComponent));
 

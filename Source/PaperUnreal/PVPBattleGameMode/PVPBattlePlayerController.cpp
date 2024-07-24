@@ -53,7 +53,7 @@ void APVPBattlePlayerController::BeginPlay()
 					continue;
 				}
 
-				ULifeComponent* LifeComponent = PossessedPawn.Get()->FindComponentByClass<ULifeComponent>();
+				ULifeComponent* LifeComponent = PossessedPawn->FindComponentByClass<ULifeComponent>();
 				if (!LifeComponent)
 				{
 					Subsystem->RemoveMappingContext(DefaultMappingContext);

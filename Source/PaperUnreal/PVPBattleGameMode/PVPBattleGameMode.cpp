@@ -50,8 +50,8 @@ void APVPBattleGameMode::BeginPlay()
 		
 		// TODO 방설정 완료될 때까지 대기
 
-		auto AtLeast2Ready = AbortOnError(GetGameState<APVPBattleGameState>()->ReadyStateTrackerComponent->ReadyCountIsAtLeast(2));
-		auto ReadyByCheat = AbortOnError(MakeFutureFromDelegate(UInGameCheats::OnStartGameByCheat));
+		auto AtLeast2Ready = GetGameState<APVPBattleGameState>()->ReadyStateTrackerComponent->ReadyCountIsAtLeast(2);
+		auto ReadyByCheat = MakeFutureFromDelegate(UInGameCheats::OnStartGameByCheat);
 
 		if (!co_await AnyOf(MoveTemp(AtLeast2Ready), MoveTemp(ReadyByCheat)))
 		{
@@ -62,7 +62,7 @@ void APVPBattleGameMode::BeginPlay()
 		BattleMode->SetPawnClass(DefaultPawnClass);
 		BattleMode->RegisterComponent();
 		
-		const FBattleRuleResult GameResult = co_await AbortOnError(BattleMode->Start(2, 2));
+		const FBattleRuleResult GameResult = co_await BattleMode->Start(2, 2);
 
 		GetGameState<APVPBattleGameState>()->StageComponent->SetCurrentStage(PVPBattleStage::Result);
 

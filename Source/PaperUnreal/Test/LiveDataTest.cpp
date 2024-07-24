@@ -46,7 +46,7 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 		{
 			for (auto Stream = LiveData.CreateStream();;)
 			{
-				Received.Add(co_await AbortOnError(Stream));
+				Received.Add(co_await Stream);
 			}
 		});
 
@@ -214,7 +214,7 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 		{
 			for (auto Stream = LiveData.CreateStrictAddStream();;)
 			{
-				Received.Add(co_await AbortOnError(Stream));
+				Received.Add(co_await Stream);
 			}
 		});
 

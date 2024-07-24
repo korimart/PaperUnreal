@@ -15,7 +15,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 			*bDestroyed = true;
 		}
 	};
-	
+
 	{
 		TArray<TTuple<TCancellablePromise<void>, TCancellableFuture<void>>> Array;
 		Array.Add(MakePromise<void>());
@@ -23,7 +23,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		Array.Add(MakePromise<void>());
 		Array.Add(MakePromise<void>());
 		Array.Add(MakePromise<void>());
-		
+
 		auto Life = MakeUnique<FLife>();
 		auto bLifeDestroyed = Life->bDestroyed;
 
@@ -60,7 +60,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("void Future를 잘 기다릴 수 있는지 테스트"), Received.Num(), 5);
 		TestTrue(TEXT("void Future를 잘 기다릴 수 있는지 테스트"), *bLifeDestroyed);
 	}
-	
+
 	{
 		TArray<TTuple<TCancellablePromise<int32>, TCancellableFuture<int32>>> Array;
 		Array.Add(MakePromise<int32>());
@@ -68,18 +68,18 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		Array.Add(MakePromise<int32>());
 		Array.Add(MakePromise<int32>());
 		Array.Add(MakePromise<int32>());
-		
+
 		auto Life = MakeUnique<FLife>();
 		auto bLifeDestroyed = Life->bDestroyed;
 
 		TArray<int32> Received;
 		RunWeakCoroutine([&Array, &Received, Life = MoveTemp(Life)](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
-			Received.Add(co_await AbortOnError(MoveTemp(Array[0].Get<1>())));
-			Received.Add(co_await AbortOnError(MoveTemp(Array[1].Get<1>())));
-			Received.Add(co_await AbortOnError(MoveTemp(Array[2].Get<1>())));
-			Received.Add(co_await AbortOnError(MoveTemp(Array[3].Get<1>())));
-			Received.Add(co_await AbortOnError(MoveTemp(Array[4].Get<1>())));
+			Received.Add(co_await MoveTemp(Array[0].Get<1>()));
+			Received.Add(co_await MoveTemp(Array[1].Get<1>()));
+			Received.Add(co_await MoveTemp(Array[2].Get<1>()));
+			Received.Add(co_await MoveTemp(Array[3].Get<1>()));
+			Received.Add(co_await MoveTemp(Array[4].Get<1>()));
 		});
 
 		TestEqual(TEXT("int32 Future를 잘 기다릴 수 있는지 테스트"), Received.Num(), 0);
@@ -108,7 +108,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		Array.Add(MakePromise<int32>());
 		Array.Add(MakePromise<int32>());
 		Array.Add(MakePromise<int32>());
-		
+
 		auto Life = MakeUnique<FLife>();
 		auto bLifeDestroyed = Life->bDestroyed;
 		auto AbortIfNotValid = MakeShared<bool>().ToSharedPtr();
@@ -117,12 +117,12 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		RunWeakCoroutine([&Array, &AbortIfNotValid, &Received, Life = MoveTemp(Life)](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
 			Context.AbortIfNotValid(AbortIfNotValid);
-			
-			Received.Add(co_await AbortOnError(MoveTemp(Array[0].Get<1>())));
-			Received.Add(co_await AbortOnError(MoveTemp(Array[1].Get<1>())));
-			Received.Add(co_await AbortOnError(MoveTemp(Array[2].Get<1>())));
-			Received.Add(co_await AbortOnError(MoveTemp(Array[3].Get<1>())));
-			Received.Add(co_await AbortOnError(MoveTemp(Array[4].Get<1>())));
+
+			Received.Add(co_await MoveTemp(Array[0].Get<1>()));
+			Received.Add(co_await MoveTemp(Array[1].Get<1>()));
+			Received.Add(co_await MoveTemp(Array[2].Get<1>()));
+			Received.Add(co_await MoveTemp(Array[3].Get<1>()));
+			Received.Add(co_await MoveTemp(Array[4].Get<1>()));
 		});
 
 		TestEqual(TEXT("AbortIfNotValid가 잘 작동하는는지 테스트"), Received.Num(), 0);
@@ -133,7 +133,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		Array[1].Get<0>().SetValue(1);
 		TestEqual(TEXT("AbortIfNotValid가 잘 작동하는는지 테스트"), Received[1], 1);
 		TestFalse(TEXT("AbortIfNotValid가 잘 작동하는는지 테스트"), *bLifeDestroyed);
-		
+
 		AbortIfNotValid = nullptr;
 		Array[2].Get<0>().SetValue(2);
 		TestEqual(TEXT("AbortIfNotValid가 잘 작동하는는지 테스트"), Received.Num(), 2);
@@ -149,14 +149,14 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 	{
 		TArray<TTuple<TCancellablePromise<int32>, TCancellableFuture<int32>>> Array;
 		Array.Add(MakePromise<int32>());
-		
+
 		auto Life = MakeUnique<FLife>();
 		auto bLifeDestroyed = Life->bDestroyed;
-		
+
 		TArray<int32> Received;
 		RunWeakCoroutine([&Array, &Received, Life = MoveTemp(Life)](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
-			Received.Add(co_await AbortOnError(MoveTemp(Array[0].Get<1>())));
+			Received.Add(co_await MoveTemp(Array[0].Get<1>()));
 		});
 
 		TestEqual(TEXT("약속이 지켜지지 않으면 종료하는지 테스트"), Received.Num(), 0);
@@ -165,16 +165,16 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("약속이 지켜지지 않으면 종료하는지 테스트"), Received.Num(), 0);
 		TestTrue(TEXT("약속이 지켜지지 않으면 종료하는지 테스트"), *bLifeDestroyed);
 	}
-	
+
 	{
 		TArray<TTuple<TCancellablePromise<int32>, TCancellableFuture<int32>>> Array;
 		Array.Add(MakePromise<int32>());
-		
-		bool bError = false;
+
+		bool bError = true;
 		RunWeakCoroutine([&Array, &bError](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
 			auto ResultOrError = co_await MoveTemp(Array[0].Get<1>());
-			bError = *ResultOrError.TryGet<EDefaultFutureError>() == EDefaultFutureError::PromiseNotFulfilled;
+			bError = false;
 		});
 
 		TestFalse(TEXT("WithError 함수로 Error를 받을 수 있는지 테스트"), bError);
@@ -186,15 +186,15 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		int32 Received = 0;
 		RunWeakCoroutine([&](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
-			Received = co_await AbortOnError(RunWeakCoroutine([](TWeakCoroutineContext<int32>&) -> TWeakCoroutine<int32>
+			Received = co_await RunWeakCoroutine([](TWeakCoroutineContext<int32>&) -> TWeakCoroutine<int32>
 			{
 				co_return 42;
-			}));
+			});
 		});
-		
+
 		TestEqual(TEXT("값을 반환하는 TWeakCoroutine 테스트"), Received, 42);
 	}
-	
+
 	{
 		TArray<TTuple<TCancellablePromise<int32>, TCancellableFuture<int32>>> Array;
 		Array.Add(MakePromise<int32>());
@@ -202,34 +202,34 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		Array.Add(MakePromise<int32>());
 		Array.Add(MakePromise<int32>());
 		Array.Add(MakePromise<int32>());
-		
+
 		int32 Received = 0;
 		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
 			auto Int0 = RunWeakCoroutine([&](TWeakCoroutineContext<int32>&) -> TWeakCoroutine<int32>
 			{
-				co_return co_await AbortOnError(MoveTemp(Array[0].Get<1>()));
+				co_return co_await MoveTemp(Array[0].Get<1>());
 			});
-			
+
 			auto Int1 = RunWeakCoroutine([&](TWeakCoroutineContext<int32>&) -> TWeakCoroutine<int32>
 			{
 				int32 Sum = 0;
-				Sum += co_await AbortOnError(MoveTemp(Array[1].Get<1>()));
-				co_return Sum + co_await AbortOnError(MoveTemp(Array[2].Get<1>()));
+				Sum += co_await MoveTemp(Array[1].Get<1>());
+				co_return Sum + co_await MoveTemp(Array[2].Get<1>());
 			});
-			
+
 			auto Int2 = RunWeakCoroutine([&](TWeakCoroutineContext<int32>&) -> TWeakCoroutine<int32>
 			{
 				int32 Sum = 0;
-				Sum += co_await AbortOnError(MoveTemp(Array[4].Get<1>()));
-				co_return Sum + co_await AbortOnError(MoveTemp(Array[3].Get<1>()));
+				Sum += co_await MoveTemp(Array[4].Get<1>());
+				co_return Sum + co_await MoveTemp(Array[3].Get<1>());
 			});
 
-			Received += co_await AbortOnError(Int1);
-			Received += co_await AbortOnError(Int2);
-			Received += co_await AbortOnError(Int0);
+			Received += co_await Int1;
+			Received += co_await Int2;
+			Received += co_await Int0;
 		});
-		
+
 		TestEqual(TEXT("값을 반환하는 TWeakCoroutine 테스트"), Received, 0);
 		Array[2].Get<0>().SetValue(10);
 		TestEqual(TEXT("값을 반환하는 TWeakCoroutine 테스트"), Received, 0);
@@ -242,6 +242,6 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		Array[3].Get<0>().SetValue(50);
 		TestEqual(TEXT("값을 반환하는 TWeakCoroutine 테스트"), Received, 150);
 	}
-	
+
 	return true;
 }

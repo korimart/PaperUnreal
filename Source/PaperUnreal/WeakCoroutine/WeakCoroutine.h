@@ -9,6 +9,7 @@
 #include "TypeTraits.h"
 #include "Algo/AllOf.h"
 #include "PaperUnreal/GameFramework2/Utils.h"
+#include "WeakCoroutine.generated.h"
 
 
 namespace WeakCoroutineDetails
@@ -18,22 +19,34 @@ namespace WeakCoroutineDetails
 	{
 		Container.AddToWeakList(Arg);
 	};
+
+	template <typename AwaitableType, bool>
+	struct TAlwaysAssumingAwaitableIfTrue
+	{
+		using Type = void;
+	};
+	
+	template <typename AwaitableType>
+	struct TAlwaysAssumingAwaitableIfTrue<AwaitableType, true>
+	{
+		using Type = TAlwaysResumingAwaitable<AwaitableType>;
+	};
 }
 
 
-template <typename, typename...>
+template <typename>
 class TWeakCoroutineContext;
 
-template <typename, typename...>
+template <typename>
 class TWeakCoroutinePromiseType;
 
 
-template <typename T, typename... ErrorTypes>
+template <typename T>
 class TWeakCoroutine
 {
 public:
-	using promise_type = TWeakCoroutinePromiseType<T, ErrorTypes...>;
-	using ContextType = TWeakCoroutineContext<T, ErrorTypes...>;
+	using promise_type = TWeakCoroutinePromiseType<T>;
+	using ContextType = TWeakCoroutineContext<T>;
 
 	TWeakCoroutine(std::coroutine_handle<promise_type> InHandle, const TSharedRef<bool>& bFinished)
 		: Handle(InHandle), bCoroutineFinished(bFinished)
@@ -42,14 +55,14 @@ public:
 
 	// TODO context doesn't need to be a pointer
 	void Init(
-		TUniquePtr<TUniqueFunction<TWeakCoroutine(TWeakCoroutineContext<T, ErrorTypes...>&)>> Captures,
-		TUniquePtr<TWeakCoroutineContext<T, ErrorTypes...>> Context);
+		TUniquePtr<TUniqueFunction<TWeakCoroutine(TWeakCoroutineContext<T>&)>> Captures,
+		TUniquePtr<TWeakCoroutineContext<T>> Context);
 
 	void Resume();
 
 	void Abort();
 
-	TCancellableFuture<T, ErrorTypes...> ReturnValue()
+	TCancellableFuture<T> ReturnValue()
 	{
 		check(CoroutineRet.IsSet());
 		auto Ret = MoveTemp(*CoroutineRet);
@@ -66,15 +79,15 @@ public:
 private:
 	std::coroutine_handle<promise_type> Handle;
 	TSharedRef<bool> bCoroutineFinished;
-	TOptional<TCancellableFuture<T, ErrorTypes...>> CoroutineRet;
+	TOptional<TCancellableFuture<T>> CoroutineRet;
 };
 
 
-template <typename Derived, typename T, typename... ErrorTypes>
+template <typename Derived, typename T>
 class TWeakCoroutinePromiseTypeBase
 {
 public:
-	using ReturnObjectType = TWeakCoroutine<T, ErrorTypes...>;
+	using ReturnObjectType = TWeakCoroutine<T>;
 
 	ReturnObjectType get_return_object()
 	{
@@ -124,50 +137,50 @@ public:
 		WeakList.Add([Weak = TWeakObjectPtr{Object}]() { return Weak.IsValid(); });
 	}
 
-	template <typename T>
-	void AddToWeakList(TScriptInterface<T> Interface)
+	template <typename U>
+	void AddToWeakList(TScriptInterface<U> Interface)
 	{
 		AddToWeakList(Interface.GetObject());
 	}
 
-	template <typename T>
-	void AddToWeakList(const TSharedPtr<T>& Object)
+	template <typename U>
+	void AddToWeakList(const TSharedPtr<U>& Object)
 	{
-		WeakList.Add([Weak = TWeakPtr<T>{Object}]() { return Weak.IsValid(); });
+		WeakList.Add([Weak = TWeakPtr<U>{Object}]() { return Weak.IsValid(); });
 	}
 
-	template <typename T>
-	void AddToWeakList(const TSharedRef<T>& Object)
+	template <typename U>
+	void AddToWeakList(const TSharedRef<U>& Object)
 	{
-		WeakList.Add([Weak = TWeakPtr<T>{Object}]() { return Weak.IsValid(); });
+		WeakList.Add([Weak = TWeakPtr<U>{Object}]() { return Weak.IsValid(); });
 	}
 
-	template <typename T>
-	void AddToWeakList(const TWeakPtr<T>& Object)
+	template <typename U>
+	void AddToWeakList(const TWeakPtr<U>& Object)
 	{
 		WeakList.Add([Weak = Object]() { return Weak.IsValid(); });
 	}
 
-	template <typename T>
-	void AddToWeakList(const TWeakObjectPtr<T>& Object)
+	template <typename U>
+	void AddToWeakList(const TWeakObjectPtr<U>& Object)
 	{
 		WeakList.Add([Weak = Object]() { return Weak.IsValid(); });
 	}
 
 protected:
-	friend class TWeakCoroutine<T, ErrorTypes...>;
+	friend class TWeakCoroutine<T>;
 
 	TArray<TFunction<bool()>> WeakList;
-	TUniquePtr<TWeakCoroutineContext<T, ErrorTypes...>> Context;
-	TUniquePtr<TUniqueFunction<ReturnObjectType(TWeakCoroutineContext<T, ErrorTypes...>&)>> Captures;
-	TOptional<TCancellablePromise<T, ErrorTypes...>> Promise;
+	TUniquePtr<TWeakCoroutineContext<T>> Context;
+	TUniquePtr<TUniqueFunction<ReturnObjectType(TWeakCoroutineContext<T>&)>> Captures;
+	TOptional<TCancellablePromise<T>> Promise;
 	TSharedRef<bool> bCoroutineFinished = MakeShared<bool>(false);
 };
 
 
-template <typename T, typename... ErrorTypes>
+template <typename T>
 class TWeakCoroutinePromiseType
-	: public TWeakCoroutinePromiseTypeBase<TWeakCoroutinePromiseType<T, ErrorTypes...>, T, ErrorTypes...>
+	: public TWeakCoroutinePromiseTypeBase<TWeakCoroutinePromiseType<T>, T>
 {
 public:
 	template <typename U>
@@ -177,9 +190,10 @@ public:
 	}
 };
 
-template <typename... ErrorTypes>
-class TWeakCoroutinePromiseType<void, ErrorTypes...>
-	: public TWeakCoroutinePromiseTypeBase<TWeakCoroutinePromiseType<void, ErrorTypes...>, void, ErrorTypes...>
+
+template <>
+class TWeakCoroutinePromiseType<void>
+	: public TWeakCoroutinePromiseTypeBase<TWeakCoroutinePromiseType<void>, void>
 {
 public:
 	void return_void()
@@ -189,7 +203,7 @@ public:
 };
 
 
-template <typename T, typename... ErrorTypes>
+template <typename T>
 class TWeakCoroutineContext
 {
 public:
@@ -206,98 +220,120 @@ public:
 	}
 
 private:
-	friend class TWeakCoroutine<T, ErrorTypes...>;
-	std::coroutine_handle<TWeakCoroutinePromiseType<T, ErrorTypes...>> Handle;
+	friend class TWeakCoroutine<T>;
+	std::coroutine_handle<TWeakCoroutinePromiseType<T>> Handle;
 };
 
 
-template <typename PromiseType, typename WrappedAwaitableType>
+UCLASS()
+class UWeakCoroutineError : public UFailableResultError
+{
+	GENERATED_BODY()
+
+public:
+	static UWeakCoroutineError* InvalidCoroutine()
+	{
+		return NewError<UWeakCoroutineError>(TEXT("InvalidCoroutine"));
+	}
+};
+
+
+template <typename InAwaitableType, typename PromiseType>
 class TWeakAwaitable
 {
 public:
-	using ReturnType = decltype(std::declval<WrappedAwaitableType>().await_resume());
+	using AwaitableType = std::conditional_t<
+		CErrorReportingAwaitable<InAwaitableType>,
+		InAwaitableType,
+		// 이거 TAlwaysAssumingAwaitable의 concept가 std::conditional_t의 결과와 관계없이 evaluate 되기 때문에 늦추려면 이렇게 해야됨
+		// TODO 더 간결한 방법이 없는지 조사해본다
+		typename WeakCoroutineDetails::TAlwaysAssumingAwaitableIfTrue<InAwaitableType, !CErrorReportingAwaitable<InAwaitableType>>::Type>;
 
-	template <typename T> requires std::is_convertible_v<T, WrappedAwaitableType>
-	TWeakAwaitable(T&& Awaitable)
-		: WrappedAwaitable(Forward<T>(Awaitable))
+	using ReturnType = decltype(std::declval<AwaitableType>().await_resume());
+
+	/**
+	 * constructor에서 Handle을 받는 것이 안전한 이유는 이 클래스의 사용을 await_transform 내부로만 제한하기 때문임
+	 * await_transform이 호출되었다는 것은 co_await 되었다는 뜻이고 그건 이 인스턴스가 Handle이 가리키는 coroutine frame 안에 존재한다는 것을 의미함
+	 * 즉 await_transform에서 생성하는 이상 이 awaitable의 생명주기는 handle이 가리키는 promise_type을 벗어나지 않음
+	 * 주의 : Handle을 사용해서 resume이나 destroy를 해서는 안 됨 다른 awaitable이 resume/destroy에 대한 권리를 가지고 있을 수 있음
+	 * 만약 그런 처리가 필요한 경우 나에게 resume/destroy 권한이 있을 때(await_suspend로 핸들이 들어와 await_resume이 호출되기 전까지)만 가능
+	 * 그 이외에는 반드시 read-only로만 사용해야 됨
+	 * 
+	 * @param InHandle 위에서 설명한 핸들
+	 * @param InAwaitable Inner Awaitable
+	 */
+	TWeakAwaitable(std::coroutine_handle<PromiseType> InHandle, InAwaitableType&& InAwaitable)
+		: Handle(InHandle), Awaitable(MoveTemp(InAwaitable))
 	{
+		static_assert(CErrorReportingAwaitable<TWeakAwaitable>);
 	}
 
 	bool await_ready() const
 	{
-		return false;
+		return Awaitable.await_ready();
 	}
 
-	bool await_suspend(std::coroutine_handle<PromiseType> InHandle)
+	template <typename HandleType>
+	void await_suspend(HandleType&& Handle)
 	{
-		Handle = InHandle;
-
-		struct FWeakCheckingHandle
-		{
-			std::coroutine_handle<PromiseType> Handle;
-
-			void resume() const
-			{
-				Handle.promise().IsValid() ? Handle.resume() : Handle.destroy();
-			}
-
-			void destroy() const
-			{
-				Handle.destroy();
-			}
-		};
-
-		if (WrappedAwaitable.await_ready())
-		{
-			return false;
-		}
-
-		WrappedAwaitable.await_suspend(FWeakCheckingHandle{Handle});
-		return true;
+		Awaitable.await_suspend(Forward<HandleType>(Handle));
 	}
 
 	ReturnType await_resume()
 	{
-		if constexpr (WeakCoroutineDetails::CWeakListAddable<ReturnType, PromiseType>)
+		ReturnType Ret = Awaitable.await_resume();
+
+		if (Ret.Failed())
 		{
-			ReturnType Ret = WrappedAwaitable.await_resume();
-			Handle.promise().AddToWeakList(Ret);
+			if (!Handle.promise().IsValid())
+			{
+				Ret.AddError(UWeakCoroutineError::InvalidCoroutine());
+			}
+			
 			return Ret;
 		}
-		else
+
+		if constexpr (WeakCoroutineDetails::CWeakListAddable<typename ReturnType::ResultType, PromiseType>)
 		{
-			return WrappedAwaitable.await_resume();
+			Handle.promise().AddToWeakList(Ret.GetResult());
 		}
+		
+		return Ret;
+	}
+
+	bool Failed() const
+	{
+		return !Handle.promise().IsValid() || Awaitable.Failed();
 	}
 
 private:
-	WrappedAwaitableType WrappedAwaitable;
 	std::coroutine_handle<PromiseType> Handle;
+	AwaitableType Awaitable;
 };
 
 
-template <typename T, typename... ErrorTypes>
-void TWeakCoroutine<T, ErrorTypes...>::Init(
-	TUniquePtr<TUniqueFunction<TWeakCoroutine(TWeakCoroutineContext<T, ErrorTypes...>&)>> Captures,
-	TUniquePtr<TWeakCoroutineContext<T, ErrorTypes...>> Context)
+template <typename T>
+void TWeakCoroutine<T>::Init(
+	TUniquePtr<TUniqueFunction<TWeakCoroutine(TWeakCoroutineContext<T>&)>> Captures,
+	TUniquePtr<TWeakCoroutineContext<T>> Context)
 {
 	Handle.promise().Captures = MoveTemp(Captures);
 	Handle.promise().Context = MoveTemp(Context);
 	Handle.promise().Context->Handle = Handle;
 
-	auto [NewPromise, NewFuture] = MakePromise<T, ErrorTypes...>();
+	auto [NewPromise, NewFuture] = MakePromise<T>();
 	Handle.promise().Promise.Emplace(MoveTemp(NewPromise));
 	CoroutineRet.Emplace(MoveTemp(NewFuture));
 }
 
-template <typename T, typename... ErrorTypes>
-void TWeakCoroutine<T, ErrorTypes...>::Resume()
+template <typename T>
+void TWeakCoroutine<T>::Resume()
 {
 	Handle.resume();
 }
 
-template <typename T, typename... ErrorTypes>
-void TWeakCoroutine<T, ErrorTypes...>::Abort()
+template <typename T>
+void TWeakCoroutine<T>::Abort()
 {
 	if (!*bCoroutineFinished)
 	{
@@ -306,11 +342,12 @@ void TWeakCoroutine<T, ErrorTypes...>::Abort()
 }
 
 
-template <typename Derived, typename T, typename... ErrorTypes>
+template <typename Derived, typename T>
 template <CAwaitable AwaitableType>
-auto TWeakCoroutinePromiseTypeBase<Derived, T, ErrorTypes...>::await_transform(AwaitableType&& Awaitable)
+auto TWeakCoroutinePromiseTypeBase<Derived, T>::await_transform(AwaitableType&& Awaitable)
 {
-	return TWeakAwaitable<Derived, std::decay_t<AwaitableType>>{Forward<AwaitableType>(Awaitable)};
+	auto Handle = std::coroutine_handle<Derived>::from_promise(*static_cast<Derived*>(this));
+	return TErrorRemovedAwaitable{TWeakAwaitable{Handle, Forward<AwaitableType>(Awaitable)}};
 }
 
 
