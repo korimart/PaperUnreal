@@ -25,18 +25,18 @@ private:
 	UPROPERTY(ReplicatedUsing=OnRep_bReady)
 	bool RepbReady = false;
 
-	UReadyStateComponent()
-	{
-		SetIsReplicatedByDefault(true);
-	}
-
 	UFUNCTION()
-	void OnRep_bReady() { bReady.OnRep(); }
+	void OnRep_bReady() { bReady.Notify(); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 		DOREPLIFETIME(ThisClass, RepbReady);
+	}
+
+	UReadyStateComponent()
+	{
+		SetIsReplicatedByDefault(true);
 	}
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override

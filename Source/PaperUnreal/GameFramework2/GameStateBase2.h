@@ -15,13 +15,10 @@ class AGameStateBase2 : public AGameStateBase
 {
 	GENERATED_BODY()
 
-	TBackedLiveData<
-		TArray<TObjectPtr<APlayerState>>,
-		ERepHandlingPolicy::CompareForAddOrRemove
-	> PlayerStateArray{PlayerArray};
+	TLiveData<TArray<TObjectPtr<APlayerState>>&> PlayerStateArray{PlayerArray};
 
 public:
-	auto GetPlayerStateArray() { return ToLiveDataView(PlayerStateArray); }
+	TLiveDataView<TArray<TObjectPtr<APlayerState>>&> GetPlayerStateArray() { return PlayerStateArray; }
 
 	double GetLatestServerWorldTimeSeconds() const
 	{
@@ -31,14 +28,16 @@ public:
 protected:
 	virtual void AddPlayerState(APlayerState* PlayerState) override
 	{
+		const auto Old = PlayerArray;
 		Super::AddPlayerState(PlayerState);
-		PlayerStateArray.NotifyAdd(PlayerState);
+		PlayerStateArray.NotifyDiff(Old);
 	}
 
 	virtual void RemovePlayerState(APlayerState* PlayerState) override
 	{
+		const auto Old = PlayerArray;
 		Super::RemovePlayerState(PlayerState);
-		PlayerStateArray.NotifyRemove(PlayerState);
+		PlayerStateArray.NotifyDiff(Old);
 	}
 
 	virtual void BeginPlay() override

@@ -132,7 +132,7 @@ class UAreaSpawnerComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	auto GetSpawnedAreas() { return ToLiveDataView(SpawnedAreas); }
+	TLiveDataView<TArray<AAreaActor*>&> GetSpawnedAreas() { return SpawnedAreas; }
 
 	template <typename FuncType>
 	AAreaActor* SpawnAreaAtRandomEmptyLocation(const FuncType& Initializer)
@@ -158,7 +158,7 @@ public:
 		const FVector SpawnLocation{CellToSpawnAreaIn->GetCenter(), 50.f};
 		AAreaActor* Ret = GetWorld()->SpawnActor<AAreaActor>(SpawnLocation, {});
 		Initializer(Ret);
-		
+
 		const TArray<AAreaActor*> Prev = RepSpawnedAreas;
 		RepSpawnedAreas.Add(Ret);
 		OnRep_SpawnedAreas(Prev);
@@ -168,11 +168,16 @@ public:
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_SpawnedAreas)
 	TArray<AAreaActor*> RepSpawnedAreas;
+	TLiveData<TArray<AAreaActor*>&> SpawnedAreas{RepSpawnedAreas};
 
-	TBackedLiveData<
-		TArray<AAreaActor*>,
-		ERepHandlingPolicy::CompareForAddOrRemove
-	> SpawnedAreas{RepSpawnedAreas};
+	UFUNCTION()
+	void OnRep_SpawnedAreas(const TArray<AAreaActor*>& Old) { SpawnedAreas.NotifyDiff(Old); }
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
+	{
+		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+		DOREPLIFETIME(ThisClass, RepSpawnedAreas);
+	}
 
 	FAreaSpawnLocationCalculator SpawnLocationCalculator;
 
@@ -189,14 +194,5 @@ private:
 		// TODO get this from an actor in the world
 		SpawnLocationCalculator.Configure(
 			{FVector2D::Zero(), {3000.f, 3000.f}}, 300.f);
-	}
-
-	UFUNCTION()
-	void OnRep_SpawnedAreas(const TArray<AAreaActor*>& Old) { SpawnedAreas.OnRep(Old); }
-
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
-	{
-		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-		DOREPLIFETIME(ThisClass, RepSpawnedAreas);
 	}
 };

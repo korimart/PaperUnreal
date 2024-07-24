@@ -14,19 +14,16 @@ class UAreaBoundaryComponent : public UActorComponent2, public IAreaBoundaryProv
 	GENERATED_BODY()
 
 public:
-	virtual TLiveDataView<TLiveData<FLoopedSegmentArray2D>> GetBoundary() override
-	{
-		return AreaBoundary;
-	}
+	virtual TLiveDataView<FLoopedSegmentArray2D> GetBoundary() override { return AreaBoundary; }
 
 	bool IsValid() const
 	{
-		return AreaBoundary->IsValid();
+		return AreaBoundary.Get().IsValid();
 	}
 
 	void Reset()
 	{
-		AreaBoundary.SetValueAlways(FLoopedSegmentArray2D{});
+		AreaBoundary.SetValueNoComparison(FLoopedSegmentArray2D{});
 	}
 
 	void ResetToStartingBoundary(const FVector& Location)
@@ -42,7 +39,7 @@ public:
 			return Ret;
 		}();
 
-		AreaBoundary.SetValueAlways(VertexPositions);
+		AreaBoundary.SetValueNoComparison(VertexPositions);
 	}
 
 	using FExpansionResult = FUnionResult;
@@ -54,23 +51,20 @@ public:
 		{
 			return {};
 		}
-		
-		if (TArray<FUnionResult> UnionResult
-			= AreaBoundary->Union(Forward<SegmentArrayType>(Path)); !UnionResult.IsEmpty())
+
+		TArray<FExpansionResult> Ret;
+		AreaBoundary.Modify([&](FLoopedSegmentArray2D& Boundary)
 		{
-			// TODO lock으로 고쳐야됨
-			AreaBoundary.Notify();
-
-			TArray<FExpansionResult> Ret;
-			for (FUnionResult& Each : UnionResult)
+			TArray<FUnionResult> UnionResult = Boundary.Union(Forward<SegmentArrayType>(Path));
+			if (!UnionResult.IsEmpty())
 			{
-				Ret.Add(MoveTemp(Each));
+				for (FUnionResult& Each : UnionResult)
+				{
+					Ret.Add(MoveTemp(Each));
+				}
 			}
-
-			return Ret;
-		}
-		
-		return {};
+		});
+		return Ret;
 	}
 
 	template <CSegmentArray2D SegmentArrayType>
@@ -78,21 +72,23 @@ public:
 	{
 		if (Path.IsValid())
 		{
-			AreaBoundary->Difference(Forward<SegmentArrayType>(Path));
-			AreaBoundary.Notify();
+			AreaBoundary.Modify([&](FLoopedSegmentArray2D& Boundary)
+			{
+				Boundary.Difference(Forward<SegmentArrayType>(Path));
+			});
 		}
 	}
 
 	bool IsInside(const FVector& Point) const
 	{
-		return AreaBoundary->IsInside(FVector2D{Point});
+		return AreaBoundary.Get().IsInside(FVector2D{Point});
 	}
-	
+
 	bool IsInside(UAreaBoundaryComponent* Other) const
 	{
 		if (const TOptional<FLoopedSegmentArray2D>& OtherBoundary = Other->GetBoundary().Get())
 		{
-			return AreaBoundary->IsInside(*OtherBoundary);
+			return AreaBoundary.Get().IsInside(*OtherBoundary);
 		}
 		return false;
 	}
@@ -102,8 +98,8 @@ public:
 		// 그냥 적당히 좋은 구현
 		// 영역의 바운딩 박스를 가로 세로 10등분해서 랜덤 셀을 하나 고른다음에
 		// 그 중심이 영역 안에 있으면 그걸 반환 아니면 거기서 가장 가까운 영역 내 위치 반환
-		
-		const FBox2D BoundingBox = AreaBoundary->CalculateBoundingBox();
+
+		const FBox2D BoundingBox = AreaBoundary.Get().CalculateBoundingBox();
 		const float CellWidth = BoundingBox.GetSize().X;
 		const float CellHeight = BoundingBox.GetSize().Y;
 		const int32 CellX = FMath::RandRange(0, 9);
@@ -113,14 +109,14 @@ public:
 
 		const FVector2D RandomCellCenter{X, Y};
 
-		if (AreaBoundary->IsInside(RandomCellCenter))
+		if (AreaBoundary.Get().IsInside(RandomCellCenter))
 		{
 			return FVector{RandomCellCenter, GetOwner()->GetActorLocation().Z};
 		}
 
 		return FVector{FindClosestPointOnBoundary2D(RandomCellCenter).GetPoint(), GetOwner()->GetActorLocation().Z};
 	}
-	
+
 	struct FPointOnBoundary
 	{
 		FSegment2D Segment;
@@ -136,10 +132,10 @@ public:
 	{
 		using FIntersection = FLoopedSegmentArray2D::FIntersection;
 
-		if (TOptional<FIntersection> Found = AreaBoundary->FindIntersection(Segment))
+		if (TOptional<FIntersection> Found = AreaBoundary.Get().FindIntersection(Segment))
 		{
 			FPointOnBoundary Ret;
-			Ret.Segment = (*AreaBoundary)[Found->SegmentIndex];
+			Ret.Segment = AreaBoundary.Get()[Found->SegmentIndex];
 			Ret.Alpha = Found->Alpha;
 			return Ret;
 		}
@@ -150,17 +146,17 @@ public:
 	FPointOnBoundary FindClosestPointOnBoundary2D(const FVector2D& Point) const
 	{
 		using FIntersection = FLoopedSegmentArray2D::FIntersection;
-		const FIntersection Intersection = AreaBoundary->FindClosestPointTo(Point);
+		const FIntersection Intersection = AreaBoundary.Get().FindClosestPointTo(Point);
 
 		FPointOnBoundary Ret;
-		Ret.Segment = (*AreaBoundary)[Intersection.SegmentIndex];
+		Ret.Segment = AreaBoundary.Get()[Intersection.SegmentIndex];
 		Ret.Alpha = Intersection.Alpha;
 		return Ret;
 	}
 
 	UE::Geometry::FSegment2d Clip(const UE::Geometry::FSegment2d& Segment) const
 	{
-		return AreaBoundary->Clip(Segment);
+		return AreaBoundary.Get().Clip(Segment);
 	}
 
 private:

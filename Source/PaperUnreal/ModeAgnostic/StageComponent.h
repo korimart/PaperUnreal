@@ -22,7 +22,7 @@ private:
 	FName RepCurrentStage;
 
 	UFUNCTION()
-	void OnRep_CurrentStage() { CurrentStage.OnRep(); }
+	void OnRep_CurrentStage() { CurrentStage.Notify(); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{

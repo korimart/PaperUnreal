@@ -8,7 +8,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLiveDataTest, "PaperUnreal.PaperUnreal.Test.Li
 bool FLiveDataTest::RunTest(const FString& Parameters)
 {
 	{
-		TLiveData2<int32> LiveData;
+		TLiveData<int32> LiveData;
 
 		TArray<int32> Received;
 		auto Handle = LiveData.Observe([&](int32 Value)
@@ -39,7 +39,7 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 	}
 
 	{
-		TLiveData2<int32> LiveData;
+		TLiveData<int32> LiveData;
 
 		TArray<int32> Received;
 		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
@@ -75,7 +75,7 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 	{
 		// 레퍼런스 테스트인데 귀찮아서 컴파일 되는지만 테스트
 		int32 BackingField;
-		TLiveData2<int32&> LiveData{BackingField};
+		TLiveData<int32&> LiveData{BackingField};
 		auto Handle = LiveData.Observe([](auto)
 		{
 		});
@@ -84,7 +84,7 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 	}
 
 	{
-		TLiveData2<TOptional<int32>> LiveData;
+		TLiveData<TOptional<int32>> LiveData;
 
 		TArray<TOptional<int32>> Received;
 		auto Handle = LiveData.Observe([&](TOptional<int32> Value)
@@ -118,7 +118,7 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 	}
 
 	{
-		TLiveData2<TOptional<int32>> LiveData;
+		TLiveData<TOptional<int32>> LiveData;
 
 		TArray<int32> Received;
 		auto Handle = LiveData.ObserveIfValid([&](int32 Value)
@@ -152,7 +152,7 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 
 	{
 		TArray<UDummy*> BackingField;
-		TLiveData2<TArray<UDummy*>&> LiveData{BackingField};
+		TLiveData<TArray<UDummy*>&> LiveData{BackingField};
 
 		TArray<UDummy*> Added;
 		auto Handle = LiveData.ObserveAddIfValid([&](UDummy* Value)

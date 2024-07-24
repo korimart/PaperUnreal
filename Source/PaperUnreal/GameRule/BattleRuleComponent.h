@@ -151,7 +151,7 @@ private:
 			check(AllValid(TeamComponent, ReadyState, Inventory));
 
 			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어의 준비 완료를 기다리는 중"), ReadyPlayer);
-			co_await AbortOnError(ReadyState->GetbReady().If(true));
+			co_await ReadyState->GetbReady().If(true);
 
 			// 죽은 다음에 다시 스폰하는 경우에는 팀이 이미 있음
 			if (TeamComponent->GetTeamIndex().Get() < 0)
@@ -196,7 +196,7 @@ private:
 
 			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어의 사망을 기다리는 중"), ReadyPlayer);
 			Context.AbortIfNotValid(Pawn);
-			co_await AbortOnError(Pawn->FindComponentByClass<ULifeComponent>()->GetbAlive().If(false));
+			co_await Pawn->FindComponentByClass<ULifeComponent>()->GetbAlive().If(false);
 
 			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어가 사망함에 따라 영역 파괴를 검토하는 중"), ReadyPlayer);
 			KillAreaIfNobodyAlive(ThisPlayerTeamIndex);
@@ -256,7 +256,7 @@ private:
 			{
 				if (Life->GetbAlive().Get())
 				{
-					const float Area = Boundary->GetBoundary()->CalculateArea();
+					const float Area = Boundary->GetBoundary().Get().CalculateArea();
 					GameResult.SortedByRank.Emplace(Team->GetTeamIndex().Get(), Area);
 				}
 			});
@@ -279,7 +279,7 @@ private:
 			{
 				Context.AbortIfNotValid(Area);
 
-				co_await AbortOnError(Area->LifeComponent->GetbAlive().If(false));
+				co_await Area->LifeComponent->GetbAlive().If(false);
 
 				UE_LOG(LogBattleRule, Log, TEXT("영역이 파괴됨에 따라 팀 %d의 모든 유저를 죽입니다."), TeamIndex);
 				for (ULifeComponent* Each : GetPawnLivesOfTeam(TeamIndex))

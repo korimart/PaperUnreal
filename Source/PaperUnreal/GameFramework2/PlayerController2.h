@@ -17,7 +17,7 @@ class APlayerController2 : public APlayerController
 	GENERATED_BODY()
 
 public:
-	auto GetPossessedPawn() { return ToLiveDataView(PossessedPawn); }
+	TLiveDataView<APawn*> GetPossessedPawn() { return PossessedPawn; }
 	
 protected:
 	virtual void BeginPlay() override

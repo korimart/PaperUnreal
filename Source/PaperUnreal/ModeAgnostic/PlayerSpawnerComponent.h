@@ -15,7 +15,7 @@ class UPlayerSpawnerComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	auto GetSpawnedPlayers() { return ToLiveDataView(Players); }
+	TLiveDataView<TArray<APawn*>&> GetSpawnedPlayers() { return Players; }
 
 	template <typename FuncType>
 	APawn* SpawnAtLocation(UClass* Class, const FVector& Location, const FuncType& Initializer)
@@ -35,23 +35,19 @@ public:
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_SpawnedPlayers)
 	TArray<APawn*> RepPlayers;
+	TLiveData<TArray<APawn*>&> Players{RepPlayers};
 	
-	TBackedLiveData<
-		TArray<APawn*>,
-		ERepHandlingPolicy::CompareForAddOrRemove
-	> Players{RepPlayers};
-
-	UPlayerSpawnerComponent()
-	{
-		SetIsReplicatedByDefault(true);
-	}
-
 	UFUNCTION()
-	void OnRep_SpawnedPlayers(const TArray<APawn*>& Prev) { Players.OnRep(Prev); }
+	void OnRep_SpawnedPlayers(const TArray<APawn*>& Prev) { Players.NotifyDiff(Prev); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 		DOREPLIFETIME(ThisClass, RepPlayers);
+	}
+	
+	UPlayerSpawnerComponent()
+	{
+		SetIsReplicatedByDefault(true);
 	}
 };

@@ -34,7 +34,7 @@ private:
 
 			// TODO 플레이를 시작하면 플레이 HUD 띄우기
 
-			co_await AbortOnError(StageComponent->GetCurrentStage().If(PVPBattleStage::Result));
+			co_await StageComponent->GetCurrentStage().If(PVPBattleStage::Result);
 
 			// TODO 캐릭터 선택 화면이건 플레이 HUD건 띄워져 있는 거 없애고 결과창 띄우기
 			UE_LOG(LogTemp, Warning, TEXT("결과창"));

@@ -27,21 +27,21 @@ private:
 	UPROPERTY(ReplicatedUsing=OnRep_TracerMaterial)
 	TSoftObjectPtr<UMaterialInstance> RepTracerMaterial;
 
-	UInventoryComponent()
-	{
-		SetIsReplicatedByDefault(true);
-	}
+	UFUNCTION()
+	void OnRep_HomeArea() { HomeArea.Notify(); }
 
 	UFUNCTION()
-	void OnRep_HomeArea() { HomeArea.OnRep(); }
-
-	UFUNCTION()
-	void OnRep_TracerMaterial() { TracerMaterial.OnRep(); }
+	void OnRep_TracerMaterial() { TracerMaterial.Notify(); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 		DOREPLIFETIME(ThisClass, RepHomeArea);
 		DOREPLIFETIME(ThisClass, RepTracerMaterial);
+	}
+	
+	UInventoryComponent()
+	{
+		SetIsReplicatedByDefault(true);
 	}
 };

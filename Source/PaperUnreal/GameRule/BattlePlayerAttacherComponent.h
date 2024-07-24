@@ -42,17 +42,17 @@ public:
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_HomeArea)
 	AAreaActor* RepHomeArea;
-	TBackedLiveData<AAreaActor*> HomeArea{RepHomeArea};
+	TLiveData<AAreaActor*&> HomeArea{RepHomeArea};
 
 	UPROPERTY(ReplicatedUsing=OnRep_TracerPathProvider)
 	TScriptInterface<ITracerPathStream> RepTracerPathProvider;
-	TBackedLiveData<TScriptInterface<ITracerPathStream>> TracerPathProvider{RepTracerPathProvider};
+	TLiveData<TScriptInterface<ITracerPathStream>&> TracerPathProvider{RepTracerPathProvider};
 
 	UFUNCTION()
-	void OnRep_HomeArea() { HomeArea.OnRep(); }
+	void OnRep_HomeArea() { HomeArea.Notify(); }
 
 	UFUNCTION()
-	void OnRep_TracerPathProvider() { TracerPathProvider.OnRep(); }
+	void OnRep_TracerPathProvider() { TracerPathProvider.Notify(); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{
@@ -86,7 +86,7 @@ private:
 	virtual void AttachServerMachineComponents() override
 	{
 		auto TracerPath = NewObject<UTracerPathComponent>(GetOwner());
-		TracerPath->SetNoPathArea(HomeArea->ServerAreaBoundary);
+		TracerPath->SetNoPathArea(HomeArea.Get()->ServerAreaBoundary);
 		TracerPath->RegisterComponent();
 		TracerPathProvider = TScriptInterface<ITracerPathStream>{TracerPath};
 
@@ -118,7 +118,7 @@ private:
 
 		ServerTracerToAreaConverter = NewObject<UTracerToAreaConverterComponent>(GetOwner());
 		ServerTracerToAreaConverter->SetTracer(TracerPath);
-		ServerTracerToAreaConverter->SetConversionDestination(HomeArea->ServerAreaBoundary);
+		ServerTracerToAreaConverter->SetConversionDestination(HomeArea.Get()->ServerAreaBoundary);
 		ServerTracerToAreaConverter->RegisterComponent();
 
 		ServerAreaSpawner->GetSpawnedAreas().ObserveAdd(this, [this](AAreaActor* NewArea)
@@ -134,7 +134,7 @@ private:
 
 		auto Killer = NewObject<UTracerKillerComponent>(GetOwner());
 		Killer->SetTracer(TracerPath);
-		Killer->SetArea(HomeArea->ServerAreaBoundary);
+		Killer->SetArea(HomeArea.Get()->ServerAreaBoundary);
 		Killer->SetOverlapChecker(ServerOverlapChecker);
 		Killer->RegisterComponent();
 
@@ -143,7 +143,7 @@ private:
 
 		RunWeakCoroutine(this, [this, Life](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			co_await AbortOnError(Life->GetbAlive().If(false));
+			co_await Life->GetbAlive().If(false);
 
 			// 현재 얘만 파괴해주면 나머지 컴포넌트는 디펜던시가 사라짐에 따라 알아서 사라짐
 			// Path를 파괴해서 상호작용을 없애 게임에 영향을 미치지 않게 한다
@@ -162,9 +162,9 @@ private:
 			TracerMesh->RegisterComponent();
 
 			auto TracerMeshGenerator = NewObject<UTracerMeshGeneratorComponent>(GetOwner());
-			TracerMeshGenerator->SetMeshSource(TracerPathProvider.GetInterface());
+			TracerMeshGenerator->SetMeshSource(TracerPathProvider.Get().GetInterface());
 			TracerMeshGenerator->SetMeshDestination(TracerMesh);
-			TracerMeshGenerator->SetMeshAttachmentTarget(HomeArea->ClientAreaMesh);
+			TracerMeshGenerator->SetMeshAttachmentTarget(HomeArea.Get()->ClientAreaMesh);
 			TracerMeshGenerator->RegisterComponent();
 
 			// 일단 위에까지 완료했으면 플레이는 가능한 거임 여기부터는 미적인 요소들을 준비한다

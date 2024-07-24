@@ -22,17 +22,17 @@ private:
 	UPROPERTY(ReplicatedUsing=OnRep_TeamIndex)
 	int32 RepTeamIndex = -1;
 
-	UTeamComponent()
-	{
-		SetIsReplicatedByDefault(true);
-	}
-
 	UFUNCTION()
-	void OnRep_TeamIndex() { TeamIndex.OnRep(); }
+	void OnRep_TeamIndex() { TeamIndex.Notify(); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 		DOREPLIFETIME(ThisClass, RepTeamIndex);
+	}
+
+	UTeamComponent()
+	{
+		SetIsReplicatedByDefault(true);
 	}
 };

@@ -65,7 +65,7 @@ void APVPBattlePlayerController::BeginPlay()
 					Context.AbortIfNotValid(LifeComponent);
 					
 					Subsystem->AddMappingContext(DefaultMappingContext, 0);
-					co_await AbortOnError(LifeComponent->GetbAlive().If(false));
+					co_await LifeComponent->GetbAlive().If(false);
 					Subsystem->RemoveMappingContext(DefaultMappingContext);
 				});
 			}

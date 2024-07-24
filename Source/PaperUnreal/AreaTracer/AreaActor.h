@@ -18,13 +18,13 @@ class AAreaActor : public AActor2
 	GENERATED_BODY()
 
 public:
+	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(TSoftObjectPtr<UMaterialInstance>, AreaMaterial, RepAreaMaterial);
+	
 	UPROPERTY()
 	ULifeComponent* LifeComponent;
 
 	UPROPERTY()
 	UTeamComponent* TeamComponent;
-
-	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(TSoftObjectPtr<UMaterialInstance>, AreaMaterial, RepAreaMaterial);
 	
 	UPROPERTY()
 	UAreaBoundaryComponent* ServerAreaBoundary;
@@ -36,6 +36,15 @@ private:
 	UPROPERTY(ReplicatedUsing=OnRep_AreaMaterial)
 	TSoftObjectPtr<UMaterialInstance> RepAreaMaterial;
 
+	UFUNCTION()
+	void OnRep_AreaMaterial() { AreaMaterial.Notify(); }
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
+	{
+		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+		DOREPLIFETIME(ThisClass, RepAreaMaterial);
+	}
+
 	AAreaActor()
 	{
 		bReplicates = true;
@@ -45,22 +54,13 @@ private:
 		TeamComponent = CreateDefaultSubobject<UTeamComponent>(TEXT("TeamComponent"));
 	}
 
-	UFUNCTION()
-	void OnRep_AreaMaterial() { AreaMaterial.OnRep(); }
-
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
-	{
-		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-		DOREPLIFETIME(ThisClass, RepAreaMaterial);
-	}
-
 	virtual void PostInitializeComponents() override
 	{
 		Super::PostInitializeComponents();
 
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			co_await AbortOnError(LifeComponent->GetbAlive().If(false));
+			co_await LifeComponent->GetbAlive().If(false);
 
 			// TODO play death animation
 		});
