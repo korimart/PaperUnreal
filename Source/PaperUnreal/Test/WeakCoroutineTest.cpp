@@ -1,4 +1,5 @@
-﻿#include "Misc/AutomationTest.h"
+﻿#include "CancellableFutureTest.h"
+#include "Misc/AutomationTest.h"
 #include "PaperUnreal/WeakCoroutine/CancellableFuture.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 
@@ -241,6 +242,28 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("값을 반환하는 TWeakCoroutine 테스트"), Received, 30);
 		Array[3].Get<0>().SetValue(50);
 		TestEqual(TEXT("값을 반환하는 TWeakCoroutine 테스트"), Received, 150);
+	}
+
+	{
+		UDummy* Dummy = NewObject<UDummy>();
+
+		FStreamableDelegate Delegate;
+		auto Ret = MakeFutureFromDelegate<UObject*>(
+			Delegate,
+			[]() { return true; },
+			[Dummy]() { return Dummy; });
+
+		Delegate.Execute();
+		Dummy->MarkAsGarbage();
+
+		bool bAborted = true;
+		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			co_await MoveTemp(Ret);
+			bAborted = false;
+		});
+
+		TestTrue(TEXT("이미 에러가 발생해 있는 걸 기다릴 때 Abort 하는지"), bAborted);
 	}
 
 	return true;

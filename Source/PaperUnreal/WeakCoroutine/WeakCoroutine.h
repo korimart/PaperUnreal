@@ -5,8 +5,8 @@
 #include <coroutine>
 
 #include "CoreMinimal.h"
-#include "AwaitableWrappers.h"
 #include "CancellableFuture.h"
+#include "MinimalCoroutine.h"
 #include "TypeTraits.h"
 #include "Algo/AllOf.h"
 #include "PaperUnreal/GameFramework2/Utils.h"

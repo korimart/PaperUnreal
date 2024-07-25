@@ -2,210 +2,93 @@
 
 #pragma once
 
-#include <coroutine>
-
 #include "CoreMinimal.h"
 #include "CancellableFuture.h"
+#include "MinimalCoroutine.h"
 #include "TypeTraits.h"
 
 
-struct FMinimalCoroutine
-{
-	struct promise_type
-	{
-		FMinimalCoroutine get_return_object()
-		{
-			return {};
-		}
-
-		std::suspend_never initial_suspend() const
-		{
-			return {};
-		}
-
-		std::suspend_never final_suspend() const noexcept
-		{
-			return {};
-		}
-
-		void return_void() const
-		{
-		}
-
-		void unhandled_exception() const
-		{
-		}
-	};
-};
-
-
-template <typename AwaitableType>
-class TIdentityAwaitable
-{
-public:
-	TIdentityAwaitable(AwaitableType&& InAwaitable)
-		: Awaitable(MoveTemp(InAwaitable))
-	{
-	}
-
-	TIdentityAwaitable(const TIdentityAwaitable&) = delete;
-	TIdentityAwaitable& operator=(const TIdentityAwaitable&) = delete;
-
-	TIdentityAwaitable(TIdentityAwaitable&&) = default;
-	TIdentityAwaitable& operator=(TIdentityAwaitable&&) = delete;
-
-	bool await_ready() const
-	{
-		return Awaitable.await_ready();
-	}
-
-	template <typename HandleType>
-	void await_suspend(HandleType&& Handle)
-	{
-		Awaitable.await_suspend(Forward<HandleType>(Handle));
-	}
-
-	auto await_resume()
-	{
-		return Awaitable.await_resume();
-	}
-
-	AwaitableType& Inner()
-	{
-		return Awaitable;
-	}
-
-private:
-	AwaitableType Awaitable;
-};
-
-
-// TODO 필터 대상이 NonErrorReporting인지 체크
-template <typename... AwaitableTypes>
+template <typename... InAwaitableTypes>
 class TAnyOfAwaitable
 {
 public:
-	TAnyOfAwaitable(AwaitableTypes&&... InAwaitables)
+	using AwaitableTuple = TTuple<typename TEnsureErrorReporting<InAwaitableTypes>::Type...>;
+	using ResultType = int32;
+
+	TAnyOfAwaitable(InAwaitableTypes&&... InAwaitables)
 		: Awaitables(MoveTemp(InAwaitables)...)
 	{
-		// TODO 이거 만족시켜야 됨
-		// static_assert(CErrorReportingAwaitable<TAnyOfAwaitable>);
+		static_assert(CErrorReportingAwaitable<TAnyOfAwaitable>);
 	}
 
 	TAnyOfAwaitable(const TAnyOfAwaitable&) = delete;
 	TAnyOfAwaitable& operator=(const TAnyOfAwaitable&) = delete;
 
 	TAnyOfAwaitable(TAnyOfAwaitable&&) = default;
-	TAnyOfAwaitable& operator=(TAnyOfAwaitable&&) = delete;
+	TAnyOfAwaitable& operator=(TAnyOfAwaitable&&) = default;
 
 	bool await_ready() const
 	{
-		const auto FindReadyAwaitable = [&]<std::size_t Index, std::size_t... Indices>(
-			auto& Self, std::index_sequence<Index, Indices...>) -> TOptional<int32>
-		{
-			if (Awaitables.template Get<Index>().await_ready())
-			{
-				return Index;
-			}
-
-			if constexpr (sizeof...(Indices) > 0)
-			{
-				return Self(Self, std::index_sequence<Indices...>{});
-			}
-			else
-			{
-				return {};
-			}
-		};
-
-		ReturnValue = FindReadyAwaitable(FindReadyAwaitable, std::index_sequence_for<AwaitableTypes...>{});
-
-		return !!ReturnValue;
+		return false;
 	}
 
 	template <typename HandleType>
 	void await_suspend(const HandleType& Handle)
 	{
-		struct FCompletionReporter
+		TSharedRef<int32> Counter = MakeShared<int32>(sizeof...(InAwaitableTypes));
+		ForEachTupleElementIndexed(Awaitables, [&](int32 Index, auto& Awaitable)
 		{
-			int32 Index;
-			HandleType Handle;
-			TAnyOfAwaitable* This;
-			TSharedRef<bool> bComplete;
-
-			void OnComplete()
+			[](auto Awaitable, int32 Index, HandleType Handle,
+			   TSharedRef<int32> ResultIndex, TSharedRef<int32> CleanUpCounter) -> FMinimalCoroutine
 			{
-				if (!*bComplete)
+				auto Result = co_await Awaitable;
+
+				--(*CleanUpCounter);
+
+				if (*ResultIndex < 0 && Result.Succeeded())
 				{
-					*bComplete = true;
-					This->ReturnValue = Index;
+					*ResultIndex = Index;
 					Handle.resume();
+					co_return;
 				}
-			}
-		};
 
-		struct FNoCompletionReporter
-		{
-			HandleType Handle;
-			TSharedRef<bool> bComplete;
-
-			~FNoCompletionReporter()
-			{
-				if (!*bComplete)
+				if (*ResultIndex < 0 && *CleanUpCounter <= 0)
 				{
 					Handle.resume();
 				}
-			}
-		};
-
-		const auto WaitForCompletion = [](
-			auto Awaitable,
-			FCompletionReporter Reporter,
-			TSharedRef<FNoCompletionReporter>) -> FMinimalCoroutine
-		{
-			co_await Awaitable;
-			Reporter.OnComplete();
-		};
-
-		auto bComplete = MakeShared<bool>(false);
-		auto NoCompletionReporter = MakeShared<FNoCompletionReporter>(Handle, bComplete);
-
-		const auto RunCoroutines = [&]<std::size_t... Indices>(std::index_sequence<Indices...>)
-		{
-			(WaitForCompletion(
-				MoveTemp(Awaitables.template Get<Indices>()),
-				{Indices, Handle, this, bComplete},
-				NoCompletionReporter), ...);
-		};
-
-		RunCoroutines(std::index_sequence_for<AwaitableTypes...>());
+			}(MoveTemp(Awaitable), Index, Handle, ResultIndex, Counter);
+		});
 	}
 
-	TOptional<int32> await_resume()
+	TFailableResult<int32> await_resume()
 	{
-		return ReturnValue;
+		if (*ResultIndex >= 0)
+		{
+			return *ResultIndex;
+		}
+
+		return NewError(TEXT("TAnyOfAwaitable 아무도 에러 없이 완료하지 않았음"));
 	}
 
 private:
-	TTuple<AwaitableTypes...> Awaitables;
-	mutable TOptional<int32> ReturnValue;
+	AwaitableTuple Awaitables;
+	TSharedRef<int32> ResultIndex = MakeShared<int32>(-1);
 };
 
 
-// TODO 필터 대상이 NonErrorReporting인지 체크
 template <typename ValueStreamType, typename PredicateType>
 class TFilteringAwaitable
 {
 public:
 	using ResultType = typename std::decay_t<ValueStreamType>::ResultType;
-	
+
 	template <typename Stream, typename Pred>
 	TFilteringAwaitable(Stream&& ValueStream, Pred&& Predicate)
 		: ValueStream(Forward<Stream>(ValueStream)), Predicate(Forward<Pred>(Predicate))
 	{
 		static_assert(CErrorReportingAwaitable<TFilteringAwaitable>);
 	}
-	
+
 	bool await_ready() const
 	{
 		return false;
@@ -226,7 +109,6 @@ public:
 			}
 
 			Handle.resume();
-			
 		}(*this, Handle);
 	}
 
@@ -234,7 +116,7 @@ public:
 	{
 		return MoveTemp(Ret.GetValue());
 	}
-	
+
 private:
 	ValueStreamType ValueStream;
 	PredicateType Predicate;
@@ -244,20 +126,6 @@ private:
 template <typename Stream, typename Pred>
 TFilteringAwaitable(Stream&& ValueStream, Pred&& Predicate)
 	-> TFilteringAwaitable<std::conditional_t<std::is_lvalue_reference_v<Stream>, Stream, std::decay_t<Stream>>, std::decay_t<Pred>>;
-
-
-template <typename T>
-decltype(auto) AwaitableOrIdentity(T&& MaybeAwaitable)
-{
-	if constexpr (CAwaitable<T>)
-	{
-		return Forward<T>(MaybeAwaitable);
-	}
-	else
-	{
-		return operator co_await(Forward<T>(MaybeAwaitable));
-	}
-}
 
 
 template <typename... MaybeAwaitableTypes>

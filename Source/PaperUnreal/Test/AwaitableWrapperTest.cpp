@@ -1,5 +1,4 @@
-﻿#include "CancellableFutureTest.h"
-#include "Misc/AutomationTest.h"
+﻿#include "Misc/AutomationTest.h"
 #include "PaperUnreal/WeakCoroutine/AwaitableWrappers.h"
 #include "PaperUnreal/WeakCoroutine/CancellableFuture.h"
 #include "PaperUnreal/WeakCoroutine/ValueStream.h"
@@ -14,16 +13,15 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 		Array.Add(MakePromise<void>());
 		Array.Add(MakePromise<void>());
 
-		bool bOver = false;
+		int32 CompletedIndex = -1;
 		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			co_await AnyOf(MoveTemp(Array[0].Get<1>()), MoveTemp(Array[1].Get<1>()));
-			bOver = true;
+			CompletedIndex = co_await AnyOf(MoveTemp(Array[0].Get<1>()), MoveTemp(Array[1].Get<1>()));
 		});
 
-		TestFalse(TEXT("AnyOf 테스트: 두 개 중에 앞에 거가 먼저 완료되면 AnyOf도 완료하는지 테스트"), bOver);
+		TestEqual(TEXT("AnyOf 테스트: 두 개 중에 앞에 거가 먼저 완료되면 AnyOf도 완료하는지 테스트"), CompletedIndex, -1);
 		Array[0].Get<0>().SetValue();
-		TestTrue(TEXT("AnyOf 테스트: 두 개 중에 앞에 거가 먼저 완료되면 AnyOf도 완료하는지 테스트"), bOver);
+		TestEqual(TEXT("AnyOf 테스트: 두 개 중에 앞에 거가 먼저 완료되면 AnyOf도 완료하는지 테스트"), CompletedIndex, 0);
 	}
 
 	{
@@ -31,16 +29,15 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 		Array.Add(MakePromise<void>());
 		Array.Add(MakePromise<void>());
 
-		bool bOver = false;
+		int32 CompletedIndex = -1;
 		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			co_await AnyOf(MoveTemp(Array[0].Get<1>()), MoveTemp(Array[1].Get<1>()));
-			bOver = true;
+			CompletedIndex = co_await AnyOf(MoveTemp(Array[0].Get<1>()), MoveTemp(Array[1].Get<1>()));
 		});
 
-		TestFalse(TEXT("AnyOf 테스트: 두 개 중에 뒤에 거가 먼저 완료되면 AnyOf도 완료하는지 테스트"), bOver);
+		TestEqual(TEXT("AnyOf 테스트: 두 개 중에 뒤에 거가 먼저 완료되면 AnyOf도 완료하는지 테스트"), CompletedIndex, -1);
 		Array[1].Get<0>().SetValue();
-		TestTrue(TEXT("AnyOf 테스트: 두 개 중에 뒤에 거가 먼저 완료되면 AnyOf도 완료하는지 테스트"), bOver);
+		TestEqual(TEXT("AnyOf 테스트: 두 개 중에 뒤에 거가 먼저 완료되면 AnyOf도 완료하는지 테스트"), CompletedIndex, 1);
 	}
 
 	{
@@ -49,36 +46,33 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 		Array.Add(MakePromise<void>());
 		Array[1].Get<0>().SetValue();
 
-		bool bOver = false;
+		int32 CompletedIndex = -1;
 		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			co_await AnyOf(MoveTemp(Array[0].Get<1>()), MoveTemp(Array[1].Get<1>()));
-			bOver = true;
+			CompletedIndex = co_await AnyOf(MoveTemp(Array[0].Get<1>()), MoveTemp(Array[1].Get<1>()));
 		});
 
-		TestTrue(TEXT("AnyOf 테스트: 이미 완료 거를 기다리기 시작해도 잘 되는지 테스트"), bOver);
+		TestEqual(TEXT("AnyOf 테스트: 이미 완료 거를 기다리기 시작해도 잘 되는지 테스트"), CompletedIndex, 1);
 	}
-
+	
 	{
-		UDummy* Dummy = NewObject<UDummy>();
-		
-		FStreamableDelegate Delegate;
-		auto Ret = MakeFutureFromDelegate<UObject*>(
-			Delegate,
-			[]() { return true; },
-			[Dummy]() { return Dummy; });
-		
-		Delegate.Execute();
-		Dummy->MarkAsGarbage();
+		TArray<TTuple<TCancellablePromise<void>, TCancellableFuture<void>>> Array;
+		Array.Add(MakePromise<void>());
+		Array.Add(MakePromise<void>());
 
 		bool bAborted = true;
+		int32 CompletedIndex = -1;
 		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			co_await MoveTemp(Ret);
+			CompletedIndex = co_await AnyOf(MoveTemp(Array[0].Get<1>()), MoveTemp(Array[1].Get<1>()));
 			bAborted = false;
 		});
 
-		TestTrue(TEXT("이미 에러가 발생해 있는 걸 기다릴 때 Abort 하는지"), bAborted);
+		TestTrue(TEXT("AnyOf 테스트: 아무도 완료하지 않은 경우"), bAborted);
+		TestEqual(TEXT("AnyOf 테스트: 아무도 완료하지 않은 경우"), CompletedIndex, -1);
+		Array.Empty();
+		TestTrue(TEXT("AnyOf 테스트: 아무도 완료하지 않은 경우"), bAborted);
+		TestEqual(TEXT("AnyOf 테스트: 아무도 완료하지 않은 경우"), CompletedIndex, -1);
 	}
 
 	{

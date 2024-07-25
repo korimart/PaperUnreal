@@ -232,13 +232,7 @@ private:
 				AreaStateTracker->DestroyComponent();
 			});
 
-			// TODO replace
-			const TOptional<int32> CompletedAwaitableIndex = co_await AnyOf(MoveTemp(Timeout), MoveTemp(LastManStanding));
-			if (!CompletedAwaitableIndex)
-			{
-				co_return UCancellableFutureError::PromiseNotFulfilled();
-			}
-
+			const int32 CompletedAwaitableIndex = co_await AnyOf(MoveTemp(Timeout), MoveTemp(LastManStanding));
 			if (CompletedAwaitableIndex == 0)
 			{
 				UE_LOG(LogBattleRule, Log, TEXT("제한시간이 끝나 게임을 종료합니다"));

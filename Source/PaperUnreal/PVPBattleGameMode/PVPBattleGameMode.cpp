@@ -52,11 +52,7 @@ void APVPBattleGameMode::BeginPlay()
 
 		auto AtLeast2Ready = GetGameState<APVPBattleGameState>()->ReadyStateTrackerComponent->ReadyCountIsAtLeast(2);
 		auto ReadyByCheat = MakeFutureFromDelegate(UInGameCheats::OnStartGameByCheat);
-
-		if (!co_await AnyOf(MoveTemp(AtLeast2Ready), MoveTemp(ReadyByCheat)))
-		{
-			co_return;
-		}
+		co_await AnyOf(MoveTemp(AtLeast2Ready), MoveTemp(ReadyByCheat));
 
 		auto BattleMode = NewObject<UBattleRuleComponent>(this);
 		BattleMode->SetPawnClass(DefaultPawnClass);

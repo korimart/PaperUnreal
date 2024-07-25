@@ -130,3 +130,30 @@ concept CInequalityComparable = requires(T Arg0, U Arg1) { Arg0 != Arg1; };
 
 template <typename PredicateType, typename ValueType>
 concept CPredicate = requires(PredicateType Predicate, ValueType Value) { { Predicate(Value) } -> std::same_as<bool>; };
+
+
+template <typename T>
+decltype(auto) AwaitableOrIdentity(T&& MaybeAwaitable)
+{
+	if constexpr (CAwaitable<T>)
+	{
+		return Forward<T>(MaybeAwaitable);
+	}
+	else
+	{
+		return operator co_await(Forward<T>(MaybeAwaitable));
+	}
+}
+
+
+template <typename TupleType>
+void ForEachTupleElementIndexed(TupleType&& Tuple, const auto& Func)
+{
+	Forward<TupleType>(Tuple).ApplyAfter([&]<typename... ElementTypes>(ElementTypes&&... Elements)
+	{
+		[&]<typename... ElementTypes2, std::size_t... Indices>(std::index_sequence<Indices...>, ElementTypes2&&... Elements2)
+		{
+			(Func(Indices, Forward<ElementTypes2>(Elements2)), ...);
+		}(std::index_sequence_for<ElementTypes...>{}, Forward<ElementTypes>(Elements)...);
+	});
+}
