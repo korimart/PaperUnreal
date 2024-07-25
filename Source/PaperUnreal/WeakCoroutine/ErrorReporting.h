@@ -16,16 +16,14 @@ class UFailableResultError : public UObject
 
 public:
 	FString What;
-	std::source_location SourceLocation;
 };
 
 
 template <typename ErrorType = UFailableResultError>
-ErrorType* NewError(const FString& What = TEXT("No error message was given"), std::source_location SourceLocation = {})
+ErrorType* NewError(const FString& What = TEXT("No error message was given"))
 {
 	ErrorType* Ret = NewObject<ErrorType>();
 	Ret->What = What;
-	Ret->SourceLocation = SourceLocation;
 	return Ret;
 }
 
@@ -36,12 +34,12 @@ class UErrorReportingError : public UFailableResultError
 	GENERATED_BODY()
 
 public:
-	static UErrorReportingError* ObjectExpired()
+	static UErrorReportingError* InvalidObject()
 	{
-		return NewError<UErrorReportingError>(TEXT(
-			"TFailable가 UObject를 보관하기 시작할 때는 Valid였는데 꺼낼 때는 Invalid가 됨"
-			"(TFailable이 TStrongObjectPtr를 사용하여 레퍼런스를 유지하기 때문에 "
-			"명시적으로 Garbage가 된 경우에만 발생 가능)"));
+		return NewError<UErrorReportingError>(TEXT("TFailable에 저장된 UObject가 Garbage임"
+			"(애초에 쓰레기로 초기화 되었을 수도 있고 도중에 쓰레기가 되었을 수도 있음. "
+			"하지만 TFailable이 Strong Object Pointer를 유지하기 때문에 레퍼런스 소실에 의한 것이 아니라 "
+			"누군가가 명시적으로 쓰레기로 만든 것임)"));
 	}
 
 	static UErrorReportingError* InnerAwaitableAborted()
@@ -76,13 +74,17 @@ struct TFailableResultStorage<ResultType*>
 	TFailableResultStorage(ResultType* ValidResult)
 		: Result(ValidResult)
 	{
-		check(::IsValid(ValidResult));
+		if (ValidResult == nullptr)
+		{
+			bInitializedWithNull = true;
+		}
 	}
 
-	bool Expired() const { return !::IsValid(Result.Get()); }
+	bool Expired() const { return !bInitializedWithNull && !::IsValid(Result.Get()); }
 	ResultType* Get() const { return Result.Get(); }
 
 private:
+	bool bInitializedWithNull = false;
 	TStrongObjectPtr<ResultType> Result;
 };
 
@@ -96,6 +98,15 @@ public:
 	TFailableResult(UFailableResultError* Error)
 	{
 		AddError(Error);
+	}
+
+	/**
+	 * ResultType이 포인터 타입일 때 TFailableResult를 nullptr로 초기화하는 경우
+	 * 값이 nullptr인 것이므로 에러로 초기화되지 않도록 (위에 UFailableResultError* 받는 오버로드로 가지 않도록) 여기서 처리함
+	 */
+	TFailableResult(std::nullptr_t)
+		: Result(nullptr)
+	{
 	}
 
 	template <typename T>
@@ -127,7 +138,7 @@ public:
 		check(Succeeded());
 		return Result->Get();
 	}
-	
+
 	decltype(auto) GetResult() const
 	{
 		check(Succeeded());
@@ -139,10 +150,20 @@ public:
 		TArray<UFailableResultError*> Ret;
 		if (Result.IsSet() && Result->Expired())
 		{
-			Ret.Add(UErrorReportingError::ObjectExpired());
+			Ret.Add(UErrorReportingError::InvalidObject());
 		}
 		Algo::Transform(Errors, Ret, [](auto& Each) { return Each.Get(); });
 		return Ret;
+	}
+
+	void LogErrors() const
+	{
+		int32 Index = 0;
+		for (UFailableResultError* Each : GetErrors())
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[%d] %s: %s"), Index, *Each->GetClass()->GetName(), *Each->What);
+			Index++;
+		}
 	}
 
 private:
@@ -188,13 +209,16 @@ public:
 	}
 
 	template <typename HandleType>
-	bool await_suspend(HandleType&& Handle)
+	bool await_suspend(HandleType&& Handle, std::source_location Current = std::source_location::current())
 	{
+		SourceLocation = Current;
+
 		if (Awaitable.await_ready())
 		{
 			Result = Awaitable.await_resume();
 			if (Result->Failed())
 			{
+				LogErrors();
 				Handle.destroy();
 				return true;
 			}
@@ -209,7 +233,16 @@ public:
 			void resume() const
 			{
 				This->Result = This->Awaitable.await_resume();
-				This->Result->Failed() ? Handle.destroy() : Handle.resume();
+
+				if (This->Result->Failed())
+				{
+					This->LogErrors();
+					Handle.destroy();
+				}
+				else
+				{
+					Handle.resume();
+				}
 			}
 
 			void destroy() const { Handle.destroy(); }
@@ -231,6 +264,14 @@ public:
 private:
 	AwaitableType Awaitable;
 	TOptional<TFailableResult<typename AwaitableType::ResultType>> Result;
+	std::source_location SourceLocation;
+
+	void LogErrors() const
+	{
+		UE_LOG(LogTemp, Warning, TEXT("\n코루틴을 종료합니다.\n파일: %hs\n함수: %hs\n라인: %d\n이유:"),
+			SourceLocation.file_name(), SourceLocation.function_name(), SourceLocation.line());
+		Result->LogErrors();
+	}
 };
 
 
@@ -239,7 +280,7 @@ class TAlwaysResumingAwaitable
 {
 public:
 	using ResultType = decltype(std::declval<AwaitableType>().await_resume());
-	
+
 	TAlwaysResumingAwaitable(AwaitableType&& InAwaitable)
 		: Awaitable(MoveTemp(InAwaitable))
 	{

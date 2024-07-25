@@ -21,7 +21,7 @@ class UWeakCoroutineError : public UFailableResultError
 public:
 	static UWeakCoroutineError* InvalidCoroutine()
 	{
-		return NewError<UWeakCoroutineError>(TEXT("InvalidCoroutine"));
+		return NewError<UWeakCoroutineError>(TEXT("AbortIfInvalid로 등록된 오브젝트가 Valid 하지 않음"));
 	}
 };
 
@@ -60,34 +60,73 @@ namespace WeakCoroutineDetails
 		}
 
 		template <typename HandleType>
-		bool await_suspend(HandleType&& Handle)
+		bool await_suspend(HandleType&& Handle, std::source_location SL = std::source_location::current())
 		{
+			SourceLocation = SL;
+		
 			if (Awaitable.await_ready())
 			{
-				Result = Awaitable.await_resume();
-				for (UFailableResultError* Each : Result->GetErrors())
+				if (ResumeInnerAndCheckValidity())
 				{
-					if (Each->IsA<UWeakCoroutineError>())
-					{
-						Handle.destroy();
-						return true;
-					}
+					return false;
 				}
-				return false;
+				
+				LogErrors();
+				Handle.destroy();
+				return true;
 			}
 
-			Awaitable.await_suspend(Forward<HandleType>(Handle));
+			struct FWeakCheckingHandle
+			{
+				TWeakAbortingAwaitable* This;
+				std::decay_t<HandleType> Handle;
+
+				void resume() const
+				{
+					if (This->ResumeInnerAndCheckValidity())
+					{
+						Handle.resume();
+						return;
+					}
+					
+					This->LogErrors();
+					Handle.destroy();
+				}
+			};
+
+			Awaitable.await_suspend(FWeakCheckingHandle{this, Forward<HandleType>(Handle)});
 			return true;
 		}
 
 		TFailableResult<ResultType> await_resume()
 		{
-			return Awaitable.await_resume();
+			return MoveTemp(*Result);
 		}
 
 	private:
 		AwaitableType Awaitable;
 		TOptional<TFailableResult<ResultType>> Result;
+		std::source_location SourceLocation;
+
+		bool ResumeInnerAndCheckValidity()
+		{
+			Result = Awaitable.await_resume();
+			for (UFailableResultError* Each : Result->GetErrors())
+			{
+				if (Each->IsA<UWeakCoroutineError>())
+				{
+					return false;
+				}
+			}
+			return true;
+		}
+
+		void LogErrors() const
+		{
+			UE_LOG(LogTemp, Warning, TEXT("\n코루틴을 종료합니다.\n파일: %hs\n함수: %hs\n라인: %d\n이유:"),
+				SourceLocation.file_name(), SourceLocation.function_name(), SourceLocation.line());
+			Result->LogErrors();
+		}
 	};
 
 
