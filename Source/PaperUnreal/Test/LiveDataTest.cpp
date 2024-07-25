@@ -170,40 +170,40 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 			Removed.Add(Value);
 		});
 
-		TestEqual(TEXT(""), Added.Num(), 0);
-		TestEqual(TEXT(""), Removed.Num(), 0);
+		TestEqual(TEXT("validable type을 element로 가지는 TArray의 Observe 테스트"), Added.Num(), 0);
+		TestEqual(TEXT("validable type을 element로 가지는 TArray의 Observe 테스트"), Removed.Num(), 0);
 		LiveData.Add(nullptr);
-		TestEqual(TEXT(""), BackingField.Num(), 1);
-		TestEqual(TEXT(""), Added.Num(), 0);
-		TestEqual(TEXT(""), Removed.Num(), 0);
+		TestEqual(TEXT("validable type을 element로 가지는 TArray의 Observe 테스트"), BackingField.Num(), 1);
+		TestEqual(TEXT("validable type을 element로 가지는 TArray의 Observe 테스트"), Added.Num(), 0);
+		TestEqual(TEXT("validable type을 element로 가지는 TArray의 Observe 테스트"), Removed.Num(), 0);
 		LiveData.AddIfValid(nullptr);
-		TestEqual(TEXT(""), BackingField.Num(), 1);
-		TestEqual(TEXT(""), Added.Num(), 0);
-		TestEqual(TEXT(""), Removed.Num(), 0);
+		TestEqual(TEXT("validable type을 element로 가지는 TArray의 Observe 테스트"), BackingField.Num(), 1);
+		TestEqual(TEXT("validable type을 element로 가지는 TArray의 Observe 테스트"), Added.Num(), 0);
+		TestEqual(TEXT("validable type을 element로 가지는 TArray의 Observe 테스트"), Removed.Num(), 0);
 		LiveData.AddIfValid(NewObject<UDummy>());
-		TestEqual(TEXT(""), Added.Num(), 1);
-		TestEqual(TEXT(""), Removed.Num(), 0);
+		TestEqual(TEXT("validable type을 element로 가지는 TArray의 Observe 테스트"), Added.Num(), 1);
+		TestEqual(TEXT("validable type을 element로 가지는 TArray의 Observe 테스트"), Removed.Num(), 0);
 		LiveData.AddIfValid(NewObject<UDummy>());
-		TestEqual(TEXT(""), Added.Num(), 2);
-		TestEqual(TEXT(""), Removed.Num(), 0);
+		TestEqual(TEXT("validable type을 element로 가지는 TArray의 Observe 테스트"), Added.Num(), 2);
+		TestEqual(TEXT("validable type을 element로 가지는 TArray의 Observe 테스트"), Removed.Num(), 0);
 		LiveData.Add(NewObject<UDummy>());
-		TestEqual(TEXT(""), Added.Num(), 3);
-		TestEqual(TEXT(""), Removed.Num(), 0);
+		TestEqual(TEXT("validable type을 element로 가지는 TArray의 Observe 테스트"), Added.Num(), 3);
+		TestEqual(TEXT("validable type을 element로 가지는 TArray의 Observe 테스트"), Removed.Num(), 0);
 		LiveData.RemoveAt(1);
-		TestEqual(TEXT(""), Added.Num(), 3);
-		TestEqual(TEXT(""), Removed.Num(), 1);
+		TestEqual(TEXT("validable type을 element로 가지는 TArray의 Observe 테스트"), Added.Num(), 3);
+		TestEqual(TEXT("validable type을 element로 가지는 TArray의 Observe 테스트"), Removed.Num(), 1);
 		LiveData.RemoveAt(1);
-		TestEqual(TEXT(""), Added.Num(), 3);
-		TestEqual(TEXT(""), Removed.Num(), 2);
+		TestEqual(TEXT("validable type을 element로 가지는 TArray의 Observe 테스트"), Added.Num(), 3);
+		TestEqual(TEXT("validable type을 element로 가지는 TArray의 Observe 테스트"), Removed.Num(), 2);
 
 		UDummy* Garbage = NewObject<UDummy>();
 		Garbage->MarkAsGarbage();
 		LiveData.Add(Garbage);
-		TestEqual(TEXT(""), Added.Num(), 3);
-		TestEqual(TEXT(""), Removed.Num(), 2);
+		TestEqual(TEXT("validable type을 element로 가지는 TArray의 Observe 테스트"), Added.Num(), 3);
+		TestEqual(TEXT("validable type을 element로 가지는 TArray의 Observe 테스트"), Removed.Num(), 2);
 		LiveData.Remove(Garbage);
-		TestEqual(TEXT(""), Added.Num(), 3);
-		TestEqual(TEXT(""), Removed.Num(), 2);
+		TestEqual(TEXT("validable type을 element로 가지는 TArray의 Observe 테스트"), Added.Num(), 3);
+		TestEqual(TEXT("validable type을 element로 가지는 TArray의 Observe 테스트"), Removed.Num(), 2);
 	}
 
 	{
@@ -225,19 +225,19 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 			LiveData.CreateStrictAddStream();
 		}
 
-		TestEqual(TEXT(""), Received.Num(), 0);
+		TestEqual(TEXT("TArray의 create strict add stream 테스트"), Received.Num(), 0);
 		LiveData.Add(0);
-		TestEqual(TEXT(""), Received.Num(), 1);
+		TestEqual(TEXT("TArray의 create strict add stream 테스트"), Received.Num(), 1);
 		LiveData.Add(0);
-		TestEqual(TEXT(""), Received.Num(), 2);
+		TestEqual(TEXT("TArray의 create strict add stream 테스트"), Received.Num(), 2);
 		LiveData.Add(0);
-		TestEqual(TEXT(""), Received.Num(), 3);
+		TestEqual(TEXT("TArray의 create strict add stream 테스트"), Received.Num(), 3);
 		LiveData.Remove(0);
-		TestEqual(TEXT(""), Received.Num(), 3);
+		TestEqual(TEXT("TArray의 create strict add stream 테스트"), Received.Num(), 3);
 		LiveData.Add(0);
-		TestEqual(TEXT(""), Received.Num(), 3);
+		TestEqual(TEXT("TArray의 create strict add stream 테스트"), Received.Num(), 3);
 		LiveData.Add(0);
-		TestEqual(TEXT(""), Received.Num(), 3);
+		TestEqual(TEXT("TArray의 create strict add stream 테스트"), Received.Num(), 3);
 	}
 
 	return true;
