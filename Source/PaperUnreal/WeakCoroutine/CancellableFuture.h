@@ -18,8 +18,12 @@ namespace FutureDetails
 		TSharedRef<bool> Life = MakeShared<bool>(false);
 		Delegate.BindSPLambda(Life, [Life = Life.ToSharedPtr(), Func = Forward<FuncType>(Func)]<typename... ArgTypes>(ArgTypes&&... Args) mutable
 		{
-			Func(Forward<ArgTypes>(Args)...);
-			Life = nullptr;
+			if (Life && !*Life)
+			{
+				Func(Forward<ArgTypes>(Args)...);
+				*Life = true;
+				Life = nullptr;
+			}
 		});
 	}
 
