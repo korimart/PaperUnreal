@@ -87,12 +87,12 @@ public:
 
 		auto PlayerStateArray = GetWorld()->GetGameState<AGameStateBase2>()->GetPlayerStateArray();
 
-		PlayerStateArray.ObserveAdd(this, [this](APlayerState* Player)
+		PlayerStateArray.ObserveAddIfValid(this, [this](APlayerState* Player)
 		{
 			InitiatePlayerSpawnSequence(Player);
 		});
 
-		PlayerStateArray.ObserveRemove(this, [this](APlayerState* Player)
+		PlayerStateArray.ObserveRemoveIfValid(this, [this](APlayerState* Player)
 		{
 			const int32 TeamIndex = Player->FindComponentByClass<UTeamComponent>()->GetTeamIndex().Get();
 			if (TeamIndex >= 0)

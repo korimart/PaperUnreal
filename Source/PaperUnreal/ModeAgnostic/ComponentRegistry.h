@@ -76,5 +76,4 @@ TCancellableFuture<ComponentType*> WaitForComponent(AActor* Owner)
 		Registry->GetComponentMulticastDelegate(ComponentType::StaticClass(), Owner),
 		[](auto){ return true; },
 		[](UActorComponent* BeforeCast) { return Cast<ComponentType>(BeforeCast); });
-	return nullptr;
 }

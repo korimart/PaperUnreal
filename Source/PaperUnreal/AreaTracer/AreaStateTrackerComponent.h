@@ -47,13 +47,8 @@ private:
 
 		AddLifeDependency(AreaSpawner);
 
-		AreaSpawner->GetSpawnedAreas().ObserveAdd(this, [this](AAreaActor* SpawnedArea)
+		AreaSpawner->GetSpawnedAreas().ObserveAddIfValid(this, [this](AAreaActor* SpawnedArea)
 		{
-			if (!IsValid(SpawnedArea))
-			{
-				return;
-			}
-			
 			UniqueHandle(SpawnedArea, AreaStateTracker::AliveHandle)
 				= SpawnedArea->LifeComponent->GetbAlive().Observe([this, SpawnedArea](bool)
 				{
@@ -61,7 +56,7 @@ private:
 				});
 		});
 
-		AreaSpawner->GetSpawnedAreas().ObserveRemove(this, [this](AAreaActor* SpawnedArea)
+		AreaSpawner->GetSpawnedAreas().ObserveRemoveIfValid(this, [this](AAreaActor* SpawnedArea)
 		{
 			RemoveHandles(SpawnedArea);
 			OnSomeConditionMaybeSatisfied();

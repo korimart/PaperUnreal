@@ -102,17 +102,14 @@ private:
 		ServerOverlapChecker->SetTracer(TracerPath);
 		ServerOverlapChecker->RegisterComponent();
 
-		ServerPlayerSpawner->GetSpawnedPlayers().ObserveAdd(this, [this](APawn* NewPlayer)
+		ServerPlayerSpawner->GetSpawnedPlayers().ObserveAddIfValid(this, [this](APawn* NewPlayer)
 		{
-			if (IsValid(NewPlayer))
-			{
-				auto NewPlayerHome = NewPlayer->FindComponentByClass<UBattlePlayerAttacherComponent>()->HomeArea.Get();
-				auto NewPlayerTracer = NewPlayer->FindComponentByClass<UTracerPathComponent>();
+			auto NewPlayerHome = NewPlayer->FindComponentByClass<UBattlePlayerAttacherComponent>()->HomeArea.Get();
+			auto NewPlayerTracer = NewPlayer->FindComponentByClass<UTracerPathComponent>();
 
-				if (NewPlayerHome != HomeArea.Get())
-				{
-					ServerOverlapChecker->AddOverlapTarget(NewPlayerTracer);
-				}
+			if (NewPlayerHome != HomeArea.Get())
+			{
+				ServerOverlapChecker->AddOverlapTarget(NewPlayerTracer);
 			}
 		});
 
@@ -121,9 +118,9 @@ private:
 		ServerTracerToAreaConverter->SetConversionDestination(HomeArea.Get()->ServerAreaBoundary);
 		ServerTracerToAreaConverter->RegisterComponent();
 
-		ServerAreaSpawner->GetSpawnedAreas().ObserveAdd(this, [this](AAreaActor* NewArea)
+		ServerAreaSpawner->GetSpawnedAreas().ObserveAddIfValid(this, [this](AAreaActor* NewArea)
 		{
-			if (IsValid(NewArea) && NewArea != HomeArea.Get())
+			if (NewArea != HomeArea.Get())
 			{
 				auto AreaSlasher = NewObject<UAreaSlasherComponent>(GetOwner());
 				AreaSlasher->SetSlashTarget(NewArea->ServerAreaBoundary);
@@ -171,16 +168,13 @@ private:
 			auto PlayerState = co_await GetOuterACharacter2()->WaitForPlayerState();
 			auto Inventory = co_await WaitForComponent<UInventoryComponent>(PlayerState);
 
-			Inventory->GetTracerMaterial().Observe(TracerMesh, [this, TracerMesh](auto SoftMaterial)
+			Inventory->GetTracerMaterial().ObserveIfValid(TracerMesh, [TracerMesh](auto SoftMaterial)
 			{
-				if (!SoftMaterial.IsNull())
+				RunWeakCoroutine(TracerMesh, [TracerMesh, SoftMaterial](FWeakCoroutineContext&) -> FWeakCoroutine
 				{
-					RunWeakCoroutine(TracerMesh, [TracerMesh, SoftMaterial](FWeakCoroutineContext&) -> FWeakCoroutine
-					{
-						auto Material = co_await RequestAsyncLoad(SoftMaterial);
-						TracerMesh->ConfigureMaterialSet({Material});
-					});
-				}
+					auto Material = co_await RequestAsyncLoad(SoftMaterial);
+					TracerMesh->ConfigureMaterialSet({Material});
+				});
 			});
 		});
 	}

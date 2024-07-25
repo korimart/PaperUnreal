@@ -49,6 +49,12 @@ struct TLiveDataValidator<ValueType*>
 };
 
 
+template <typename ValueType>
+struct TLiveDataValidator<TObjectPtr<ValueType>> : TLiveDataValidator<ValueType*>
+{
+};
+
+
 template <typename InterfaceType>
 struct TLiveDataValidator<TScriptInterface<InterfaceType>>
 {
@@ -63,6 +69,23 @@ struct TLiveDataValidator<TScriptInterface<InterfaceType>>
 
 	// LiveData 안에 원본이 살아있지 않을 테니 copy 또는 move를 사용해 새로 만들라는 뜻
 	static InterfaceType* ToValidConstruct(const TScriptInterface<InterfaceType>& Value) { return Value.GetInterface(); }
+};
+
+
+template <typename ObjectType>
+struct TLiveDataValidator<TSoftObjectPtr<ObjectType>>
+{
+	static constexpr bool bSupported = true;
+
+	using ValidType = TSoftObjectPtr<ObjectType>;
+
+	static bool IsValid(const TSoftObjectPtr<ObjectType>& Value) { return !Value.IsNull(); }
+
+	// LiveData 안에 원본이 살아있을 테니 life time bound를 가정하고 ref를 반환하라는 뜻
+	static const TSoftObjectPtr<ObjectType>& ToValidRef(const TSoftObjectPtr<ObjectType>& Value UE_LIFETIMEBOUND) { return Value; }
+
+	// LiveData 안에 원본이 살아있지 않을 테니 copy 또는 move를 사용해 새로 만들라는 뜻
+	static TSoftObjectPtr<ObjectType> ToValidConstruct(const TSoftObjectPtr<ObjectType>& Value) { return Value; }
 };
 
 
@@ -184,6 +207,14 @@ public:
 		FDelegateSPHandle Ret;
 		Observe(Ret.ToShared(), Forward<FuncType>(Func));
 		return Ret;
+	}
+	
+	template <typename FuncType>
+	void ObserveIfValid(UObject* Lifetime, FuncType&& Func)
+	{
+		auto ValidCheckingFunc = RelayValidRefTo<Validator>(Forward<FuncType>(Func));
+		ValidCheckingFunc(Get());
+		OnChanged.AddWeakLambda(Lifetime, MoveTemp(ValidCheckingFunc));
 	}
 
 	template <typename T, typename FuncType>
@@ -362,7 +393,7 @@ public:
 	}
 
 	template <typename FuncType>
-	void ObserveAddIfValid(const auto Lifetime, FuncType&& Func) requires Validator::bSupported
+	void ObserveAddIfValid(const auto& Lifetime, FuncType&& Func) requires Validator::bSupported
 	{
 		ObserveAdd(Lifetime, RelayValidRefTo<Validator>(Forward<FuncType>(Func)));
 	}
@@ -457,12 +488,21 @@ public:
 
 	template <typename... ArgTypes>
 	decltype(auto) Observe(ArgTypes&&... Args) { return LiveData.Observe(Forward<ArgTypes>(Args)...); }
+	
+	template <typename... ArgTypes>
+	decltype(auto) ObserveIfValid(ArgTypes&&... Args) { return LiveData.ObserveIfValid(Forward<ArgTypes>(Args)...); }
 
 	template <typename... ArgTypes>
 	decltype(auto) ObserveAdd(ArgTypes&&... Args) { return LiveData.ObserveAdd(Forward<ArgTypes>(Args)...); }
+	
+	template <typename... ArgTypes>
+	decltype(auto) ObserveAddIfValid(ArgTypes&&... Args) { return LiveData.ObserveAddIfValid(Forward<ArgTypes>(Args)...); }
 
 	template <typename... ArgTypes>
 	decltype(auto) ObserveRemove(ArgTypes&&... Args) { return LiveData.ObserveRemove(Forward<ArgTypes>(Args)...); }
+	
+	template <typename... ArgTypes>
+	decltype(auto) ObserveRemoveIfValid(ArgTypes&&... Args) { return LiveData.ObserveRemoveIfValid(Forward<ArgTypes>(Args)...); }
 
 	decltype(auto) CreateStream() { return LiveData.CreateStream(); }
 	decltype(auto) CreateAddStream() { return LiveData.CreateAddStream(); }
