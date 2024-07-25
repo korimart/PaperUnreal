@@ -170,11 +170,11 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		TArray<TTuple<TCancellablePromise<int32>, TCancellableFuture<int32>>> Array;
 		Array.Add(MakePromise<int32>());
 
-		bool bError = true;
+		bool bError = false;
 		RunWeakCoroutine([&Array, &bError](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
-			auto ResultOrError = co_await MoveTemp(Array[0].Get<1>());
-			bError = false;
+			TFailableResult<int32> ResultOrError = co_await WithError(MoveTemp(Array[0].Get<1>()));
+			bError = ResultOrError.GetErrors()[0]->IsA<UCancellableFutureError>();
 		});
 
 		TestFalse(TEXT("WithError 함수로 Error를 받을 수 있는지 테스트"), bError);

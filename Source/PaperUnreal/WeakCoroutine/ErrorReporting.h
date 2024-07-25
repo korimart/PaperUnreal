@@ -60,8 +60,9 @@ struct TFailableResultStorage
 		: Result(Forward<T>(Value))
 	{
 	}
-	
+
 	bool Expired() const { return false; }
+	ResultType& Get() { return Result; }
 	const ResultType& Get() const { return Result; }
 
 private:
@@ -77,7 +78,7 @@ struct TFailableResultStorage<ResultType*>
 	{
 		check(::IsValid(ValidResult));
 	}
-	
+
 	bool Expired() const { return !::IsValid(Result.Get()); }
 	ResultType* Get() const { return Result.Get(); }
 
@@ -96,7 +97,7 @@ public:
 	{
 		AddError(Error);
 	}
-	
+
 	template <typename T>
 	TFailableResult(T&& Value) requires !std::is_convertible_v<T, UFailableResultError*>
 		: Result(Forward<T>(Value))
@@ -121,6 +122,12 @@ public:
 		return !Failed();
 	}
 
+	decltype(auto) GetResult()
+	{
+		check(Succeeded());
+		return Result->Get();
+	}
+	
 	decltype(auto) GetResult() const
 	{
 		check(Succeeded());
@@ -147,13 +154,16 @@ private:
 template <typename AwaitableType>
 concept CErrorReportingAwaitable = requires(AwaitableType Awaitable)
 {
+	typename AwaitableType::ResultType;
 	{ Awaitable.await_resume() } -> CInstantiationOf<TFailableResult>;
-	{ Awaitable.Failed() } -> std::same_as<bool>;
 };
 
 
 template <typename AwaitableType>
-concept CNonErrorReportingAwaitable = !CErrorReportingAwaitable<AwaitableType>;
+concept CNonErrorReportingAwaitable = requires(AwaitableType Awaitable)
+{
+	{ Awaitable.await_resume() } -> CNotInstantiationOf<TFailableResult>;
+};
 
 
 template <CErrorReportingAwaitable AwaitableType>
@@ -178,12 +188,17 @@ public:
 	}
 
 	template <typename HandleType>
-	void await_suspend(HandleType&& Handle)
+	bool await_suspend(HandleType&& Handle)
 	{
-		if (Awaitable.await_ready() && Awaitable.Failed())
+		if (Awaitable.await_ready())
 		{
-			Handle.destroy();
-			return;
+			Result = Awaitable.await_resume();
+			if (Result->Failed())
+			{
+				Handle.destroy();
+				return true;
+			}
+			return false;
 		}
 
 		struct FFailChecker
@@ -191,20 +206,31 @@ public:
 			TErrorRemovedAwaitable* This;
 			std::decay_t<HandleType> Handle;
 
-			void resume() const { This->Awaitable.Failed() ? Handle.destroy() : Handle.resume(); }
+			void resume() const
+			{
+				This->Result = This->Awaitable.await_resume();
+				This->Result->Failed() ? Handle.destroy() : Handle.resume();
+			}
+
 			void destroy() const { Handle.destroy(); }
 		};
 
 		Awaitable.await_suspend(FFailChecker{this, Forward<HandleType>(Handle)});
+		return true;
 	}
 
-	auto await_resume()
+	typename AwaitableType::ResultType await_resume()
 	{
-		return Awaitable.await_resume().GetResult();
+		// 이곳의 std::move 사용은 의도적임
+		// MoveTemp는 prvalue가 arguemnt로 들어왔는지 static_assert로 체크하는데
+		// GetResult의 결과는 ResultType이 포인터 타입일 때 prvalue이고 그 외에는 lvalue reference임
+		// lvalue reference일 때는 move하고 포인터 타입일 때는 그냥 반환하는 것이 목적이므로 std::move를 사용함
+		return std::move(Result->GetResult());
 	}
 
 private:
 	AwaitableType Awaitable;
+	TOptional<TFailableResult<typename AwaitableType::ResultType>> Result;
 };
 
 
@@ -212,6 +238,8 @@ template <CNonErrorReportingAwaitable AwaitableType>
 class TAlwaysResumingAwaitable
 {
 public:
+	using ResultType = decltype(std::declval<AwaitableType>().await_resume());
+	
 	TAlwaysResumingAwaitable(AwaitableType&& InAwaitable)
 		: Awaitable(MoveTemp(InAwaitable))
 	{
@@ -250,7 +278,7 @@ public:
 		Awaitable.await_suspend(FAbortChecker{this, Forward<HandleType>(Handle)});
 	}
 
-	TFailableResult<decltype(std::declval<AwaitableType>().await_resume())> await_resume()
+	TFailableResult<ResultType> await_resume()
 	{
 		if (bAborted)
 		{
@@ -258,11 +286,6 @@ public:
 		}
 
 		return Awaitable.await_resume();
-	}
-
-	bool Failed() const
-	{
-		return bAborted;
 	}
 
 private:

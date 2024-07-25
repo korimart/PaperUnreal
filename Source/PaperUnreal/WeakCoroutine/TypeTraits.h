@@ -35,6 +35,9 @@ inline constexpr bool TIsInstantiationOf_V = TIsInstantiationOf<std::decay_t<T>,
 template <typename T, template <typename...> typename Template>
 concept CInstantiationOf = TIsInstantiationOf_V<T, Template>;
 
+template <typename T, template <typename...> typename Template>
+concept CNotInstantiationOf = !TIsInstantiationOf_V<T, Template>;
+
 
 template <typename FromType, typename... ToTypes>
 constexpr bool TIsConvertible_V = (std::is_convertible_v<FromType, ToTypes> || ...);

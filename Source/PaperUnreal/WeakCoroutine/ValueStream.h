@@ -87,6 +87,7 @@ class TValueStream
 {
 public:
 	using ReceiverType = TValueStreamValueReceiver<T>;
+	using ResultType = T;
 
 	TValueStream() = default;
 

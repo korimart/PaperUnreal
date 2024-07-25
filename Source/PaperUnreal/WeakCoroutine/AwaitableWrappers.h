@@ -70,6 +70,11 @@ public:
 		return Awaitable.await_resume();
 	}
 
+	AwaitableType& Inner()
+	{
+		return Awaitable;
+	}
+
 private:
 	AwaitableType Awaitable;
 };
@@ -192,6 +197,8 @@ template <typename ValueStreamType, typename PredicateType>
 class TFilteringAwaitable
 {
 public:
+	using ResultType = typename std::decay_t<ValueStreamType>::ResultType;
+	
 	template <typename Stream, typename Pred>
 	TFilteringAwaitable(Stream&& ValueStream, Pred&& Predicate)
 		: ValueStream(Forward<Stream>(ValueStream)), Predicate(Forward<Pred>(Predicate))
@@ -223,20 +230,15 @@ public:
 		}(*this, Handle);
 	}
 
-	auto await_resume()
+	TFailableResult<ResultType> await_resume()
 	{
 		return MoveTemp(Ret.GetValue());
 	}
 	
-	bool Failed() const
-	{
-		return Ret->Failed();
-	}
-
 private:
 	ValueStreamType ValueStream;
 	PredicateType Predicate;
-	TOptional<decltype(operator co_await(std::declval<std::decay_t<ValueStreamType>&>()).await_resume())> Ret;
+	TOptional<TFailableResult<ResultType>> Ret;
 };
 
 template <typename Stream, typename Pred>
@@ -244,25 +246,16 @@ TFilteringAwaitable(Stream&& ValueStream, Pred&& Predicate)
 	-> TFilteringAwaitable<std::conditional_t<std::is_lvalue_reference_v<Stream>, Stream, std::decay_t<Stream>>, std::decay_t<Pred>>;
 
 
-namespace AwaitableWrapperDetails
+template <typename T>
+decltype(auto) AwaitableOrIdentity(T&& MaybeAwaitable)
 {
-	template <typename T>
-	decltype(auto) AwaitableOrIdentity(T&& MaybeAwaitable)
+	if constexpr (CAwaitable<T>)
 	{
-		if constexpr (CAwaitable<T>)
-		{
-			return Forward<T>(MaybeAwaitable);
-		}
-		else
-		{
-			return operator co_await(Forward<T>(MaybeAwaitable));
-		}
+		return Forward<T>(MaybeAwaitable);
 	}
-
-	template <typename... AwaitableTypes>
-	TAnyOfAwaitable<AwaitableTypes...> AnyOfImpl(AwaitableTypes... Awaitables)
+	else
 	{
-		return {MoveTemp(Awaitables)...};
+		return operator co_await(Forward<T>(MaybeAwaitable));
 	}
 }
 
@@ -270,8 +263,7 @@ namespace AwaitableWrapperDetails
 template <typename... MaybeAwaitableTypes>
 auto AnyOf(MaybeAwaitableTypes&&... MaybeAwaitables)
 {
-	using namespace AwaitableWrapperDetails;
-	return AnyOfImpl(AwaitableOrIdentity(Forward<MaybeAwaitableTypes>(MaybeAwaitables))...);
+	return TAnyOfAwaitable{AwaitableOrIdentity(Forward<MaybeAwaitableTypes>(MaybeAwaitables))...};
 }
 
 
