@@ -292,3 +292,17 @@ private:
 	bool bAborted = false;
 	AwaitableType Awaitable;
 };
+
+
+template <typename AwaitableType>
+struct TEnsureErrorReporting
+{
+	using Type = TAlwaysResumingAwaitable<AwaitableType>;
+};
+
+
+template <CErrorReportingAwaitable AwaitableType>
+struct TEnsureErrorReporting<AwaitableType>
+{
+	using Type = AwaitableType;
+};
