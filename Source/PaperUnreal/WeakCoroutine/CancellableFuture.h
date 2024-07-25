@@ -70,7 +70,6 @@ public:
 
 	template <typename U>
 	void SetValue(U&& Value)
-		requires std::is_constructible_v<TFailableResult<ResultType>, U> || std::is_constructible_v<UFailableResultError*, U>
 	{
 		Ret.Emplace(TFailableResult<ResultType>{Forward<U>(Value)});
 		
@@ -119,20 +118,19 @@ public:
 	using StateType = TCancellableFutureState<T>;
 	using ResultType = typename StateType::ResultType;
 
-	TCancellableFuture(const TSharedRef<StateType>& InState)
-		: State(InState)
-	{
-	}
-
 	TCancellableFuture() requires std::is_same_v<T, void>
 		: State(MakeShared<StateType>())
 	{
 		State->SetValue();
 	}
 
+	TCancellableFuture(const TSharedRef<StateType>& InState)
+		: State(InState)
+	{
+	}
+
 	template <typename U>
-	TCancellableFuture(U&& ReadyValue)
-		requires std::is_constructible_v<TFailableResult<ResultType>, U> || std::is_constructible_v<UFailableResultError*, U>
+	TCancellableFuture(U&& ReadyValue) requires !std::is_convertible_v<U, const TSharedRef<StateType>&>
 		: State(MakeShared<StateType>())
 	{
 		State->SetValue(Forward<U>(ReadyValue));
@@ -226,7 +224,6 @@ public:
 
 	template <typename U>
 	void SetValue(U&& Value)
-		requires std::is_constructible_v<T, U> || std::is_constructible_v<UFailableResultError*, U>
 	{
 		check(!IsSet());
 		std::exchange(State, nullptr)->SetValue(Forward<U>(Value));
@@ -274,7 +271,7 @@ public:
 	}
 
 	template <typename U>
-	void SetValue(U&& Value) requires std::is_constructible_v<T, U>
+	void SetValue(U&& Value)
 	{
 		check(!HasThisInstanceSet());
 

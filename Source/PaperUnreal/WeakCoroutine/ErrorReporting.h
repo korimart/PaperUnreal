@@ -30,22 +30,77 @@ ErrorType* NewError(const FString& What = TEXT("No error message was given"), st
 }
 
 
+UCLASS()
+class UErrorReportingError : public UFailableResultError
+{
+	GENERATED_BODY()
+
+public:
+	static UErrorReportingError* ObjectExpired()
+	{
+		return NewError<UErrorReportingError>(TEXT(
+			"TFailable가 UObject를 보관하기 시작할 때는 Valid였는데 꺼낼 때는 Invalid가 됨"
+			"(TFailable이 TStrongObjectPtr를 사용하여 레퍼런스를 유지하기 때문에 "
+			"명시적으로 Garbage가 된 경우에만 발생 가능)"));
+	}
+
+	static UErrorReportingError* InnerAwaitableAborted()
+	{
+		return NewError<UErrorReportingError>(TEXT(
+			"TAlwaysResumingAwaitable: inner awaitable이 코루틴을 파괴했으므로 에러로 바꿔서 resume 합니다"));
+	}
+};
+
+
+template <typename ResultType>
+struct TFailableResultStorage
+{
+	template <typename T>
+	TFailableResultStorage(T&& Value)
+		: Result(Forward<T>(Value))
+	{
+	}
+	
+	bool Expired() const { return false; }
+	const ResultType& Get() const { return Result; }
+
+private:
+	ResultType Result;
+};
+
+
+template <typename ResultType> requires std::is_base_of_v<UObject, std::decay_t<ResultType>>
+struct TFailableResultStorage<ResultType*>
+{
+	TFailableResultStorage(ResultType* ValidResult)
+		: Result(ValidResult)
+	{
+		check(::IsValid(ValidResult));
+	}
+	
+	bool Expired() const { return !::IsValid(Result.Get()); }
+	ResultType* Get() const { return Result.Get(); }
+
+private:
+	TStrongObjectPtr<ResultType> Result;
+};
+
+
 template <typename InResultType>
 class TFailableResult
 {
 public:
 	using ResultType = InResultType;
-	
-	template <typename T>
-	TFailableResult(T&& Value)
-		requires std::is_constructible_v<ResultType, T> && !std::is_constructible_v<UFailableResultError*, T>
-		: Result(Forward<T>(Value))
-	{
-	}
 
 	TFailableResult(UFailableResultError* Error)
 	{
 		AddError(Error);
+	}
+	
+	template <typename T>
+	TFailableResult(T&& Value) requires !std::is_convertible_v<T, UFailableResultError*>
+		: Result(Forward<T>(Value))
+	{
 	}
 
 	TFailableResult(TFailableResult&&) = default;
@@ -53,35 +108,38 @@ public:
 
 	void AddError(UFailableResultError* Error)
 	{
-		check(!Result.IsSet());
 		Errors.Emplace(Error);
 	}
 
 	bool Failed() const
 	{
-		return Errors.Num() > 0;
+		return (Result.IsSet() && Result->Expired()) || Errors.Num() > 0;
 	}
 
 	bool Succeeded() const
 	{
-		return Result.IsSet();
+		return !Failed();
 	}
 
-	const ResultType& GetResult() const
+	decltype(auto) GetResult() const
 	{
 		check(Succeeded());
-		return Result.GetValue();
+		return Result->Get();
 	}
 
 	TArray<UFailableResultError*> GetErrors() const
 	{
 		TArray<UFailableResultError*> Ret;
-		Algo::Transform(Errors, Ret, [](auto& Each){ return Each.Get(); });
+		if (Result.IsSet() && Result->Expired())
+		{
+			Ret.Add(UErrorReportingError::ObjectExpired());
+		}
+		Algo::Transform(Errors, Ret, [](auto& Each) { return Each.Get(); });
 		return Ret;
 	}
 
 private:
-	TOptional<ResultType> Result;
+	TOptional<TFailableResultStorage<ResultType>> Result;
 	TArray<TStrongObjectPtr<UFailableResultError>> Errors;
 };
 
@@ -196,9 +254,9 @@ public:
 	{
 		if (bAborted)
 		{
-			return NewError(TEXT("TAlwaysResumingAwaitable: inner awaitable이 abort 했으므로 에러로 resume 합니다"));
+			return UErrorReportingError::InnerAwaitableAborted();
 		}
-		
+
 		return Awaitable.await_resume();
 	}
 
