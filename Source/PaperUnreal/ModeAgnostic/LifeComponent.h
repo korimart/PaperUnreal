@@ -15,12 +15,13 @@ class ULifeComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(bool, bAlive, RepbAlive);
+	DECLARE_LIVE_DATA_GETTER_SETTER(bAlive);
 
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_bAlive)
 	bool RepbAlive = true;
-	
+	mutable TLiveData<bool&> bAlive{RepbAlive};
+
 	UFUNCTION()
 	void OnRep_bAlive() { bAlive.Notify(); }
 
@@ -29,7 +30,7 @@ private:
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 		DOREPLIFETIME(ThisClass, RepbAlive);
 	}
-	
+
 	ULifeComponent()
 	{
 		SetIsReplicatedByDefault(true);

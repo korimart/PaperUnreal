@@ -17,15 +17,17 @@ class UInventoryComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(AAreaActor*, HomeArea, RepHomeArea); // TODO move
-	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(TSoftObjectPtr<UMaterialInstance>, TracerMaterial, RepTracerMaterial);
+	DECLARE_LIVE_DATA_GETTER_SETTER(HomeArea); // TODO move
+	DECLARE_LIVE_DATA_GETTER_SETTER(TracerMaterial);
 
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_HomeArea)
 	AAreaActor* RepHomeArea;
+	mutable TLiveData<AAreaActor*&> HomeArea{RepHomeArea};
 
 	UPROPERTY(ReplicatedUsing=OnRep_TracerMaterial)
 	TSoftObjectPtr<UMaterialInstance> RepTracerMaterial;
+	mutable TLiveData<TSoftObjectPtr<UMaterialInstance>&> TracerMaterial{RepTracerMaterial};
 
 	UFUNCTION()
 	void OnRep_HomeArea() { HomeArea.Notify(); }

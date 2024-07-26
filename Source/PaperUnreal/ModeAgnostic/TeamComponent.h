@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "PaperUnreal/GameFramework2/ActorComponent2.h"
-#include "PaperUnreal/GameFramework2/Utils.h"
 #include "PaperUnreal/WeakCoroutine/LiveData.h"
 #include "Net/UnrealNetwork.h"
 #include "TeamComponent.generated.h"
@@ -16,11 +15,12 @@ class UTeamComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(int32, TeamIndex, RepTeamIndex);
+	DECLARE_LIVE_DATA_GETTER_SETTER(TeamIndex);
 
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_TeamIndex)
 	int32 RepTeamIndex = -1;
+	mutable TLiveData<int32&> TeamIndex{RepTeamIndex};
 
 	UFUNCTION()
 	void OnRep_TeamIndex() { TeamIndex.Notify(); }

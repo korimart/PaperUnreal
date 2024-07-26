@@ -153,3 +153,9 @@ ReplicatedAreaExpander
 -> derived class로 자꾸 만들지 말고 type traits로 관련 정보 look up 하게 구현하자
 4. value streamer 제거, byte streamer 제거 및 tracer path 방식 좀 변경 <-- 크래시 발생하므로 1순위
 5. TracerToAreaConverter가 live data 콜백이 원본을 수정하는 circular 관계이므로 교통정리하는 클래스 구현
+
+
+
+
+1. Player Controller에 loop에서 UObject에 co_await 계속 걸어서 weak list에 pawn 계속 들어가는 문제 수정
+2. line mesh component replication 구현 (과정에서 byte streamer / value streamer 제거)

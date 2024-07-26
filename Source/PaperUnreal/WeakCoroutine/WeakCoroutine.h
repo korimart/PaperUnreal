@@ -174,14 +174,13 @@ namespace WeakCoroutineDetails
 				Ret.AddError(UWeakCoroutineError::InvalidCoroutine());
 			}
 
-			// TODO
-			// if constexpr (WeakCoroutineDetails::CWeakListAddable<ResultType, PromiseType>)
-			// {
-			// 	if (Ret.Succeeded())
-			// 	{
-			// 		Handle.promise().AddToWeakList(Ret.GetResult());
-			// 	}
-			// }
+			if constexpr (WeakCoroutineDetails::CWeakListAddable<ResultType, PromiseType>)
+			{
+				if (Ret.Succeeded())
+				{
+					Handle.promise().AddToWeakList(Ret.GetResult());
+				}
+			}
 
 			return Ret;
 		}

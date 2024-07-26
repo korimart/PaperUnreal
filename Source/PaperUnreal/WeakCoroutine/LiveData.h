@@ -120,10 +120,11 @@ protected:
 };
 
 
-template <typename ValueType, typename = void>
+template <typename InValueType, typename = void>
 class TLiveData : public FLiveDataBase
 {
 public:
+	using ValueType = InValueType;
 	using DecayedValueType = std::decay_t<ValueType>;
 	using ConstRefValueType = const DecayedValueType&;
 	using Validator = TLiveDataValidator<DecayedValueType>;
@@ -158,9 +159,9 @@ public:
 	template <typename T> requires CInequalityComparable<ValueType, T> && std::is_assignable_v<ValueType&, T>
 	bool SetValueSilent(T&& Right)
 	{
-		check(!bExecutingCallbacks);
 		if (Value != Right)
 		{
+			check(!bExecutingCallbacks);
 			Value = Forward<T>(Right);
 			return true;
 		}
@@ -530,10 +531,7 @@ private:
 };
 
 
-// TLiveData Declarations
-#define DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(Type, Name, BackingField)\
-	private: TLiveData<std::type_identity_t<Type>&> Name{BackingField};\
-	public:\
-	TLiveDataView<std::type_identity_t<Type>&> Get##Name() { return Name; };\
-	void Set##Name(const std::type_identity_t<Type>& NewValue) { DEFINE_REPPED_VAR_SETTER(Name, NewValue); }
-// ~TLiveData Declarations
+#define DECLARE_LIVE_DATA_GETTER_SETTER(Name)\
+	template <typename U>\
+	void Set##Name(U&& NewValue){ check(GetNetMode() != NM_Client); Name = Forward<U>(NewValue); }\
+	auto Get##Name() const { return TLiveDataView{Name}; }

@@ -18,8 +18,6 @@ class AAreaActor : public AActor2
 	GENERATED_BODY()
 
 public:
-	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(TSoftObjectPtr<UMaterialInstance>, AreaMaterial, RepAreaMaterial);
-	
 	UPROPERTY()
 	ULifeComponent* LifeComponent;
 
@@ -32,9 +30,12 @@ public:
 	UPROPERTY()
 	UAreaMeshComponent* ClientAreaMesh;
 
+	DECLARE_LIVE_DATA_GETTER_SETTER(AreaMaterial);
+	
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_AreaMaterial)
 	TSoftObjectPtr<UMaterialInstance> RepAreaMaterial;
+	mutable TLiveData<TSoftObjectPtr<UMaterialInstance>&> AreaMaterial{RepAreaMaterial};
 
 	UFUNCTION()
 	void OnRep_AreaMaterial() { AreaMaterial.Notify(); }

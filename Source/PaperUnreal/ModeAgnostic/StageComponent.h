@@ -15,11 +15,12 @@ class UStageComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	DECLARE_REPPED_LIVE_DATA_GETTER_SETTER(FName, CurrentStage, RepCurrentStage);
+	DECLARE_LIVE_DATA_GETTER_SETTER(CurrentStage);
 
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_CurrentStage)
 	FName RepCurrentStage;
+	mutable TLiveData<FName&> CurrentStage{RepCurrentStage};
 
 	UFUNCTION()
 	void OnRep_CurrentStage() { CurrentStage.Notify(); }
