@@ -174,13 +174,14 @@ namespace WeakCoroutineDetails
 				Ret.AddError(UWeakCoroutineError::InvalidCoroutine());
 			}
 
-			if constexpr (WeakCoroutineDetails::CWeakListAddable<ResultType, PromiseType>)
-			{
-				if (Ret.Succeeded())
-				{
-					Handle.promise().AddToWeakList(Ret.GetResult());
-				}
-			}
+			// TODO
+			// if constexpr (WeakCoroutineDetails::CWeakListAddable<ResultType, PromiseType>)
+			// {
+			// 	if (Ret.Succeeded())
+			// 	{
+			// 		Handle.promise().AddToWeakList(Ret.GetResult());
+			// 	}
+			// }
 
 			return Ret;
 		}
@@ -340,15 +341,21 @@ public:
 		return !*bCoroutineFinished && Algo::AllOf(WeakList, [](const auto& Each) { return Each(); });
 	}
 
-	void AddToWeakList(UObject* Object)
+	void AddToWeakList(const UObject* Object)
 	{
-		WeakList.Add([Weak = TWeakObjectPtr{Object}]() { return Weak.IsValid(); });
+		WeakList.Add([Weak = TWeakObjectPtr<const UObject>{Object}]() { return Weak.IsValid(); });
 	}
 
 	template <typename U>
 	void AddToWeakList(TScriptInterface<U> Interface)
 	{
 		AddToWeakList(Interface.GetObject());
+	}
+	
+	template <typename U, typename = typename U::UClassType>
+	void AddToWeakList(const U* Interface)
+	{
+		AddToWeakList(Cast<UObject>(Interface));
 	}
 
 	template <typename U>
@@ -463,7 +470,8 @@ auto RunWeakCoroutineNoCaptures(const FuncType& Func, ArgTypes&&... Args)
 }
 
 
-template <typename MaybeAwaitableType>
+// TODO
+template <typename... AllowedErrorTypes, typename MaybeAwaitableType>
 auto WithError(MaybeAwaitableType&& MaybeAwaitable)
 {
 	return WeakCoroutineDetails::TWithErrorAwaitable{AwaitableOrIdentity(Forward<MaybeAwaitableType>(MaybeAwaitable))};

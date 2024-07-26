@@ -19,6 +19,12 @@ namespace Utils_Private
 	{
 		return ::IsValid(Pointer.GetObject());
 	}
+	
+	template <typename T, typename = typename T::UClassType>
+	bool IsValid(const T* InterfacePointer)
+	{
+		return ::IsValid(Cast<UObject>(InterfacePointer));
+	}
 
 	template <typename SmartPointerType>
 	concept CSmartPointer = requires(SmartPointerType SmartPointer)
@@ -79,6 +85,69 @@ struct FDelegateSPHandle
 
 private:
 	TSharedRef<bool> Life = MakeShared<bool>();
+};
+
+
+class FTickingSwitch
+{
+public:
+	void Tick(bool bNewBool)
+	{
+		bPrevTick = bThisTick;
+		bThisTick = bNewBool;
+	}
+
+	void IfSwitchedOnThisFrame(const auto& Func)
+	{
+		if (!bPrevTick && bThisTick)
+		{
+			Func();
+		}
+	}
+
+	void IfTrueThisFrame(const auto& Func)
+	{
+		if (bThisTick)
+		{
+			Func();
+		}
+	}
+
+	void IfSwitchedOffThisFrame(const auto& Func)
+	{
+		if (bPrevTick && !bThisTick)
+		{
+			Func();
+		}
+	}
+	
+private:
+	bool bPrevTick = false;
+	bool bThisTick = false;
+};
+
+
+template <typename T>
+class TTickingValue
+{
+public:
+	void Tick(TOptional<T> Value)
+	{
+		PrevTick = MoveTemp(ThisTick);
+		ThisTick = MoveTemp(Value);
+	}
+
+	void OverTwoTicks(const auto& Func)
+	{
+		if (PrevTick && ThisTick)
+		{
+			Func(*PrevTick, *ThisTick);
+		}
+	}
+
+private:
+	TOptional<T> PrevTick;
+	TOptional<T> ThisTick;
 };
 
 

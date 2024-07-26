@@ -8,6 +8,7 @@
 #include "GameFramework/PlayerState.h"
 #include "PaperUnreal/AreaTracer/AreaSpawnerComponent.h"
 #include "PaperUnreal/AreaTracer/AreaStateTrackerComponent.h"
+#include "PaperUnreal/Development/InGameCheats.h"
 #include "PaperUnreal/GameFramework2/ActorComponent2.h"
 #include "PaperUnreal/ModeAgnostic/InventoryComponent.h"
 #include "PaperUnreal/ModeAgnostic/PlayerSpawnerComponent.h"
@@ -232,7 +233,15 @@ private:
 				AreaStateTracker->DestroyComponent();
 			});
 
-			const int32 CompletedAwaitableIndex = co_await AnyOf(MoveTemp(Timeout), MoveTemp(LastManStanding));
+			const int32 CompletedAwaitableIndex = co_await AnyOf(
+				MoveTemp(Timeout), MoveTemp(LastManStanding), UInGameCheats::OnEndGameByCheat);
+
+			if (CompletedAwaitableIndex != 2 && UInGameCheats::bDoNotEndGameUntilCheat)
+			{
+				UE_LOG(LogBattleRule, Log, TEXT("게임 끝났지만 치트를 기다리는 중"));
+				co_await UInGameCheats::OnEndGameByCheat;
+			}
+
 			if (CompletedAwaitableIndex == 0)
 			{
 				UE_LOG(LogBattleRule, Log, TEXT("제한시간이 끝나 게임을 종료합니다"));

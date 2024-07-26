@@ -39,8 +39,7 @@ private:
 	UPROPERTY()
 	TSet<UTracerPathComponent*> OverlapTargets;
 
-	TOptional<FVector2D> LastCheckPoint;
-	FSegment2D MovementThisTick;
+	TTickingValue<FVector2D> CheckPoint;
 
 	UTracerOverlapCheckerComponent()
 	{
@@ -59,42 +58,38 @@ private:
 	{
 		Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-		const FVector2D ThisCheckPoint = FVector2D{GetOwner()->GetActorLocation()};
+		CheckPoint.Tick(FVector2D{GetOwner()->GetActorLocation()});
 		
-		if (!LastCheckPoint)
+		CheckPoint.OverTwoTicks([&](const FVector2D& LastTick, const FVector2D& ThisTick)
 		{
-			LastCheckPoint = ThisCheckPoint;
-			return;
-		}
-		
-		MovementThisTick = FSegment2D{*LastCheckPoint, ThisCheckPoint};
-		
-		if (MovementThisTick.Length() > UE_KINDA_SMALL_NUMBER)
-		{
-			OnMaybeOverlappingSelf();
-			OnMaybeOverlappingTarget();
-			LastCheckPoint = ThisCheckPoint;
-		}
+			const FSegment2D Movement{LastTick, ThisTick};
+			
+			if (Movement.Length() > UE_KINDA_SMALL_NUMBER)
+			{
+				OnMaybeOverlappingSelf(Movement);
+				OnMaybeOverlappingTarget(Movement);
+			}
+		});
 	}
 
-	void OnMaybeOverlappingSelf()
+	void OnMaybeOverlappingSelf(const FSegment2D& Movement)
 	{
-		const int32 SegmentCount = OverlapInstigator->GetTracerPath().SegmentCount();
-
+		// TODO fix
+		const int32 SegmentCount = OverlapInstigator->GetRunningPathAsSegments().SegmentCount();
 		if (SegmentCount >= 3
-			&& OverlapInstigator->GetTracerPath()
+			&& OverlapInstigator->GetRunningPathAsSegments()
 			                    .SubArray(0, SegmentCount - 3)
-			                    .FindIntersection(MovementThisTick))
+			                    .FindIntersection(Movement))
 		{
 			OnTracerBumpedInto.Broadcast(OverlapInstigator);
 		}
 	}
 
-	void OnMaybeOverlappingTarget()
+	void OnMaybeOverlappingTarget(const FSegment2D& Movement)
 	{
 		for (UTracerPathComponent* Each : OverlapTargets)
 		{
-			if (IsValid(Each) && Each->GetTracerPath().FindIntersection(MovementThisTick))
+			if (IsValid(Each) && Each->GetRunningPathAsSegments().FindIntersection(Movement))
 			{
 				OnTracerBumpedInto.Broadcast(Each);
 			}

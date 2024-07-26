@@ -62,10 +62,12 @@ private:
 
 		Area->GetBoundary().Observe(this, [this](const FLoopedSegmentArray2D& Boundary)
 		{
-			if (Tracer->GetTracerPath().IsValid())
+			const FSegmentArray2D& RunningTracerPath = Tracer->GetRunningPathAsSegments();
+			
+			if (RunningTracerPath.IsValid())
 			{
 				// 트레이서의 첫 포인트가 영역 경계 위에 있기 때문에 안전한 체크를 위해서 영역 안으로 살짝 넣음
-				const FSegment2D FirstSegment = Tracer->GetTracerPath()[0];
+				const FSegment2D FirstSegment = RunningTracerPath[0];
 				const FVector2D TracerOrigin = FirstSegment.StartPoint() - FirstSegment.Direction * UE_KINDA_SMALL_NUMBER;
 
 				if (!Boundary.IsInside(TracerOrigin))
@@ -75,7 +77,7 @@ private:
 				}
 			}
 
-			if (!Tracer->GetTracerPath().IsValid() && !Boundary.IsInside(FVector2D{GetOwner()->GetActorLocation()}))
+			if (!RunningTracerPath.IsValid() && !Boundary.IsInside(FVector2D{GetOwner()->GetActorLocation()}))
 			{
 				UE_LOG(LogTracerKiller, Log, TEXT("%p 내가 서 있던 영역이 없어져 사망합니다"), this);
 				KillPlayer(GetOwner());

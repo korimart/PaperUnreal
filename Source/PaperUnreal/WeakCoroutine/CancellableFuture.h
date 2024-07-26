@@ -463,6 +463,18 @@ auto MakeFutureFromDelegate(MulticastDelegateType& MulticastDelegate, PredicateT
 	return Ret;
 }
 
+template <CDelegate DelegateType>
+auto operator co_await(DelegateType& Delegate)
+{
+	return TCancellableFutureAwaitable{MakeFutureFromDelegate(Delegate)};
+}
+
+template <CMulticastDelegate MulticastDelegateType>
+auto operator co_await(MulticastDelegateType& MulticastDelegate)
+{
+	return TCancellableFutureAwaitable{MakeFutureFromDelegate(MulticastDelegate)};
+}
+
 
 inline TCancellableFuture<AGameStateBase*> WaitForGameState(UWorld* World)
 {

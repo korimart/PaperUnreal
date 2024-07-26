@@ -8,8 +8,7 @@
 #include "PaperUnreal/AreaTracer/AreaSpawnerComponent.h"
 #include "PaperUnreal/AreaTracer/ReplicatedTracerPathComponent.h"
 #include "PaperUnreal/AreaTracer/TracerKillerComponent.h"
-#include "PaperUnreal/AreaTracer/TracerMeshComponent.h"
-#include "PaperUnreal/AreaTracer/TracerMeshGeneratorComponent.h"
+#include "PaperUnreal/AreaTracer/TracerPointEventComponent.h"
 #include "PaperUnreal/AreaTracer/TracerOverlapCheckerComponent.h"
 #include "PaperUnreal/AreaTracer/TracerPathComponent.h"
 #include "PaperUnreal/AreaTracer/TracerToAreaConverterComponent.h"
@@ -18,6 +17,7 @@
 #include "PaperUnreal/ModeAgnostic/ComponentRegistry.h"
 #include "PaperUnreal/ModeAgnostic/InventoryComponent.h"
 #include "PaperUnreal/GameFramework2/Character2.h"
+#include "PaperUnreal/ModeAgnostic/LineMeshComponent.h"
 #include "BattlePlayerAttacherComponent.generated.h"
 
 
@@ -155,14 +155,13 @@ private:
 			co_await HomeArea;
 			co_await TracerPathProvider;
 
-			auto TracerMesh = NewObject<UTracerMeshComponent>(GetOwner());
+			auto TracerMesh = NewObject<ULineMeshComponent>(GetOwner());
 			TracerMesh->RegisterComponent();
-
-			auto TracerMeshGenerator = NewObject<UTracerMeshGeneratorComponent>(GetOwner());
-			TracerMeshGenerator->SetMeshSource(TracerPathProvider.Get().GetInterface());
-			TracerMeshGenerator->SetMeshDestination(TracerMesh);
-			TracerMeshGenerator->SetMeshAttachmentTarget(HomeArea.Get()->ClientAreaMesh);
-			TracerMeshGenerator->RegisterComponent();
+			
+			auto TracerPointEvent = NewObject<UTracerPointEventComponent>(GetOwner());
+			TracerPointEvent->SetEventSource(TracerPathProvider.Get().GetInterface());
+			TracerPointEvent->RegisterComponent();
+			TracerPointEvent->AddEventListener(TracerMesh);
 
 			// 일단 위에까지 완료했으면 플레이는 가능한 거임 여기부터는 미적인 요소들을 준비한다
 			auto PlayerState = co_await GetOuterACharacter2()->WaitForPlayerState();

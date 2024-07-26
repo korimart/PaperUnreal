@@ -59,10 +59,11 @@ private:
 		AddLifeDependency(Tracer);
 		AddLifeDependency(ConversionDestination);
 
-		Tracer->GetTracerPathStreamer().OnStreamEnd(this, [this]()
-		{
-			ConvertPathToArea();
-		});
+		// TODO
+		// Tracer->GetTracerPathStreamer().OnStreamEnd(this, [this]()
+		// {
+		// 	ConvertPathToArea();
+		// });
 
 		ConversionDestination->GetBoundary().Observe(this, [this](auto&)
 		{
@@ -80,10 +81,11 @@ private:
 		}
 
 		bImConversionInstigator = true;
-		for (const FExpansionResult& Each : ConversionDestination->ExpandByPath(Tracer->GetTracerPath()))
-		{
-			OnTracerToAreaConversion.Broadcast(Each.CorrectlyAlignedPath);
-		}
+		// TODO
+		// for (const FExpansionResult& Each : ConversionDestination->ExpandByPath(Tracer->GetTracerPath()))
+		// {
+		// 	OnTracerToAreaConversion.Broadcast(Each.CorrectlyAlignedPath);
+		// }
 		bImConversionInstigator = false;
 	}
 };

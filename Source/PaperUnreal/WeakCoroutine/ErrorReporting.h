@@ -118,6 +118,11 @@ public:
 	TFailableResult(TFailableResult&&) = default;
 	TFailableResult& operator=(TFailableResult&&) = default;
 
+	explicit operator bool() const
+	{
+		return Succeeded();
+	}
+
 	void AddError(UFailableResultError* Error)
 	{
 		Errors.Emplace(Error);

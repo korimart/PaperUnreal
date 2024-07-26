@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "CancellableFuture.h"
-#include "WeakCoroutine.h"
 #include "PaperUnreal/GameFramework2/Utils.h"
 #include "ValueStream.generated.h"
 
@@ -65,6 +64,7 @@ public:
 		PopFront(Promises).SetValue(Forward<U>(Value));
 	}
 
+	// TODO rename
 	void End()
 	{
 		bEnded = true;

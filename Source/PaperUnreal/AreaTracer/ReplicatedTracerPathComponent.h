@@ -50,7 +50,7 @@ private:
 			AddLifeDependency(ServerTracerPath);
 			Replicator = NewObject<UByteStreamComponent>(this);
 			Replicator->SetChunkSize(FTracerPathPoint::ChunkSize);
-			Replicator->SetInputStream(ServerTracerPath->GetTracerPathStreamer());
+			// Replicator->SetInputStream(ServerTracerPath->GetTracerPathStreamer());
 			Replicator->RegisterComponent();
 		}
 	}

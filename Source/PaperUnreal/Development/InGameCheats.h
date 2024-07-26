@@ -20,7 +20,10 @@ class UInGameCheats : public UCheatManagerExtension
 	GENERATED_BODY()
 
 public:
+	inline static bool bDoNotEndGameUntilCheat{true};
+	
 	inline static FSimpleMulticastDelegate OnStartGameByCheat{};
+	inline static FSimpleMulticastDelegate OnEndGameByCheat{};
 
 private:
 	UFUNCTION(Exec, BlueprintAuthorityOnly)
@@ -90,5 +93,11 @@ private:
 	void StartGame()
 	{
 		OnStartGameByCheat.Broadcast();
+	}
+	
+	UFUNCTION(Exec, BlueprintAuthorityOnly)
+	void EndGame()
+	{
+		OnEndGameByCheat.Broadcast();
 	}
 };

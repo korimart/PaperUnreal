@@ -14,12 +14,17 @@ class UTracerPathComponent : public UActorComponent2, public ITracerPathStream
 	GENERATED_BODY()
 
 public:
-	virtual const TValueStreamer<FTracerPathEvent>& GetTracerPathStreamer() const override
+	virtual TLiveDataView<TOptional<FTracerPathPoint2>> GetRunningPathHead() const override
 	{
-		return TracerPathStreamer;
+		return PathHead;
 	}
 
-	const FSegmentArray2D& GetTracerPath() const
+	virtual TLiveDataView<TArray<FTracerPathPoint2>> GetRunningPathTail() const override
+	{
+		return PathTail;
+	}
+
+	const FSegmentArray2D& GetRunningPathAsSegments() const
 	{
 		return Path;
 	}
@@ -34,9 +39,10 @@ private:
 	UPROPERTY()
 	UAreaBoundaryComponent* NoPathArea;
 
-	bool bGeneratedThisFrame = false;
+	mutable TLiveData<TOptional<FTracerPathPoint2>> PathHead;
+	mutable TLiveData<TArray<FTracerPathPoint2>> PathTail;
 	FSegmentArray2D Path;
-	TValueStreamer<FTracerPathEvent> TracerPathStreamer;
+	FTickingSwitch Switch;
 
 	UTracerPathComponent()
 	{
@@ -55,44 +61,69 @@ private:
 	{
 		Super::UninitializeComponent();
 
-		TracerPathStreamer.EndStreams();
+		EmptyPoints();
 	}
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override
 	{
 		Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-		const bool bGeneratedLastFrame = bGeneratedThisFrame;
-		const bool bWillGenerateThisFrame = NoPathArea->IsValid() && !NoPathArea->IsInside(GetOwner()->GetActorLocation());
-		bGeneratedThisFrame = bWillGenerateThisFrame;
+		const bool bAreaHasNonZeroArea = NoPathArea->IsValid();
+		const bool bOwnerIsOutsideArea = !NoPathArea->IsInside(GetOwner()->GetActorLocation());
+		const bool bGeneratePath = bAreaHasNonZeroArea && bOwnerIsOutsideArea;
 		
-		if (bWillGenerateThisFrame)
+		Switch.Tick(bGeneratePath);
+
+		Switch.IfTrueThisFrame([&]()
 		{
 			Generate();
-		}
-
-		if (bGeneratedLastFrame && !bGeneratedThisFrame)
+		});
+		
+		Switch.IfSwitchedOnThisFrame([&]()
 		{
-			if (NoPathArea->IsValid())
-			{
-				Path.SetPoint(-1, NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint());
-			}
-			
-			TracerPathStreamer.ReceiveValue(CreateEvent(EStreamEvent::LastModified));
-			TracerPathStreamer.EndStreams();
-			Path.Empty();
+			AttachHeadToArea();
+		});
+
+		Switch.IfSwitchedOffThisFrame([&]()
+		{
+			AttachHeadToArea();
+			EmptyPoints();
+		});
+	}
+
+	void AttachHeadToArea()
+	{
+		if (NoPathArea->IsValid())
+		{
+			const FVector2D Attached = NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint();
+			Path.SetPoint(-1, Attached);
+			PathHead.SetValue(FTracerPathPoint2{Attached, PathHead.GetValid().PathDirection});
 		}
+	}
+
+	void AddPoint(const FVector2D& Location, const FVector2D& Direction)
+	{
+		PathHead.SetValue(TOptional<FTracerPathPoint2>{});
+		Path.AddPoint(Location);
+		PathTail.Add(FTracerPathPoint2{Location, Direction});
+		PathHead.SetValue(FTracerPathPoint2{Location, Direction});
+	}
+
+	void EmptyPoints()
+	{
+		Path.Empty();
+		PathHead.SetValue(TOptional<FTracerPathPoint2>{});
+		PathTail.Empty();
 	}
 
 	void Generate()
 	{
 		const FVector2D ActorLocation2D{GetOwner()->GetActorLocation()};
+		const FVector2D ActorDirection2D{GetOwner()->GetActorForwardVector()};
 
 		if (Path.PointCount() == 0)
 		{
-			Path.AddPoint(ActorLocation2D);
-			Path.SetPoint(-1, NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint());
-			TracerPathStreamer.ReceiveValue(CreateEvent(EStreamEvent::Appended));
+			AddPoint(ActorLocation2D, ActorDirection2D);
 			return;
 		}
 
@@ -103,8 +134,7 @@ private:
 
 		if (Path.PointCount() < 3)
 		{
-			Path.AddPoint(ActorLocation2D);
-			TracerPathStreamer.ReceiveValue(CreateEvent(EStreamEvent::Appended));
+			AddPoint(ActorLocation2D, ActorDirection2D);
 			return;
 		}
 
@@ -134,28 +164,14 @@ private:
 			return (DeviatingVector - Proj).Length();
 		}();
 
-		if (Curvature > 0.005f || CurrentDeviation > 10.f)
+		if (Curvature > 0.005f || CurrentDeviation > 1.f)
 		{
-			Path.AddPoint(ActorLocation2D);
-			TracerPathStreamer.ReceiveValue(CreateEvent(EStreamEvent::Appended));
+			AddPoint(ActorLocation2D, ActorDirection2D);
 		}
 		else
 		{
 			Path.SetPoint(-1, ActorLocation2D);
-			TracerPathStreamer.ReceiveValue(CreateEvent(EStreamEvent::LastModified));
+			PathHead.SetValue(FTracerPathPoint2{ActorLocation2D, ActorDirection2D});
 		}
-	}
-
-	FTracerPathEvent CreateEvent(EStreamEvent Event) const
-	{
-		return {
-			.Event = Event,
-			.Affected = {
-				{
-					.Point = Path.GetLastPoint(),
-					.PathDirection = FVector2D{GetOwner()->GetActorForwardVector()}
-				}
-			}
-		};
 	}
 };

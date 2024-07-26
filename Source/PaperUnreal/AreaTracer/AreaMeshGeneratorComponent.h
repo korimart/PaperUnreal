@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "AreaBoundaryProvider.h"
 #include "AreaMeshComponent.h"
-#include "PaperUnreal/WeakCoroutine/AwaitableWrappers.h"
+#include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 #include "AreaMeshGeneratorComponent.generated.h"
 
 
