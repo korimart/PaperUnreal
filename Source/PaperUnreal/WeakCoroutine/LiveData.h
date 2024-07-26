@@ -469,11 +469,14 @@ private:
 	{
 		this->GuardCallbackInvocation([&]() { OnElementRemoved.Broadcast(Element); });
 
-		for (FDelegateHandle Each : StrictAddStreamHandles)
+		// 델리게이트를 unbind하면 델리게이트가 파괴되면서 stream을 종료함
+		// 그 때 콜백으로 다시 CreateStrictAddStream이 호출될 수 있기 때문에 Array가 순회 도중 수정되는 것을
+		// 피하기 위해 먼저 비운다음에 델리게이트를 unbind 한다
+		auto Copy = MoveTemp(StrictAddStreamHandles);
+		for (FDelegateHandle Each : Copy)
 		{
 			OnElementAdded.Remove(Each);
 		}
-		StrictAddStreamHandles.Empty();
 	}
 };
 
