@@ -355,11 +355,6 @@ public:
 		return MoveTemp(Future).ConsumeValue();
 	}
 
-	bool Failed() const
-	{
-		return Future.PeekValue().Failed();
-	}
-
 private:
 	FutureType Future;
 };

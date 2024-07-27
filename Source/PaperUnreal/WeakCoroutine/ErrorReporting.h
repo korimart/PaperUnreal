@@ -53,9 +53,19 @@ public:
 template <typename ResultType>
 struct TFailableResultStorage
 {
-	template <typename T>
-	TFailableResultStorage(T&& Value)
-		: Result(Forward<T>(Value))
+	TFailableResultStorage(const ResultType& Value)
+		: Result(Value)
+	{
+	}
+	
+	TFailableResultStorage(ResultType&& Value)
+		: Result(MoveTemp(Value))
+	{
+	}
+
+	template <typename... ArgTypes>
+	TFailableResultStorage(EInPlace, ArgTypes&&... Args)
+		: Result(Forward<ArgTypes>(Args)...)
 	{
 	}
 
@@ -100,6 +110,14 @@ public:
 		AddError(Error);
 	}
 
+	TFailableResult(const TArray<UFailableResultError*>& Errors)
+	{
+		for (UFailableResultError* Each : Errors)
+		{
+			AddError(Each);
+		}
+	}
+
 	/**
 	 * ResultType이 포인터 타입일 때 TFailableResult를 nullptr로 초기화하는 경우
 	 * 값이 nullptr인 것이므로 에러로 초기화되지 않도록 (위에 UFailableResultError* 받는 오버로드로 가지 않도록) 여기서 처리함
@@ -109,9 +127,19 @@ public:
 	{
 	}
 
-	template <typename T>
-	TFailableResult(T&& Value) requires !std::is_convertible_v<T, UFailableResultError*>
-		: Result(Forward<T>(Value))
+	TFailableResult(const ResultType& Value)
+		: Result(Value)
+	{
+	}
+	
+	TFailableResult(ResultType&& Value)
+		: Result(MoveTemp(Value))
+	{
+	}
+	
+	template <typename... ArgTypes>
+	TFailableResult(EInPlace, ArgTypes&&... Args)
+		: Result(InPlace, InPlace, Forward<ArgTypes>(Args)...)
 	{
 	}
 
@@ -196,6 +224,8 @@ template <CErrorReportingAwaitable AwaitableType>
 class TErrorRemovedAwaitable
 {
 public:
+	using ResultType = typename AwaitableType::ResultType;
+	
 	TErrorRemovedAwaitable(AwaitableType&& InAwaitable)
 		: Awaitable(MoveTemp(InAwaitable))
 	{
@@ -253,17 +283,16 @@ public:
 			void destroy() const { Handle.destroy(); }
 		};
 
+		// 지금 이 구현 이게 가정되어 있음 여기 걸리면 구현 수정해야 됨
+		static_assert(std::is_void_v<decltype(Awaitable.await_suspend(std::declval<FFailChecker>()))>);
+		
 		Awaitable.await_suspend(FFailChecker{this, Forward<HandleType>(Handle)});
 		return true;
 	}
 
 	typename AwaitableType::ResultType await_resume()
 	{
-		// 이곳의 std::move 사용은 의도적임
-		// MoveTemp는 prvalue가 arguemnt로 들어왔는지 static_assert로 체크하는데
-		// GetResult의 결과는 ResultType이 포인터 타입일 때 prvalue이고 그 외에는 lvalue reference임
-		// lvalue reference일 때는 move하고 포인터 타입일 때는 그냥 반환하는 것이 목적이므로 std::move를 사용함
-		return std::move(Result->GetResult());
+		return MoveTempIfPossible(Result->GetResult());
 	}
 
 private:
@@ -304,16 +333,16 @@ public:
 	}
 
 	template <typename HandleType>
-	void await_suspend(HandleType&& Handle)
+	auto await_suspend(HandleType&& Handle)
 	{
 		struct FAbortChecker
 		{
 			TAlwaysResumingAwaitable* This;
 			std::decay_t<HandleType> Handle;
 
-			void resume() { Handle.resume(); }
+			void resume() const { Handle.resume(); }
 
-			void destroy()
+			void destroy() const
 			{
 				This->bAborted = true;
 				Handle.resume();
@@ -321,7 +350,7 @@ public:
 		};
 
 		bAborted = false;
-		Awaitable.await_suspend(FAbortChecker{this, Forward<HandleType>(Handle)});
+		return Awaitable.await_suspend(FAbortChecker{this, Forward<HandleType>(Handle)});
 	}
 
 	TFailableResult<ResultType> await_resume()

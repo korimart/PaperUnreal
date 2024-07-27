@@ -5,6 +5,7 @@
 #include <coroutine>
 
 #include "CoreMinimal.h"
+#include "AwaitableWrappers.h"
 #include "CancellableFuture.h"
 #include "MinimalCoroutine.h"
 #include "TypeTraits.h"
@@ -26,15 +27,8 @@ public:
 };
 
 
-namespace WeakCoroutineDetails
+namespace WeakCoroutine_Private
 {
-	template <typename T, typename WeakListContainerType>
-	concept CWeakListAddable = requires(T Arg, WeakListContainerType Container)
-	{
-		Container.AddToWeakList(Arg);
-	};
-
-
 	template <typename AwaitableType>
 	class TWithErrorAwaitable : public TIdentityAwaitable<AwaitableType>
 	{
@@ -63,14 +57,14 @@ namespace WeakCoroutineDetails
 		bool await_suspend(HandleType&& Handle, std::source_location SL = std::source_location::current())
 		{
 			SourceLocation = SL;
-		
+
 			if (Awaitable.await_ready())
 			{
 				if (ResumeInnerAndCheckValidity())
 				{
 					return false;
 				}
-				
+
 				LogErrors();
 				Handle.destroy();
 				return true;
@@ -88,7 +82,7 @@ namespace WeakCoroutineDetails
 						Handle.resume();
 						return;
 					}
-					
+
 					This->LogErrors();
 					Handle.destroy();
 				}
@@ -160,9 +154,9 @@ namespace WeakCoroutineDetails
 		}
 
 		template <typename HandleType>
-		void await_suspend(HandleType&& Handle)
+		auto await_suspend(HandleType&& Handle)
 		{
-			Awaitable.await_suspend(Forward<HandleType>(Handle));
+			return Awaitable.await_suspend(Forward<HandleType>(Handle));
 		}
 
 		TFailableResult<ResultType> await_resume()
@@ -172,14 +166,6 @@ namespace WeakCoroutineDetails
 			if (!Handle.promise().IsValid())
 			{
 				Ret.AddError(UWeakCoroutineError::InvalidCoroutine());
-			}
-
-			if constexpr (WeakCoroutineDetails::CWeakListAddable<ResultType, PromiseType>)
-			{
-				if (Ret.Succeeded())
-				{
-					Handle.promise().AddToWeakList(Ret.GetResult());
-				}
 			}
 
 			return Ret;
@@ -316,18 +302,20 @@ public:
 		return await_transform(operator co_await(Forward<AnyType>(Any)));
 	}
 
+	// TODO AsAbrotPtrReturning이 가장 바깥이 됨에 따라 source location이 올바르지 않게 되었음
+
 	template <CAwaitable AwaitableType>
-	auto await_transform(WeakCoroutineDetails::TWithErrorAwaitable<AwaitableType>&& Awaitable)
+	auto await_transform(WeakCoroutine_Private::TWithErrorAwaitable<AwaitableType>&& Awaitable)
 	{
 		auto Handle = std::coroutine_handle<Derived>::from_promise(*static_cast<Derived*>(this));
-		return WeakCoroutineDetails::TWeakAbortingAwaitable{WeakCoroutineDetails::TWeakAwaitable{Handle, MoveTemp(Awaitable.Inner())}};
+		return AsAbortPtrReturning(WeakCoroutine_Private::TWeakAbortingAwaitable{WeakCoroutine_Private::TWeakAwaitable{Handle, MoveTemp(Awaitable.Inner())}});
 	}
 
 	template <CAwaitable AwaitableType>
 	auto await_transform(AwaitableType&& Awaitable)
 	{
 		auto Handle = std::coroutine_handle<Derived>::from_promise(*static_cast<Derived*>(this));
-		return TErrorRemovedAwaitable{WeakCoroutineDetails::TWeakAwaitable{Handle, Forward<AwaitableType>(Awaitable)}};
+		return AsAbortPtrReturning(TErrorRemovedAwaitable{WeakCoroutine_Private::TWeakAwaitable{Handle, Forward<AwaitableType>(Awaitable)}});
 	}
 
 	void Abort()
@@ -337,58 +325,35 @@ public:
 
 	bool IsValid() const
 	{
-		return !*bCoroutineFinished && Algo::AllOf(WeakList, [](const auto& Each) { return Each(); });
+		return !*bCoroutineFinished && Algo::AllOf(WeakList, [](const auto& Each) { return Each.IsValid(); });
 	}
 
-	void AddToWeakList(const UObject* Object)
+	template <CUObjectWrapper U>
+	void AddToWeakList(const U& Weak)
 	{
-		WeakList.Add([Weak = TWeakObjectPtr<const UObject>{Object}]() { return Weak.IsValid(); });
-	}
-
-	template <typename U>
-	void AddToWeakList(TScriptInterface<U> Interface)
-	{
-		AddToWeakList(Interface.GetObject());
-	}
-	
-	template <typename U, typename = typename U::UClassType>
-	void AddToWeakList(const U* Interface)
-	{
-		AddToWeakList(Cast<UObject>(Interface));
+		WeakList.Emplace(TUObjectWrapperTypeTraits<U>::GetUObject(Weak));
 	}
 
 	template <typename U>
-	void AddToWeakList(const TSharedPtr<U>& Object)
+	void RemoveFromWeakList(const U& Weak)
 	{
-		WeakList.Add([Weak = TWeakPtr<U>{Object}]() { return Weak.IsValid(); });
-	}
-
-	template <typename U>
-	void AddToWeakList(const TSharedRef<U>& Object)
-	{
-		WeakList.Add([Weak = TWeakPtr<U>{Object}]() { return Weak.IsValid(); });
-	}
-
-	template <typename U>
-	void AddToWeakList(const TWeakPtr<U>& Object)
-	{
-		WeakList.Add([Weak = Object]() { return Weak.IsValid(); });
-	}
-
-	template <typename U>
-	void AddToWeakList(const TWeakObjectPtr<U>& Object)
-	{
-		WeakList.Add([Weak = Object]() { return Weak.IsValid(); });
+		WeakList.Remove(TUObjectWrapperTypeTraits<U>::GetUObject(Weak));
 	}
 
 protected:
 	friend class TWeakCoroutine<T>;
 
-	TArray<TFunction<bool()>> WeakList;
+	TArray<TWeakObjectPtr<const UObject>> WeakList;
 	TUniquePtr<TWeakCoroutineContext<T>> Context;
 	TUniquePtr<TUniqueFunction<ReturnObjectType(TWeakCoroutineContext<T>&)>> Captures;
 	TOptional<TCancellablePromise<T>> Promise;
 	TSharedRef<bool> bCoroutineFinished = MakeShared<bool>(false);
+
+	template <CErrorReportingAwaitable AwaitableType>
+	decltype(auto) AsAbortPtrReturning(AwaitableType&& Awaitable);
+
+	template <CNonErrorReportingAwaitable AwaitableType>
+	decltype(auto) AsAbortPtrReturning(AwaitableType&& Awaitable);
 };
 
 
@@ -415,6 +380,123 @@ public:
 		this->Promise->SetValue();
 	}
 };
+
+
+template <typename T>
+class TAbortPtr
+{
+public:
+	/**
+	 * 여기서 핸들을 받는 것이 안전한 이유는 다음과 같음
+	 * TAbortPtr는 Weak Coroutine의 코루틴 프레임 내에서 co_await에 의해서만 생성될 수 있음
+	 * 그리고 copy 불가능 move 불가능이기 때문에 코루틴 프레임 내에서 평생을 살아감
+	 * 즉 생성과 파괴가 코루틴에 의해서 일어나고 그 안에서만 살기 떄문에 Handle이 TAbortPtr보다 더 오래 살음
+	 * 
+	 * @param Handle 
+	 * @param Pointer 
+	 */
+	TAbortPtr(auto Handle, T* Pointer)
+		: Ptr(Pointer)
+	{
+		if (Ptr)
+		{
+			Handle.promise().AddToWeakList(Ptr);
+
+			NoAbort = [Handle](T* Ptr)
+			{
+				Handle.promise().RemoveFromWeakList(Ptr);
+			};
+		}
+	}
+
+	~TAbortPtr()
+	{
+		if (Ptr)
+		{
+			NoAbort(Ptr);
+		}
+	}
+
+	// 절대 허용해서는 안 됨 constructor의 주석 참고
+	// copy 또는 move를 허용하면 Handle이 코루틴 프레임 바깥으로 탈출할 수 있음
+	TAbortPtr(const TAbortPtr&) = delete;
+	TAbortPtr& operator=(const TAbortPtr&) = delete;
+	TAbortPtr(TAbortPtr&&) = delete;
+	TAbortPtr& operator=(TAbortPtr&) = delete;
+
+	/**
+	 * lvalue일 때만 허용하지 않으면 Weak Coroutine 내에서 co_await으로 TAbortPtr를 받을 때
+	 * T*로 실수로 받아서 invalid 시 abort가 곧바로 해제될 수 있음
+	 * 한 번은 일단 TAbortPtr로 받은 다음에 함수 호출 등에는 implicit conversion으로 그냥 넘길 수 있도록
+	 * lvalue일 때는 허용하되 rvalue일 때는 허용하지 않음
+	 */
+	operator T*() & { return Ptr; }
+
+	T* operator->() const { return Ptr; }
+	T& operator*() const { return *Ptr; }
+
+private:
+	T* Ptr;
+	TFunction<void(T*)> NoAbort;
+};
+
+
+template <typename Derived, typename T>
+template <CErrorReportingAwaitable AwaitableType>
+decltype(auto) TWeakCoroutinePromiseTypeBase<Derived, T>::AsAbortPtrReturning(AwaitableType&& Awaitable)
+{
+	using ResultType = typename std::decay_t<AwaitableType>::ResultType;
+
+	if constexpr (CUObjectWrapper<ResultType>)
+	{
+		using AbortPtrType = TAbortPtr<std::remove_pointer_t<typename TUObjectWrapperTypeTraits<ResultType>::RawPtrType>>;
+		auto Handle = std::coroutine_handle<Derived>::from_promise(*static_cast<Derived*>(this));
+
+		return TTransformingAwaitable
+		{
+			Forward<AwaitableType>(Awaitable),
+			[Handle](TFailableResult<ResultType>&& Result) -> TFailableResult<AbortPtrType>
+			{
+				if (Result.Succeeded())
+				{
+					return {InPlace, Handle, TUObjectWrapperTypeTraits<ResultType>::GetRaw(Result.GetResult())};
+				}
+
+				return Result.GetErrors();
+			},
+		};
+	}
+	else
+	{
+		return Forward<AwaitableType>(Awaitable);
+	}
+}
+
+template <typename Derived, typename T>
+template <CNonErrorReportingAwaitable AwaitableType>
+decltype(auto) TWeakCoroutinePromiseTypeBase<Derived, T>::AsAbortPtrReturning(AwaitableType&& Awaitable)
+{
+	using ResultType = decltype(Awaitable.await_resume());
+
+	if constexpr (CUObjectWrapper<ResultType>)
+	{
+		using AbortPtrType = TAbortPtr<std::remove_pointer_t<typename TUObjectWrapperTypeTraits<ResultType>::RawPtrType>>;
+		auto Handle = std::coroutine_handle<Derived>::from_promise(*static_cast<Derived*>(this));
+
+		return TTransformingAwaitable
+		{
+			Forward<AwaitableType>(Awaitable),
+			[Handle](ResultType&& Result) -> AbortPtrType
+			{
+				return {Handle, MoveTemp(Result)};
+			},
+		};
+	}
+	else
+	{
+		return Forward<AwaitableType>(Awaitable);
+	}
+}
 
 
 template <typename FuncType>
@@ -473,7 +555,7 @@ auto RunWeakCoroutineNoCaptures(const FuncType& Func, ArgTypes&&... Args)
 template <typename... AllowedErrorTypes, typename MaybeAwaitableType>
 auto WithError(MaybeAwaitableType&& MaybeAwaitable)
 {
-	return WeakCoroutineDetails::TWithErrorAwaitable{AwaitableOrIdentity(Forward<MaybeAwaitableType>(MaybeAwaitable))};
+	return WeakCoroutine_Private::TWithErrorAwaitable{AwaitableOrIdentity(Forward<MaybeAwaitableType>(MaybeAwaitable))};
 }
 
 

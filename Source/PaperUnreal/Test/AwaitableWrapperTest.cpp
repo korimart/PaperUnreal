@@ -54,7 +54,7 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 
 		TestEqual(TEXT("AnyOf 테스트: 이미 완료 거를 기다리기 시작해도 잘 되는지 테스트"), CompletedIndex, 1);
 	}
-	
+
 	{
 		TArray<TTuple<TCancellablePromise<void>, TCancellableFuture<void>>> Array;
 		Array.Add(MakePromise<void>());
@@ -94,6 +94,24 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Filter 함수 테스트"), Received, 0);
 		Receiver.Pin()->ReceiveValue(4);
 		TestEqual(TEXT("Filter 함수 테스트"), Received, 4);
+	}
+
+	{
+		auto [Promise, Future] = MakePromise<void>();
+
+		int32 Received = 0;
+		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			int32 Result = co_await Transform(MoveTemp(Future), [](const TFailableResult<std::monostate>&)
+			{
+				return 3;
+			});
+			Received = Result;
+		});
+
+		TestEqual(TEXT("Transform 함수 테스트"), Received, 0);
+		Promise.SetValue();
+		TestEqual(TEXT("Transform 함수 테스트"), Received, 3);
 	}
 
 	return true;

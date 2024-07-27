@@ -9,35 +9,6 @@
 
 namespace Utils_Private
 {
-	inline bool IsValid(const UObject* Pointer)
-	{
-		return ::IsValid(Pointer);
-	}
-
-	template <typename T>
-	bool IsValid(const TScriptInterface<T>& Pointer)
-	{
-		return ::IsValid(Pointer.GetObject());
-	}
-	
-	template <typename T, typename = typename T::UClassType>
-	bool IsValid(const T* InterfacePointer)
-	{
-		return ::IsValid(Cast<UObject>(InterfacePointer));
-	}
-
-	template <typename SmartPointerType>
-	concept CSmartPointer = requires(SmartPointerType SmartPointer)
-	{
-		SmartPointer.IsValid();
-	};
-
-	bool IsValid(CSmartPointer auto SmartPointer)
-	{
-		return SmartPointer.IsValid();
-	}
-
-
 	template <typename FuncType>
 	class TFinally
 	{
@@ -165,9 +136,10 @@ T* ValidOrNull(T** Object)
 }
 
 
-bool AllValid(const auto&... Check)
+template <typename... ArgTypes>
+bool AllValid(const ArgTypes&... Check)
 {
-	return (Utils_Private::IsValid(Check) && ...);
+	return (::IsValid(TUObjectWrapperTypeTraits<ArgTypes>::GetUObject(Check)) && ...);
 }
 
 

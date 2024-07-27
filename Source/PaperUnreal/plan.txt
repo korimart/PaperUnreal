@@ -159,6 +159,7 @@ ReplicatedAreaExpander
 
 1. Player Controller에 loop에서 UObject에 co_await 계속 걸어서 weak list에 pawn 계속 들어가는 문제 수정
 -> 문제가 두 개임. 1. 똑같은 거 여러 번 넣을 수 있음 2. 넣기를 원치 않는 걸 안 넣는 방법이 없음
+1. WithError<> 구현
 2. line mesh component replication 구현 (과정에서 byte streamer / value streamer 제거)
 3. TracerToAreaConverter가 live data 콜백이 원본을 수정하는 circular 관계이므로 교통정리하는 클래스 구현
 4. 게임 시작 전 자유행동 구현

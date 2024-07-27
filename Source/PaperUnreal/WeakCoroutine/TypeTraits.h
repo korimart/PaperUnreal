@@ -110,6 +110,46 @@ public:
 };
 
 
+template <typename WrapperType>
+struct TUObjectWrapperTypeTraitsImpl
+{
+};
+
+template <typename ObjectType>
+struct TUObjectWrapperTypeTraitsImpl<ObjectType*>
+{
+	using RawPtrType = ObjectType*;
+	static ObjectType* GetUObject(ObjectType* Object) { return Object; }
+	static ObjectType* GetRaw(ObjectType* Object) { return Object; }
+};
+
+template <typename InterfaceType>
+struct TUObjectWrapperTypeTraitsImpl<TScriptInterface<InterfaceType>>
+{
+	using RawPtrType = InterfaceType*;
+	static UObject* GetUObject(const TScriptInterface<InterfaceType>& Interface) { return Interface.GetObject(); }
+	static InterfaceType* GetRaw(const TScriptInterface<InterfaceType>& Interface) { return Interface.GetInterface(); }
+};
+
+template <typename InterfaceType>
+	requires !std::is_base_of_v<UObject, std::decay_t<InterfaceType>>
+	&& requires { typename InterfaceType::UClassType; }
+struct TUObjectWrapperTypeTraitsImpl<InterfaceType*>
+{
+	using RawPtrType = InterfaceType*;
+	static UObject* GetUObject(InterfaceType* Interface) { return Cast<UObject>(Interface); }
+	static InterfaceType* GetRaw(InterfaceType* Interface) { return Interface; }
+};
+
+template <typename WrapperType>
+struct TUObjectWrapperTypeTraits : TUObjectWrapperTypeTraitsImpl<std::decay_t<WrapperType>>
+{
+};
+
+
+template <typename T>
+concept CUObjectWrapper = requires(T Arg) { { TUObjectWrapperTypeTraits<T>::GetUObject(Arg) }; };
+
 template <typename T>
 concept CDelegate = TIsInstantiationOf_V<T, TDelegate>;
 

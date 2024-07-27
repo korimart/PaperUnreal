@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Materials/MaterialInterface.h"
 #include "PaperUnreal/AreaTracer/SegmentArray.h"
 #include "PaperUnreal/GameFramework2/ActorComponent2.h"
 #include "PaperUnreal/GameFramework2/DynamicMeshComponent2.h"

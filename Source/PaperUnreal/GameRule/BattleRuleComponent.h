@@ -17,7 +17,6 @@
 #include "PaperUnreal/ModeAgnostic/WorldTimerComponent.h"
 #include "PaperUnreal/WeakCoroutine/AwaitableWrappers.h"
 #include "PaperUnreal/WeakCoroutine/CancellableFuture.h"
-#include "PaperUnreal/WeakCoroutine/ValueStream.h"
 #include "BattleRuleComponent.generated.h"
 
 

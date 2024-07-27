@@ -57,9 +57,9 @@ public:
 	}
 
 	template <typename HandleType>
-	void await_suspend(HandleType&& Handle)
+	auto await_suspend(HandleType&& Handle)
 	{
-		Awaitable.await_suspend(Forward<HandleType>(Handle));
+		return Awaitable.await_suspend(Forward<HandleType>(Handle));
 	}
 
 	auto await_resume()

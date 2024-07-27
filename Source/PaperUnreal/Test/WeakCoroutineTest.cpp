@@ -112,7 +112,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 
 		auto Life = MakeUnique<FLife>();
 		auto bLifeDestroyed = Life->bDestroyed;
-		auto AbortIfNotValid = MakeShared<bool>().ToSharedPtr();
+		auto AbortIfNotValid = NewObject<UDummy>();
 
 		TArray<int32> Received;
 		RunWeakCoroutine([&Array, &AbortIfNotValid, &Received, Life = MoveTemp(Life)](FWeakCoroutineContext& Context) -> FWeakCoroutine
@@ -135,7 +135,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("AbortIfNotValid가 잘 작동하는는지 테스트"), Received[1], 1);
 		TestFalse(TEXT("AbortIfNotValid가 잘 작동하는는지 테스트"), *bLifeDestroyed);
 
-		AbortIfNotValid = nullptr;
+		AbortIfNotValid->MarkAsGarbage();
 		Array[2].Get<0>().SetValue(2);
 		TestEqual(TEXT("AbortIfNotValid가 잘 작동하는는지 테스트"), Received.Num(), 2);
 		TestTrue(TEXT("AbortIfNotValid가 잘 작동하는는지 테스트"), *bLifeDestroyed);
@@ -264,6 +264,111 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		});
 
 		TestTrue(TEXT("이미 에러가 발생해 있는 걸 기다릴 때 Abort 하는지"), bAborted);
+	}
+	
+	{
+		auto [Promise, Future] = MakePromise<UDummy*>();
+		UDummy* Null = nullptr;
+		Promise.SetValue(Null);
+
+		bool bReceived = false;
+		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			auto Dummy = co_await MoveTemp(Future);
+			bReceived = Dummy == nullptr;
+		});
+
+		TestTrue(TEXT("nullptr인 UObject를 잘 받을 수 있는지"), bReceived);
+	}
+	
+	{
+		auto [Promise, Future] = MakePromise<UDummy*>();
+		UDummy* Dummy = NewObject<UDummy>();
+		
+		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			TAbortPtr<UDummy> Result = co_await MoveTemp(Future);
+			
+			// 컴파일 되지 않아야 함
+			// UDummy* Result = co_await MoveTemp(Future);
+			
+			TestTrue(TEXT("UObject 타입이 TAbortPtr로 잘 Transform 되는지 테스트"), Result == Dummy);
+		});
+		
+		Promise.SetValue(Dummy);
+	}
+
+	{
+		auto [Promise, Future] = MakePromise<UDummy*>();
+		UDummy* Dummy = NewObject<UDummy>();
+		
+		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			TFailableResult<TAbortPtr<UDummy>> Result = co_await WithError(MoveTemp(Future));
+			TestTrue(TEXT("WithError를 씌워도 TAbortPtr로 잘 Transform 되는지 테스트"), Result.GetResult() == Dummy);
+		});
+		
+		Promise.SetValue(Dummy);
+	}
+
+	{
+		TArray<TTuple<TCancellablePromise<UDummy*>, TCancellableFuture<UDummy*>>> Array;
+		Array.Add(MakePromise<UDummy*>());
+		Array.Add(MakePromise<UDummy*>());
+		Array.Add(MakePromise<UDummy*>());
+		Array.Add(MakePromise<UDummy*>());
+		Array.Add(MakePromise<UDummy*>());
+
+		TArray<UDummy*> Dummies
+		{
+			nullptr,
+			NewObject<UDummy>(),
+			NewObject<UDummy>(),
+			NewObject<UDummy>(),
+			NewObject<UDummy>(),
+		};
+
+		TArray<UDummy*> Received;
+		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			{
+				auto Result = co_await MoveTemp(Array[0].Get<1>());
+				Received.Add(Result);
+			}
+			
+			{
+				auto Result = co_await MoveTemp(Array[1].Get<1>());
+				Received.Add(Result);
+			}
+			
+			{
+				auto Result = co_await MoveTemp(Array[2].Get<1>());
+				Received.Add(Result);
+			}
+			
+			{
+				auto Result0 = co_await MoveTemp(Array[3].Get<1>());
+				Received.Add(Result0);
+				auto Result1 = co_await MoveTemp(Array[4].Get<1>());
+				Received.Add(Result1);
+			}
+		});
+
+		for (int32 i = 0; i < 5; i++)
+		{
+			Array[i].Get<0>().SetValue(Dummies[i]);
+
+			if (Dummies[i])
+			{
+				Dummies[i]->MarkAsGarbage();
+			}
+		}
+
+		TestEqual(TEXT("TAbortPtr가 Abort 상태를 잘 관리하는지 테스트"), Received.Num(), 4);
+		TestEqual(TEXT("TAbortPtr가 Abort 상태를 잘 관리하는지 테스트"), Received[0], Dummies[0]);
+		TestEqual(TEXT("TAbortPtr가 Abort 상태를 잘 관리하는지 테스트"), Received[1], Dummies[1]);
+		TestEqual(TEXT("TAbortPtr가 Abort 상태를 잘 관리하는지 테스트"), Received[2], Dummies[2]);
+		TestEqual(TEXT("TAbortPtr가 Abort 상태를 잘 관리하는지 테스트"), Received[3], Dummies[3]);
 	}
 
 	return true;

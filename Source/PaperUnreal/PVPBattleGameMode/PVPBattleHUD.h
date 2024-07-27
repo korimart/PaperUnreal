@@ -7,7 +7,7 @@
 #include "GameFramework/HUD.h"
 #include "GameFramework/GameStateBase.h"
 #include "PaperUnreal/ModeAgnostic/StageComponent.h"
-#include "PaperUnreal/WeakCoroutine/AwaitableWrappers.h"
+#include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 #include "PVPBattleHUD.generated.h"
 
 /**
@@ -25,8 +25,8 @@ private:
 
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			AGameStateBase* GameState = co_await WaitForGameState(GetWorld());
-			UStageComponent* StageComponent = GameState->FindComponentByClass<UStageComponent>();
+			auto GameState = co_await WaitForGameState(GetWorld());
+			auto StageComponent = GameState->FindComponentByClass<UStageComponent>();
 			check(IsValid(StageComponent));
 
 			// TODO 방장 여부 기다려서 방장이면 방 설정 화면 띄우기
