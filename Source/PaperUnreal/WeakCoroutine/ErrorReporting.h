@@ -189,16 +189,6 @@ public:
 		return Ret;
 	}
 
-	void LogErrors() const
-	{
-		int32 Index = 0;
-		for (UFailableResultError* Each : GetErrors())
-		{
-			UE_LOG(LogTemp, Warning, TEXT("[%d] %s: %s"), Index, *Each->GetClass()->GetName(), *Each->What);
-			Index++;
-		}
-	}
-
 private:
 	TOptional<TFailableResultStorage<ResultType>> Result;
 	TArray<TStrongObjectPtr<UFailableResultError>> Errors;
@@ -208,7 +198,7 @@ private:
 template <typename AwaitableType>
 concept CErrorReportingAwaitable = requires(AwaitableType Awaitable)
 {
-	typename AwaitableType::ResultType;
+	requires CAwaitable<AwaitableType>;
 	{ Awaitable.await_resume() } -> CInstantiationOf<TFailableResult>;
 };
 
@@ -216,7 +206,15 @@ concept CErrorReportingAwaitable = requires(AwaitableType Awaitable)
 template <typename AwaitableType>
 concept CNonErrorReportingAwaitable = requires(AwaitableType Awaitable)
 {
-	{ Awaitable.await_resume() } -> CNotInstantiationOf<TFailableResult>;
+	requires CAwaitable<AwaitableType>;
+	requires !CErrorReportingAwaitable<AwaitableType>;
+};
+
+
+template <CErrorReportingAwaitable AwaitableType>
+struct TErrorReportResultType
+{
+	using Type = typename decltype(std::declval<AwaitableType>().await_resume())::ResultType;
 };
 
 
@@ -224,7 +222,7 @@ template <CErrorReportingAwaitable AwaitableType>
 class TErrorRemovedAwaitable
 {
 public:
-	using ResultType = typename AwaitableType::ResultType;
+	using ResultType = typename TErrorReportResultType<AwaitableType>::Type;
 	
 	TErrorRemovedAwaitable(AwaitableType&& InAwaitable)
 		: Awaitable(MoveTemp(InAwaitable))
@@ -253,7 +251,7 @@ public:
 			Result = Awaitable.await_resume();
 			if (Result->Failed())
 			{
-				LogErrors();
+				Handle.promise().SetErrors(Result->GetErrors());
 				Handle.destroy();
 				return true;
 			}
@@ -271,7 +269,7 @@ public:
 
 				if (This->Result->Failed())
 				{
-					This->LogErrors();
+					Handle.promise().SetErrors(This->Result->GetErrors());
 					Handle.destroy();
 				}
 				else
@@ -290,22 +288,15 @@ public:
 		return true;
 	}
 
-	typename AwaitableType::ResultType await_resume()
+	ResultType await_resume()
 	{
 		return MoveTempIfPossible(Result->GetResult());
 	}
 
 private:
 	AwaitableType Awaitable;
-	TOptional<TFailableResult<typename AwaitableType::ResultType>> Result;
+	TOptional<TFailableResult<ResultType>> Result;
 	std::source_location SourceLocation;
-
-	void LogErrors() const
-	{
-		UE_LOG(LogTemp, Warning, TEXT("\n코루틴을 종료합니다.\n파일: %hs\n함수: %hs\n라인: %d\n이유:"),
-			SourceLocation.file_name(), SourceLocation.function_name(), SourceLocation.line());
-		Result->LogErrors();
-	}
 };
 
 
@@ -374,7 +365,6 @@ struct TEnsureErrorReporting
 {
 	using Type = TAlwaysResumingAwaitable<AwaitableType>;
 };
-
 
 template <CErrorReportingAwaitable AwaitableType>
 struct TEnsureErrorReporting<AwaitableType>

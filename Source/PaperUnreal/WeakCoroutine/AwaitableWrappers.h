@@ -172,6 +172,38 @@ TTransformingAwaitable(Await&& Awaitable, Trans&& TransformFunc)
 	-> TTransformingAwaitable<std::decay_t<Await>, std::decay_t<Trans>>;
 
 
+template <typename AwaitableType>
+class TSourceLocationAwaitable
+{
+public:
+	TSourceLocationAwaitable(AwaitableType&& InAwaitable)
+		: Awaitable(MoveTemp(InAwaitable))
+	{
+	}
+	
+	bool await_ready() const
+	{
+		return Awaitable.await_ready();
+	}
+
+	template <typename HandleType>
+	auto await_suspend(HandleType&& Handle, std::source_location SL = std::source_location::current())
+	{
+		Handle.promise().SetSourceLocation(SL);
+		return Awaitable.await_suspend(Forward<HandleType>(Handle));
+	}
+
+	auto await_resume()
+	{
+		return Awaitable.await_resume();
+	}
+	
+private:
+	AwaitableType Awaitable;
+};
+
+
+
 template <typename... MaybeAwaitableTypes>
 auto AnyOf(MaybeAwaitableTypes&&... MaybeAwaitables)
 {

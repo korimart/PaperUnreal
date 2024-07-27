@@ -41,7 +41,7 @@ namespace WeakCoroutine_Private
 	class TWeakAbortingAwaitable
 	{
 	public:
-		using ResultType = typename AwaitableType::ResultType;
+		using ResultType = typename TErrorReportResultType<AwaitableType>::Type;
 
 		TWeakAbortingAwaitable(AwaitableType&& Inner)
 			: Awaitable(MoveTemp(Inner))
@@ -54,10 +54,8 @@ namespace WeakCoroutine_Private
 		}
 
 		template <typename HandleType>
-		bool await_suspend(HandleType&& Handle, std::source_location SL = std::source_location::current())
+		bool await_suspend(HandleType&& Handle)
 		{
-			SourceLocation = SL;
-
 			if (Awaitable.await_ready())
 			{
 				if (ResumeInnerAndCheckValidity())
@@ -65,7 +63,7 @@ namespace WeakCoroutine_Private
 					return false;
 				}
 
-				LogErrors();
+				Handle.promise().SetErrors(Result->GetErrors());
 				Handle.destroy();
 				return true;
 			}
@@ -83,12 +81,15 @@ namespace WeakCoroutine_Private
 						return;
 					}
 
-					This->LogErrors();
+					Handle.promise().SetErrors(This->Result->GetErrors());
 					Handle.destroy();
 				}
 			};
 
+			// 지금 이 구현 이게 가정되어 있음 여기 걸리면 구현 수정해야 됨
+			static_assert(std::is_void_v<decltype(Awaitable.await_suspend(std::declval<FWeakCheckingHandle>()))>);
 			Awaitable.await_suspend(FWeakCheckingHandle{this, Forward<HandleType>(Handle)});
+
 			return true;
 		}
 
@@ -100,7 +101,6 @@ namespace WeakCoroutine_Private
 	private:
 		AwaitableType Awaitable;
 		TOptional<TFailableResult<ResultType>> Result;
-		std::source_location SourceLocation;
 
 		bool ResumeInnerAndCheckValidity()
 		{
@@ -114,13 +114,6 @@ namespace WeakCoroutine_Private
 			}
 			return true;
 		}
-
-		void LogErrors() const
-		{
-			UE_LOG(LogTemp, Warning, TEXT("\n코루틴을 종료합니다.\n파일: %hs\n함수: %hs\n라인: %d\n이유:"),
-				SourceLocation.file_name(), SourceLocation.function_name(), SourceLocation.line());
-			Result->LogErrors();
-		}
 	};
 
 
@@ -129,7 +122,7 @@ namespace WeakCoroutine_Private
 	{
 	public:
 		using AwaitableType = typename TEnsureErrorReporting<InAwaitableType>::Type;
-		using ResultType = typename AwaitableType::ResultType;
+		using ResultType = typename TErrorReportResultType<AwaitableType>::Type;
 
 		/**
 		 * constructor에서 Handle을 받는 것이 안전한 이유는 이 클래스의 사용을 await_transform 내부로만 제한하기 때문임
@@ -272,6 +265,25 @@ class TWeakCoroutinePromiseTypeBase
 public:
 	using ReturnObjectType = TWeakCoroutine<T>;
 
+	~TWeakCoroutinePromiseTypeBase()
+	{
+		if (LastCoAwaitSourceLocation)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Weak Coroutine Abort 발생."));
+			UE_LOG(LogTemp, Warning, TEXT("파일: %hs"), LastCoAwaitSourceLocation->file_name());
+			UE_LOG(LogTemp, Warning, TEXT("함수: %hs"), LastCoAwaitSourceLocation->function_name());
+			UE_LOG(LogTemp, Warning, TEXT("라인: %d"), LastCoAwaitSourceLocation->line());
+			UE_LOG(LogTemp, Warning, TEXT("사유는 다음과 같습니다."));
+			
+			int32 Index = 0;
+			for (UFailableResultError* Each : Errors)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[%d] %s: %s"), Index, *Each->GetClass()->GetName(), *Each->What);
+				Index++;
+			}
+		}
+	}
+
 	ReturnObjectType get_return_object()
 	{
 		return
@@ -286,8 +298,9 @@ public:
 		return {};
 	}
 
-	std::suspend_never final_suspend() const noexcept
+	std::suspend_never final_suspend() noexcept
 	{
+		LastCoAwaitSourceLocation.Reset();
 		*bCoroutineFinished = true;
 		return {};
 	}
@@ -302,20 +315,20 @@ public:
 		return await_transform(operator co_await(Forward<AnyType>(Any)));
 	}
 
-	// TODO AsAbrotPtrReturning이 가장 바깥이 됨에 따라 source location이 올바르지 않게 되었음
-
 	template <CAwaitable AwaitableType>
 	auto await_transform(WeakCoroutine_Private::TWithErrorAwaitable<AwaitableType>&& Awaitable)
 	{
+		using namespace WeakCoroutine_Private;
 		auto Handle = std::coroutine_handle<Derived>::from_promise(*static_cast<Derived*>(this));
-		return AsAbortPtrReturning(WeakCoroutine_Private::TWeakAbortingAwaitable{WeakCoroutine_Private::TWeakAwaitable{Handle, MoveTemp(Awaitable.Inner())}});
+		return TSourceLocationAwaitable{AsAbortPtrReturning(TWeakAbortingAwaitable{TWeakAwaitable{Handle, MoveTemp(Awaitable.Inner())}})};
 	}
 
 	template <CAwaitable AwaitableType>
 	auto await_transform(AwaitableType&& Awaitable)
 	{
+		using namespace WeakCoroutine_Private;
 		auto Handle = std::coroutine_handle<Derived>::from_promise(*static_cast<Derived*>(this));
-		return AsAbortPtrReturning(TErrorRemovedAwaitable{WeakCoroutine_Private::TWeakAwaitable{Handle, Forward<AwaitableType>(Awaitable)}});
+		return TSourceLocationAwaitable{AsAbortPtrReturning(TErrorRemovedAwaitable{TWeakAwaitable{Handle, Forward<AwaitableType>(Awaitable)}})};
 	}
 
 	void Abort()
@@ -340,6 +353,16 @@ public:
 		WeakList.Remove(TUObjectWrapperTypeTraits<U>::GetUObject(Weak));
 	}
 
+	void SetSourceLocation(std::source_location SL)
+	{
+		LastCoAwaitSourceLocation = SL;
+	}
+
+	void SetErrors(const TArray<UFailableResultError*>& InErrors)
+	{
+		Errors = InErrors;
+	}
+
 protected:
 	friend class TWeakCoroutine<T>;
 
@@ -348,6 +371,10 @@ protected:
 	TUniquePtr<TUniqueFunction<ReturnObjectType(TWeakCoroutineContext<T>&)>> Captures;
 	TOptional<TCancellablePromise<T>> Promise;
 	TSharedRef<bool> bCoroutineFinished = MakeShared<bool>(false);
+	TOptional<std::source_location> LastCoAwaitSourceLocation;
+
+	// 설정된 이후 즉시 코루틴이 파괴된다고 가정해 UObject의 생명주기에 관해 신경쓰지 않음
+	TArray<UFailableResultError*> Errors;
 
 	template <CErrorReportingAwaitable AwaitableType>
 	decltype(auto) AsAbortPtrReturning(AwaitableType&& Awaitable);
