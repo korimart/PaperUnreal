@@ -501,6 +501,11 @@ inline TCancellableFuture<void> WaitForSeconds(UWorld* World, float Seconds)
 template <typename SoftObjectType>
 TCancellableFuture<SoftObjectType*> RequestAsyncLoad(const TSoftObjectPtr<SoftObjectType>& SoftPointer)
 {
+	if (SoftPointer.IsNull())
+	{
+		return nullptr;
+	}
+	
 	if (SoftPointer.IsValid())
 	{
 		return SoftPointer.Get();

@@ -72,6 +72,9 @@ private:
 
 	UPROPERTY()
 	UTracerToAreaConverterComponent* ServerTracerToAreaConverter;
+	
+	UPROPERTY()
+	ULineMeshComponent* ClientTracerMesh;
 
 	virtual void InitializeComponent() override
 	{
@@ -155,25 +158,26 @@ private:
 			co_await HomeArea;
 			co_await TracerPathProvider;
 
-			auto TracerMesh = NewObject<ULineMeshComponent>(GetOwner());
-			TracerMesh->RegisterComponent();
+			ClientTracerMesh = NewObject<ULineMeshComponent>(GetOwner());
+			ClientTracerMesh->RegisterComponent();
 			
 			auto TracerPointEvent = NewObject<UTracerPointEventComponent>(GetOwner());
 			TracerPointEvent->SetEventSource(TracerPathProvider.Get().GetInterface());
 			TracerPointEvent->RegisterComponent();
-			TracerPointEvent->AddEventListener(TracerMesh);
+			TracerPointEvent->AddEventListener(ClientTracerMesh);
 
 			// 일단 위에까지 완료했으면 플레이는 가능한 거임 여기부터는 미적인 요소들을 준비한다
 			auto PlayerState = co_await GetOuterACharacter2()->WaitForPlayerState();
 			auto Inventory = co_await WaitForComponent<UInventoryComponent>(PlayerState);
-
-			Inventory->GetTracerMaterial().ObserveIfValid(TracerMesh, [TracerMesh](auto SoftMaterial)
+			
+			RunWeakCoroutine(this, [this, &Inventory](FWeakCoroutineContext&) -> FWeakCoroutine
 			{
-				RunWeakCoroutine(TracerMesh, [TracerMesh, SoftMaterial](FWeakCoroutineContext&) -> FWeakCoroutine
+				for (auto MaterialStream = Inventory->GetTracerMaterial().CreateStream();;)
 				{
+					auto SoftMaterial = co_await Filter(MaterialStream, [](const auto& Soft) { return !Soft.IsNull(); });
 					auto Material = co_await RequestAsyncLoad(SoftMaterial);
-					TracerMesh->ConfigureMaterialSet({Material});
-				});
+					ClientTracerMesh->ConfigureMaterialSet({Material});
+				}
 			});
 		});
 	}

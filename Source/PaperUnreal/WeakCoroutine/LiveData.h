@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "TypeTraits.h"
+#include "AwaitableWrappers.h"
 #include "ValueStream.h"
 
 
@@ -209,7 +210,7 @@ public:
 		Observe(Ret.ToShared(), Forward<FuncType>(Func));
 		return Ret;
 	}
-	
+
 	template <typename FuncType>
 	void ObserveIfValid(UObject* Lifetime, FuncType&& Func)
 	{
@@ -490,21 +491,25 @@ public:
 	{
 	}
 
+	//
+	// Forwarding Functions
+	//
+
 	template <typename... ArgTypes>
 	decltype(auto) Observe(ArgTypes&&... Args) { return LiveData.Observe(Forward<ArgTypes>(Args)...); }
-	
+
 	template <typename... ArgTypes>
 	decltype(auto) ObserveIfValid(ArgTypes&&... Args) { return LiveData.ObserveIfValid(Forward<ArgTypes>(Args)...); }
 
 	template <typename... ArgTypes>
 	decltype(auto) ObserveAdd(ArgTypes&&... Args) { return LiveData.ObserveAdd(Forward<ArgTypes>(Args)...); }
-	
+
 	template <typename... ArgTypes>
 	decltype(auto) ObserveAddIfValid(ArgTypes&&... Args) { return LiveData.ObserveAddIfValid(Forward<ArgTypes>(Args)...); }
 
 	template <typename... ArgTypes>
 	decltype(auto) ObserveRemove(ArgTypes&&... Args) { return LiveData.ObserveRemove(Forward<ArgTypes>(Args)...); }
-	
+
 	template <typename... ArgTypes>
 	decltype(auto) ObserveRemoveIfValid(ArgTypes&&... Args) { return LiveData.ObserveRemoveIfValid(Forward<ArgTypes>(Args)...); }
 
@@ -517,6 +522,14 @@ public:
 	decltype(auto) Get() { return LiveData.Get(); }
 	decltype(auto) Get() const { return LiveData.Get(); }
 
+	//
+	// ~Forwarding Functions
+	//
+
+	//
+	// Live Data View Convenience Functions
+	//
+
 	template <CEqualityComparable<ValueType> ArgType>
 	auto If(ArgType&& OfThis)
 	{
@@ -528,6 +541,10 @@ public:
 	{
 		return Filter(CreateStream(), [Predicate = Forward<PredicateType>(Predicate)](const auto& Value) { return Predicate(Value); });
 	}
+	
+	//
+	// ~Live Data View Convenience Functions
+	//
 
 private:
 	TLiveData<ValueType>& LiveData;

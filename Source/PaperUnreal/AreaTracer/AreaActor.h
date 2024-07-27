@@ -105,13 +105,13 @@ private:
 		AreaMeshGenerator->SetMeshDestination(ClientAreaMesh);
 		AreaMeshGenerator->RegisterComponent();
 
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			for (auto AreaMaterialStream = AreaMaterial.CreateStream();;)
+			for (auto MaterialStream = AreaMaterial.CreateStream();;)
 			{
-				auto SoftAreaMaterial = co_await AreaMaterialStream;
-				auto AreaMaterial = co_await RequestAsyncLoad(SoftAreaMaterial);
-				ClientAreaMesh->ConfigureMaterialSet({AreaMaterial});
+				auto SoftMaterial = co_await Filter(MaterialStream, [](const auto& Soft) { return !Soft.IsNull(); });
+				auto Material = co_await RequestAsyncLoad(SoftMaterial);
+				ClientAreaMesh->ConfigureMaterialSet({Material});
 			}
 		});
 	}

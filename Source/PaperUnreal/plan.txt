@@ -164,3 +164,4 @@ ReplicatedAreaExpander
 3. TracerToAreaConverter가 live data 콜백이 원본을 수정하는 circular 관계이므로 교통정리하는 클래스 구현
 4. 게임 시작 전 자유행동 구현
 5. 방설정/장비설정/결과창 UI 구현
+6. co_await에 lvalue를 허용하도록 구현?
