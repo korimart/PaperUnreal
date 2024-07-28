@@ -13,7 +13,7 @@
 #include "PaperUnreal/AreaTracer/TracerPathComponent.h"
 #include "PaperUnreal/AreaTracer/TracerToAreaConverterComponent.h"
 #include "PaperUnreal/ModeAgnostic/ComponentAttacherComponent.h"
-#include "PaperUnreal/ModeAgnostic/PlayerSpawnerComponent.h"
+#include "PaperUnreal/ModeAgnostic/PawnSpawnerComponent.h"
 #include "PaperUnreal/ModeAgnostic/ComponentRegistry.h"
 #include "PaperUnreal/ModeAgnostic/InventoryComponent.h"
 #include "PaperUnreal/GameFramework2/Character2.h"
@@ -29,13 +29,13 @@ class UBattlePlayerAttacherComponent : public UComponentAttacherComponent
 public:
 	void SetDependencies(
 		UAreaSpawnerComponent* AreaSpawner,
-		UPlayerSpawnerComponent* PlayerSpawner,
+		UPawnSpawnerComponent* PawnSpawner,
 		AAreaActor* InHomeArea)
 	{
 		check(GetNetMode() != NM_Client);
 		check(!HasBeenInitialized());
 		ServerAreaSpawner = AreaSpawner;
-		ServerPlayerSpawner = PlayerSpawner;
+		ServerPawnSpawner = PawnSpawner;
 		HomeArea = InHomeArea;
 	}
 
@@ -65,7 +65,7 @@ private:
 	UAreaSpawnerComponent* ServerAreaSpawner;
 
 	UPROPERTY()
-	UPlayerSpawnerComponent* ServerPlayerSpawner;
+	UPawnSpawnerComponent* ServerPawnSpawner;
 
 	UPROPERTY()
 	UTracerOverlapCheckerComponent* ServerOverlapChecker;
@@ -82,7 +82,7 @@ private:
 
 		if (GetNetMode() != NM_Client)
 		{
-			check(AllValid(ServerAreaSpawner, ServerPlayerSpawner, RepHomeArea));
+			check(AllValid(ServerAreaSpawner, ServerPawnSpawner, RepHomeArea));
 		}
 	}
 
@@ -105,7 +105,7 @@ private:
 		ServerOverlapChecker->SetTracer(TracerPath);
 		ServerOverlapChecker->RegisterComponent();
 
-		ServerPlayerSpawner->GetSpawnedPlayers().ObserveAddIfValid(this, [this](APawn* NewPlayer)
+		ServerPawnSpawner->GetSpawnedPawns().ObserveAddIfValid(this, [this](APawn* NewPlayer)
 		{
 			auto NewPlayerHome = NewPlayer->FindComponentByClass<UBattlePlayerAttacherComponent>()->HomeArea.Get();
 			auto NewPlayerTracer = NewPlayer->FindComponentByClass<UTracerPathComponent>();

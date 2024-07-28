@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "PaperUnreal/AreaTracer/AreaSpawnerComponent.h"
 #include "PaperUnreal/GameFramework2/GameStateBase2.h"
-#include "PaperUnreal/ModeAgnostic/PlayerSpawnerComponent.h"
+#include "PaperUnreal/ModeAgnostic/PawnSpawnerComponent.h"
 #include "PaperUnreal/ModeAgnostic/ReadyStateTrackerComponent.h"
 #include "PaperUnreal/ModeAgnostic/StageComponent.h"
 #include "PaperUnreal/ModeAgnostic/WorldTimerComponent.h"
@@ -30,7 +30,7 @@ public:
 	UAreaSpawnerComponent* AreaSpawnerComponent;
 	
 	UPROPERTY()
-	UPlayerSpawnerComponent* PlayerSpawnerComponent;
+	UPawnSpawnerComponent* PawnSpawnerComponent;
 	
 	UPROPERTY()
 	UReadyStateTrackerComponent* ReadyStateTrackerComponent;
@@ -41,7 +41,7 @@ private:
 		StageComponent = CreateDefaultSubobject<UStageComponent>(TEXT("StageComponent"));
 		WorldTimerComponent = CreateDefaultSubobject<UWorldTimerComponent>(TEXT("WorldTimerComponent"));
 		AreaSpawnerComponent = CreateDefaultSubobject<UAreaSpawnerComponent>(TEXT("AreaSpawnerComponent"));
-		PlayerSpawnerComponent = CreateDefaultSubobject<UPlayerSpawnerComponent>(TEXT("PlayerSpawnerComponent"));
+		PawnSpawnerComponent = CreateDefaultSubobject<UPawnSpawnerComponent>(TEXT("PawnSpawnerComponent"));
 		ReadyStateTrackerComponent = CreateDefaultSubobject<UReadyStateTrackerComponent>(TEXT("ReadyStateTrackerComponent"));
 	}
 };

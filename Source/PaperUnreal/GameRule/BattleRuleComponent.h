@@ -11,7 +11,7 @@
 #include "PaperUnreal/Development/InGameCheats.h"
 #include "PaperUnreal/GameFramework2/ActorComponent2.h"
 #include "PaperUnreal/ModeAgnostic/InventoryComponent.h"
-#include "PaperUnreal/ModeAgnostic/PlayerSpawnerComponent.h"
+#include "PaperUnreal/ModeAgnostic/PawnSpawnerComponent.h"
 #include "PaperUnreal/ModeAgnostic/ReadyStateComponent.h"
 #include "PaperUnreal/ModeAgnostic/TeamComponent.h"
 #include "PaperUnreal/ModeAgnostic/WorldTimerComponent.h"
@@ -78,10 +78,10 @@ public:
 		// TODO spawn
 		WorldTimer = GetWorld()->GetGameState()->FindComponentByClass<UWorldTimerComponent>();
 		AreaSpawner = GetWorld()->GetGameState()->FindComponentByClass<UAreaSpawnerComponent>();
-		PlayerSpawner = GetWorld()->GetGameState()->FindComponentByClass<UPlayerSpawnerComponent>();
+		PawnSpawner = GetWorld()->GetGameState()->FindComponentByClass<UPawnSpawnerComponent>();
 
 		// 이 컴포넌트들은 디펜던시: 이 컴포넌트들을 가지는 GameState에 대해서만 이 클래스를 사용할 수 있음
-		check(AllValid(WorldTimer, AreaSpawner, PlayerSpawner));
+		check(AllValid(WorldTimer, AreaSpawner, PawnSpawner));
 
 		TeamAllocator.Configure(TeamCount, EachTeamMemberCount);
 
@@ -89,7 +89,7 @@ public:
 
 		PlayerStateArray.ObserveAddIfValid(this, [this](APlayerState* Player)
 		{
-			InitiatePlayerSpawnSequence(Player);
+			InitiatePawnSpawnSequence(Player);
 		});
 
 		PlayerStateArray.ObserveRemoveIfValid(this, [this](APlayerState* Player)
@@ -116,7 +116,7 @@ private:
 	UAreaSpawnerComponent* AreaSpawner;
 
 	UPROPERTY()
-	UPlayerSpawnerComponent* PlayerSpawner;
+	UPawnSpawnerComponent* PawnSpawner;
 
 	FTeamAllocator TeamAllocator;
 
@@ -137,7 +137,7 @@ private:
 		SoftSolidRedLight,
 	};
 
-	void InitiatePlayerSpawnSequence(APlayerState* ReadyPlayer)
+	void InitiatePawnSpawnSequence(APlayerState* ReadyPlayer)
 	{
 		RunWeakCoroutine(this, [this, ReadyPlayer](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
@@ -186,10 +186,10 @@ private:
 			Inventory->SetTracerMaterial(TracerMaterials[ThisPlayerTeamIndex % TracerMaterials.Num()]);
 
 			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어 폰을 스폰합니다"), ReadyPlayer);
-			APawn* Pawn = PlayerSpawner->SpawnAtLocation(PawnClass, ThisPlayerArea->ServerAreaBoundary->GetRandomPointInside(), [&](APawn* ToInit)
+			APawn* Pawn = PawnSpawner->SpawnAtLocation(PawnClass, ThisPlayerArea->ServerAreaBoundary->GetRandomPointInside(), [&](APawn* ToInit)
 			{
 				auto Attacher = NewObject<UBattlePlayerAttacherComponent>(ToInit);
-				Attacher->SetDependencies(AreaSpawner, PlayerSpawner, ThisPlayerArea);
+				Attacher->SetDependencies(AreaSpawner, PawnSpawner, ThisPlayerArea);
 				Attacher->RegisterComponent();
 			});
 			ReadyPlayer->GetOwningController()->Possess(Pawn);
@@ -206,7 +206,7 @@ private:
 			Pawn->Destroy();
 
 			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어 리스폰 시퀀스를 시작합니다"), ReadyPlayer);
-			InitiatePlayerSpawnSequence(ReadyPlayer);
+			InitiatePawnSpawnSequence(ReadyPlayer);
 		});
 	}
 
@@ -328,7 +328,7 @@ private:
 	TArray<ULifeComponent*> GetPawnLivesOfTeam(int32 TeamIndex) const
 	{
 		TArray<ULifeComponent*> Ret;
-		for (APawn* Each : PlayerSpawner->GetSpawnedPlayers().Get())
+		for (APawn* Each : PawnSpawner->GetSpawnedPawns().Get())
 		{
 			if (!IsValid(Each) || !Each->GetPlayerState())
 			{

@@ -6,17 +6,16 @@
 #include "Net/UnrealNetwork.h"
 #include "PaperUnreal/GameFramework2/ActorComponent2.h"
 #include "PaperUnreal/WeakCoroutine/LiveData.h"
-#include "PlayerSpawnerComponent.generated.h"
+#include "PawnSpawnerComponent.generated.h"
 
 
-// TODO rename
 UCLASS()
-class UPlayerSpawnerComponent : public UActorComponent2
+class UPawnSpawnerComponent : public UActorComponent2
 {
 	GENERATED_BODY()
 
 public:
-	TLiveDataView<TArray<APawn*>&> GetSpawnedPlayers() { return Players; }
+	TLiveDataView<TArray<APawn*>&> GetSpawnedPawns() { return Pawns; }
 
 	APawn* SpawnAtLocation(UClass* Class, const FVector& Location, const auto& Initializer)
 	{
@@ -28,28 +27,28 @@ public:
 		
 		auto NewComponent = NewObject<UActorComponent2>(Spawned);
 		NewComponent->RegisterComponent();
-		NewComponent->OnEndPlay.AddWeakLambda(this, [this, Spawned]() { Players.Remove(Spawned); });
+		NewComponent->OnEndPlay.AddWeakLambda(this, [this, Spawned]() { Pawns.Remove(Spawned); });
 		
-		Players.Add(Spawned);
+		Pawns.Add(Spawned);
 		
 		return Spawned;
 	}
 
 private:
-	UPROPERTY(ReplicatedUsing=OnRep_SpawnedPlayers)
-	TArray<APawn*> RepPlayers;
-	TLiveData<TArray<APawn*>&> Players{RepPlayers};
+	UPROPERTY(ReplicatedUsing=OnRep_SpawnedPawns)
+	TArray<APawn*> RepPawns;
+	TLiveData<TArray<APawn*>&> Pawns{RepPawns};
 	
 	UFUNCTION()
-	void OnRep_SpawnedPlayers(const TArray<APawn*>& Prev) { Players.NotifyDiff(Prev); }
+	void OnRep_SpawnedPawns(const TArray<APawn*>& Prev) { Pawns.NotifyDiff(Prev); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-		DOREPLIFETIME(ThisClass, RepPlayers);
+		DOREPLIFETIME(ThisClass, RepPawns);
 	}
 	
-	UPlayerSpawnerComponent()
+	UPawnSpawnerComponent()
 	{
 		SetIsReplicatedByDefault(true);
 	}
