@@ -1,7 +1,7 @@
 ﻿#include "CancellableFutureTest.h"
 #include "Misc/AutomationTest.h"
-#include "PaperUnreal/WeakCoroutine/AwaitableWrappers.h"
 #include "PaperUnreal/WeakCoroutine/LiveData.h"
+#include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLiveDataTest, "PaperUnreal.PaperUnreal.Test.LiveDataTest", EAutomationTestFlags::EditorContext | EAutomationTestFlags::SmokeFilter)
 

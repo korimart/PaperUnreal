@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <source_location>
+
 #include "CoreMinimal.h"
 #include "CancellableFuture.h"
 #include "MinimalCoroutine.h"

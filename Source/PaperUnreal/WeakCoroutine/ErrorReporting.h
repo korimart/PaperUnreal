@@ -2,10 +2,10 @@
 
 #pragma once
 
-#include <source_location>
-
 #include "CoreMinimal.h"
 #include "TypeTraits.h"
+#include "Algo/AllOf.h"
+#include "Algo/AnyOf.h"
 #include "ErrorReporting.generated.h"
 
 
@@ -57,7 +57,7 @@ struct TFailableResultStorage
 		: Result(Value)
 	{
 	}
-	
+
 	TFailableResultStorage(ResultType&& Value)
 		: Result(MoveTemp(Value))
 	{
@@ -131,17 +131,20 @@ public:
 		: Result(Value)
 	{
 	}
-	
+
 	TFailableResult(ResultType&& Value)
 		: Result(MoveTemp(Value))
 	{
 	}
-	
+
 	template <typename... ArgTypes>
 	TFailableResult(EInPlace, ArgTypes&&... Args)
 		: Result(InPlace, InPlace, Forward<ArgTypes>(Args)...)
 	{
 	}
+
+	TFailableResult(const TFailableResult&) = delete;
+	TFailableResult& operator=(const TFailableResult&) = delete;
 
 	TFailableResult(TFailableResult&&) = default;
 	TFailableResult& operator=(TFailableResult&&) = default;
@@ -189,6 +192,34 @@ public:
 		return Ret;
 	}
 
+	template <typename... ErrorTypes>
+	bool OnlyContains() const
+	{
+		const TArray<UClass*> AllowedUClasses{ErrorTypes::StaticClass()...};
+		for (const auto& Error : Errors)
+		{
+			if (Algo::AllOf(AllowedUClasses, [&](UClass* AllowedUClass) { return !Error->IsA(AllowedUClass); }))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	template <typename... ErrorTypes>
+	bool ContainsAny() const
+	{
+		const TArray<UClass*> WantedUClasses{ErrorTypes::StaticClass()...};
+		for (const auto& Error : Errors)
+		{
+			if (Algo::AnyOf(WantedUClasses, [&](UClass* WantedUClass) { return Error->IsA(WantedUClass); }))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
 private:
 	TOptional<TFailableResultStorage<ResultType>> Result;
 	TArray<TStrongObjectPtr<UFailableResultError>> Errors;
@@ -218,23 +249,22 @@ struct TErrorReportResultType
 };
 
 
-template <CErrorReportingAwaitable AwaitableType>
-class TErrorRemovedAwaitable
+template <typename Derived, CAwaitable AwaitableType>
+class TConditionalResumeAwaitable
 {
 public:
-	using ResultType = typename TErrorReportResultType<AwaitableType>::Type;
-	
-	TErrorRemovedAwaitable(AwaitableType&& InAwaitable)
-		: Awaitable(MoveTemp(InAwaitable))
+	using ReturnType = decltype(std::declval<AwaitableType>().await_resume());
+
+	TConditionalResumeAwaitable(AwaitableType&& Inner)
+		: Awaitable(MoveTemp(Inner))
 	{
-		static_assert(CNonErrorReportingAwaitable<TErrorRemovedAwaitable>);
 	}
 
-	TErrorRemovedAwaitable(const TErrorRemovedAwaitable&) = delete;
-	TErrorRemovedAwaitable& operator=(const TErrorRemovedAwaitable&) = delete;
+	TConditionalResumeAwaitable(const TConditionalResumeAwaitable&) = delete;
+	TConditionalResumeAwaitable& operator=(const TConditionalResumeAwaitable&) = delete;
 
-	TErrorRemovedAwaitable(TErrorRemovedAwaitable&&) = default;
-	TErrorRemovedAwaitable& operator=(TErrorRemovedAwaitable&&) = default;
+	TConditionalResumeAwaitable(TConditionalResumeAwaitable&&) = default;
+	TConditionalResumeAwaitable& operator=(TConditionalResumeAwaitable&&) = default;
 
 	bool await_ready() const
 	{
@@ -242,49 +272,111 @@ public:
 	}
 
 	template <typename HandleType>
-	bool await_suspend(HandleType&& Handle, std::source_location Current = std::source_location::current())
+	bool await_suspend(const HandleType& Handle)
 	{
-		SourceLocation = Current;
-
 		if (Awaitable.await_ready())
 		{
-			Result = Awaitable.await_resume();
-			if (Result->Failed())
+			const bool bResume = ShouldResume(Handle);
+			if (!bResume)
 			{
-				Handle.promise().SetErrors(Result->GetErrors());
 				Handle.destroy();
 				return true;
 			}
 			return false;
 		}
 
-		struct FFailChecker
+		struct FConditionalResumeHandle
 		{
-			TErrorRemovedAwaitable* This;
-			std::decay_t<HandleType> Handle;
+			TConditionalResumeAwaitable* This;
+			HandleType Handle;
 
 			void resume() const
 			{
-				This->Result = This->Awaitable.await_resume();
-
-				if (This->Result->Failed())
-				{
-					Handle.promise().SetErrors(This->Result->GetErrors());
-					Handle.destroy();
-				}
-				else
-				{
-					Handle.resume();
-				}
+				const bool bResume = This->ShouldResume(Handle);
+				bResume ? Handle.resume() : Handle.destroy();
 			}
 
 			void destroy() const { Handle.destroy(); }
 		};
 
-		// 지금 이 구현 이게 가정되어 있음 여기 걸리면 구현 수정해야 됨
-		static_assert(std::is_void_v<decltype(Awaitable.await_suspend(std::declval<FFailChecker>()))>);
-		
-		Awaitable.await_suspend(FFailChecker{this, Forward<HandleType>(Handle)});
+		using SuspendType = decltype(std::declval<AwaitableType>().await_suspend(std::declval<FConditionalResumeHandle>()));
+
+		if constexpr (std::is_void_v<SuspendType>)
+		{
+			Awaitable.await_suspend(FConditionalResumeHandle{this, Handle});
+			return true;
+		}
+		else if (Awaitable.await_suspend(FConditionalResumeHandle{this, Handle}))
+		{
+			return true;
+		}
+
+		const bool bResume = ShouldResume(Handle);
+		if (!bResume)
+		{
+			Handle.destroy();
+			return true;
+		}
+		return false;
+	}
+
+private:
+	AwaitableType Awaitable;
+
+	template <typename HandleType>
+	bool ShouldResume(const HandleType& Handle)
+	{
+		struct FReadOnlyHandle
+		{
+			FReadOnlyHandle(HandleType InHandle)
+				: Handle(InHandle)
+			{
+			}
+
+			auto& promise() const
+			{
+				return Handle.promise();
+			}
+
+		private:
+			HandleType Handle;
+		};
+
+		Derived* AsDerived = static_cast<Derived*>(this);
+		return AsDerived->ShouldResume(FReadOnlyHandle{Handle}, Awaitable.await_resume());
+	}
+};
+
+
+template <CErrorReportingAwaitable AwaitableType>
+class TErrorRemovingAwaitable : public TConditionalResumeAwaitable<TErrorRemovingAwaitable<AwaitableType>, AwaitableType>
+{
+public:
+	using Super = TConditionalResumeAwaitable<TErrorRemovingAwaitable, AwaitableType>;
+	using ResultType = typename TErrorReportResultType<AwaitableType>::Type;
+
+	TErrorRemovingAwaitable(AwaitableType&& Inner)
+		: Super(MoveTemp(Inner))
+	{
+		static_assert(CNonErrorReportingAwaitable<TErrorRemovingAwaitable>);
+	}
+
+	TErrorRemovingAwaitable(const TErrorRemovingAwaitable&) = delete;
+	TErrorRemovingAwaitable& operator=(const TErrorRemovingAwaitable&) = delete;
+
+	TErrorRemovingAwaitable(TErrorRemovingAwaitable&&) = default;
+	TErrorRemovingAwaitable& operator=(TErrorRemovingAwaitable&&) = default;
+
+	bool ShouldResume(const auto& Handle, TFailableResult<ResultType>&& InnerResult)
+	{
+		Result = MoveTemp(InnerResult);
+
+		if (Result->Failed())
+		{
+			Handle.promise().SetErrors(Result->GetErrors());
+			return false;
+		}
+
 		return true;
 	}
 
@@ -294,9 +386,81 @@ public:
 	}
 
 private:
-	AwaitableType Awaitable;
 	TOptional<TFailableResult<ResultType>> Result;
-	std::source_location SourceLocation;
+};
+
+
+struct FAllowAll
+{
+};
+
+
+template <CErrorReportingAwaitable AwaitableType, typename AllowedErrorTypeList, typename NeverAllowedTypeList>
+class TErrorFilteringAwaitable
+	: public TConditionalResumeAwaitable
+	<
+		TErrorFilteringAwaitable<AwaitableType, AllowedErrorTypeList, NeverAllowedTypeList>,
+		AwaitableType
+	>
+{
+public:
+	using Super = TConditionalResumeAwaitable<TErrorFilteringAwaitable, AwaitableType>;
+	using ResultType = typename TErrorReportResultType<AwaitableType>::Type;
+
+	static constexpr bool bAllowAll = std::is_same_v<FAllowAll, AllowedErrorTypeList>;
+
+	TErrorFilteringAwaitable(AwaitableType&& Inner)
+		: Super(MoveTemp(Inner))
+	{
+		static_assert(CErrorReportingAwaitable<TErrorFilteringAwaitable>);
+	}
+
+	TErrorFilteringAwaitable(const TErrorFilteringAwaitable&) = delete;
+	TErrorFilteringAwaitable& operator=(const TErrorFilteringAwaitable&) = delete;
+
+	TErrorFilteringAwaitable(TErrorFilteringAwaitable&&) = default;
+	TErrorFilteringAwaitable& operator=(TErrorFilteringAwaitable&&) = default;
+
+	bool ShouldResume(const auto& Handle, TFailableResult<ResultType>&& InnerResult)
+	{
+		Result = MoveTemp(InnerResult);
+
+		if (Result->Succeeded())
+		{
+			return true;
+		}
+
+		if constexpr (!bAllowAll)
+		{
+			if ([&]<typename... AllowedErrorTypes>(TTypeList<AllowedErrorTypes...>)
+			{
+				return !Result->template OnlyContains<AllowedErrorTypes...>();
+			}(AllowedErrorTypeList{}))
+			{
+				Handle.promise().SetErrors(Result->GetErrors());
+				return false;
+			}
+		}
+
+		if ([&]<typename... NeverAllowedErrorTypes>(TTypeList<NeverAllowedErrorTypes...>)
+		{
+			return Result->template ContainsAny<NeverAllowedErrorTypes...>();
+		}(NeverAllowedTypeList{}))
+		{
+			Handle.promise().SetErrors(Result->GetErrors());
+			return false;
+		}
+
+		return true;
+	}
+
+	TFailableResult<ResultType> await_resume()
+	{
+		return MoveTemp(*Result);
+	}
+
+private:
+	TOptional<TFailableResult<ResultType>> Result;
 };
 
 

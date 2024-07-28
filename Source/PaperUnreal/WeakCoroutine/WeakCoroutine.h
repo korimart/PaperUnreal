@@ -29,91 +29,12 @@ public:
 
 namespace WeakCoroutine_Private
 {
-	template <typename AwaitableType>
+	template <typename AwaitableType, typename InAllowedErrorTypeList>
 	class TWithErrorAwaitable : public TIdentityAwaitable<AwaitableType>
 	{
 	public:
+		using AllowedErrorTypeList = InAllowedErrorTypeList;
 		using TIdentityAwaitable<AwaitableType>::TIdentityAwaitable;
-	};
-
-
-	template <CErrorReportingAwaitable AwaitableType>
-	class TWeakAbortingAwaitable
-	{
-	public:
-		using ResultType = typename TErrorReportResultType<AwaitableType>::Type;
-
-		TWeakAbortingAwaitable(AwaitableType&& Inner)
-			: Awaitable(MoveTemp(Inner))
-		{
-		}
-
-		bool await_ready() const
-		{
-			return false;
-		}
-
-		template <typename HandleType>
-		bool await_suspend(HandleType&& Handle)
-		{
-			if (Awaitable.await_ready())
-			{
-				if (ResumeInnerAndCheckValidity())
-				{
-					return false;
-				}
-
-				Handle.promise().SetErrors(Result->GetErrors());
-				Handle.destroy();
-				return true;
-			}
-
-			struct FWeakCheckingHandle
-			{
-				TWeakAbortingAwaitable* This;
-				std::decay_t<HandleType> Handle;
-
-				void resume() const
-				{
-					if (This->ResumeInnerAndCheckValidity())
-					{
-						Handle.resume();
-						return;
-					}
-
-					Handle.promise().SetErrors(This->Result->GetErrors());
-					Handle.destroy();
-				}
-			};
-
-			// 지금 이 구현 이게 가정되어 있음 여기 걸리면 구현 수정해야 됨
-			static_assert(std::is_void_v<decltype(Awaitable.await_suspend(std::declval<FWeakCheckingHandle>()))>);
-			Awaitable.await_suspend(FWeakCheckingHandle{this, Forward<HandleType>(Handle)});
-
-			return true;
-		}
-
-		TFailableResult<ResultType> await_resume()
-		{
-			return MoveTemp(*Result);
-		}
-
-	private:
-		AwaitableType Awaitable;
-		TOptional<TFailableResult<ResultType>> Result;
-
-		bool ResumeInnerAndCheckValidity()
-		{
-			Result = Awaitable.await_resume();
-			for (UFailableResultError* Each : Result->GetErrors())
-			{
-				if (Each->IsA<UWeakCoroutineError>())
-				{
-					return false;
-				}
-			}
-			return true;
-		}
 	};
 
 
@@ -274,7 +195,7 @@ public:
 			UE_LOG(LogTemp, Warning, TEXT("함수: %hs"), LastCoAwaitSourceLocation->function_name());
 			UE_LOG(LogTemp, Warning, TEXT("라인: %d"), LastCoAwaitSourceLocation->line());
 			UE_LOG(LogTemp, Warning, TEXT("사유는 다음과 같습니다."));
-			
+
 			int32 Index = 0;
 			for (UFailableResultError* Each : Errors)
 			{
@@ -315,12 +236,22 @@ public:
 		return await_transform(operator co_await(Forward<AnyType>(Any)));
 	}
 
-	template <CAwaitable AwaitableType>
-	auto await_transform(WeakCoroutine_Private::TWithErrorAwaitable<AwaitableType>&& Awaitable)
+	template <typename... _>
+	auto await_transform(WeakCoroutine_Private::TWithErrorAwaitable<_...>&& Awaitable)
 	{
 		using namespace WeakCoroutine_Private;
+
 		auto Handle = std::coroutine_handle<Derived>::from_promise(*static_cast<Derived*>(this));
-		return TSourceLocationAwaitable{AsAbortPtrReturning(TWeakAbortingAwaitable{TWeakAwaitable{Handle, MoveTemp(Awaitable.Inner())}})};
+		auto WeakAwaitable = TWeakAwaitable{Handle, MoveTemp(Awaitable.Inner())};
+
+		using ErrorFilteringAwaitableType = TErrorFilteringAwaitable
+		<
+			decltype(WeakAwaitable),
+			typename std::decay_t<decltype(Awaitable)>::AllowedErrorTypeList,
+			TTypeList<UWeakCoroutineError>
+		>;
+
+		return TSourceLocationAwaitable{AsAbortPtrReturning(ErrorFilteringAwaitableType{MoveTemp(WeakAwaitable)})};
 	}
 
 	template <CAwaitable AwaitableType>
@@ -328,7 +259,7 @@ public:
 	{
 		using namespace WeakCoroutine_Private;
 		auto Handle = std::coroutine_handle<Derived>::from_promise(*static_cast<Derived*>(this));
-		return TSourceLocationAwaitable{AsAbortPtrReturning(TErrorRemovedAwaitable{TWeakAwaitable{Handle, Forward<AwaitableType>(Awaitable)}})};
+		return TSourceLocationAwaitable{AsAbortPtrReturning(TErrorRemovingAwaitable{TWeakAwaitable{Handle, Forward<AwaitableType>(Awaitable)}})};
 	}
 
 	void Abort()
@@ -578,11 +509,20 @@ auto RunWeakCoroutineNoCaptures(const FuncType& Func, ArgTypes&&... Args)
 }
 
 
-// TODO
 template <typename... AllowedErrorTypes, typename MaybeAwaitableType>
 auto WithError(MaybeAwaitableType&& MaybeAwaitable)
 {
-	return WeakCoroutine_Private::TWithErrorAwaitable{AwaitableOrIdentity(Forward<MaybeAwaitableType>(MaybeAwaitable))};
+	using namespace WeakCoroutine_Private;
+
+	using AllowedErrorTypeList = std::conditional_t
+	<
+		sizeof...(AllowedErrorTypes) == 0,
+		FAllowAll,
+		TTypeList<AllowedErrorTypes...>
+	>;
+
+	auto Awaitable = AwaitableOrIdentity(Forward<MaybeAwaitableType>(MaybeAwaitable));
+	return TWithErrorAwaitable<decltype(Awaitable), AllowedErrorTypeList>{MoveTemp(Awaitable)};
 }
 
 

@@ -30,11 +30,6 @@ private:
 	UPROPERTY()
 	TScriptInterface<ITracerPathStream> EventSource;
 
-	UPROPERTY()
-	TArray<TScriptInterface<ITracerPointEventListener>> EventListeners;
-
-	FVector2D LastValidHead;
-
 	UTracerPointEventComponent()
 	{
 		bWantsInitializeComponent = true;
