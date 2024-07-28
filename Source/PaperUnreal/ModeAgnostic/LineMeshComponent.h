@@ -70,6 +70,11 @@ public:
 
 		Points[Index] = Point;
 
+		if (Points.Num() < 2)
+		{
+			return;
+		}
+
 		const FVector2D ForwardDirection = (Points.Last() - Points.Last(1)).GetSafeNormal();
 		const FVector2D RightDirection{-ForwardDirection.Y, ForwardDirection.X};
 
@@ -77,7 +82,7 @@ public:
 		Mesh->SetVertex(LeftVertices[Index], FVector{Points[Index] - RightDirection * HalfWidth, MeshHeight});
 		Mesh->SetVertex(RightVertices[Index], FVector{Points[Index] + RightDirection * HalfWidth, MeshHeight});
 
-		if (Points.Num() >= 3)
+		if (Points.Num() >= 4)
 		{
 			const FVector2D LastForwardDirection = (Points.Last(1) - Points.Last(2)).GetSafeNormal();
 			const FVector2D PerpDirection = (ForwardDirection + LastForwardDirection).GetSafeNormal();
