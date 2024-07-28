@@ -3,10 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Components/DynamicMeshComponent.h"
 #include "Materials/MaterialInterface.h"
 #include "PaperUnreal/AreaTracer/SegmentArray.h"
 #include "PaperUnreal/GameFramework2/ActorComponent2.h"
-#include "PaperUnreal/GameFramework2/DynamicMeshComponent2.h"
 #include "Generators/PlanarPolygonMeshGenerator.h"
 #include "AreaMeshComponent.generated.h"
 
@@ -40,9 +40,8 @@ public:
 
 	void ConfigureMaterialSet(const TArray<UMaterialInterface*>& NewMaterialSet)
 	{
-		// TODO 작동하지 않는 듯 하니 치트로 머티리얼 나중에 설정해서 확인해보자
 		DynamicMeshComponent->ConfigureMaterialSet(NewMaterialSet);
-		DynamicMeshComponent->NotifyMaterialSetUpdated();
+		DynamicMeshComponent->NotifyMeshModified();
 	}
 
 	bool IsValid() const
@@ -79,7 +78,7 @@ public:
 
 private:
 	UPROPERTY()
-	UDynamicMeshComponent2* DynamicMeshComponent;
+	UDynamicMeshComponent* DynamicMeshComponent;
 
 	FLoopedSegmentArray2D LastSetWorldBoundary;
 
@@ -97,7 +96,7 @@ private:
 	{
 		Super::BeginPlay();
 
-		DynamicMeshComponent = NewObject<UDynamicMeshComponent2>(GetOwner(), TEXT("DynamicMeshComponent"));
+		DynamicMeshComponent = NewObject<UDynamicMeshComponent>(GetOwner(), TEXT("DynamicMeshComponent"));
 		DynamicMeshComponent->AttachToComponent(GetOwner()->GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);
 		DynamicMeshComponent->RegisterComponent();
 	}

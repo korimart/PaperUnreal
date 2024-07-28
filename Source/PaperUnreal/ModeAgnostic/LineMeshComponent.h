@@ -3,9 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Components/DynamicMeshComponent.h"
 #include "PaperUnreal/AreaTracer/TracerPointEventListener.h"
 #include "PaperUnreal/GameFramework2/ActorComponent2.h"
-#include "PaperUnreal/GameFramework2/DynamicMeshComponent2.h"
 #include "LineMeshComponent.generated.h"
 
 
@@ -132,7 +132,7 @@ private:
 	static constexpr float MeshHeight = 51.f;
 
 	UPROPERTY()
-	UDynamicMeshComponent2* DynamicMeshComponent;
+	UDynamicMeshComponent* DynamicMeshComponent;
 
 	TArray<FVector2D> Points;
 	TArray<int32> LeftVertices;
@@ -147,7 +147,7 @@ private:
 	{
 		Super::InitializeComponent();
 
-		DynamicMeshComponent = NewObject<UDynamicMeshComponent2>(GetOwner(), TEXT("DynamicMeshComponent"));
+		DynamicMeshComponent = NewObject<UDynamicMeshComponent>(GetOwner(), TEXT("DynamicMeshComponent"));
 		DynamicMeshComponent->RegisterComponent();
 	}
 

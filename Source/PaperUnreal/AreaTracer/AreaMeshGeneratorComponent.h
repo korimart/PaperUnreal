@@ -41,12 +41,11 @@ private:
 	{
 		Super::InitializeComponent();
 
-		check(AllValid(MeshSource, MeshDest));
+		AddLifeDependency(Cast<UActorComponent2>(MeshSource.GetObject()));
+		AddLifeDependency(MeshDest);
 
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
-			Context.AbortIfNotValid(MeshSource);
-			Context.AbortIfNotValid(MeshDest);
 			for (auto BoundaryStream = MeshSource->GetBoundary().CreateStream();;)
 			{
 				MeshDest->SetMeshByWorldBoundary(co_await BoundaryStream);
