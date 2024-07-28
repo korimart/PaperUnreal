@@ -6,7 +6,6 @@
 #include "AreaBoundaryComponent.h"
 #include "AreaBoundaryProvider.h"
 #include "Net/UnrealNetwork.h"
-#include "PaperUnreal/WeakCoroutine/AwaitableWrappers.h"
 #include "ReplicatedAreaBoundaryComponent.generated.h"
 
 
@@ -16,7 +15,7 @@ class UReplicatedAreaBoundaryComponent : public UActorComponent2, public IAreaBo
 	GENERATED_BODY()
 
 public:
-	virtual TLiveDataView<FLoopedSegmentArray2D> GetBoundary() override { return AreaBoundary; }
+	virtual TLiveDataView<FLoopedSegmentArray2D> GetBoundary() const override { return AreaBoundary; }
 
 	void SetAreaBoundarySource(UAreaBoundaryComponent* Source)
 	{
@@ -26,6 +25,7 @@ public:
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_Points)
 	TArray<FVector2D> RepPoints;
+	mutable TLiveData<FLoopedSegmentArray2D> AreaBoundary;
 
 	UFUNCTION()
 	void OnRep_Points() { AreaBoundary.SetValueNoComparison(RepPoints); }
@@ -38,8 +38,6 @@ private:
 	
 	UPROPERTY()
 	UAreaBoundaryComponent* BoundarySource;
-
-	TLiveData<FLoopedSegmentArray2D> AreaBoundary;
 
 	UReplicatedAreaBoundaryComponent()
 	{

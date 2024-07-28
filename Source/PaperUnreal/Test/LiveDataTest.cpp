@@ -240,5 +240,28 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("TArray의 create strict add stream 테스트"), Received.Num(), 3);
 	}
 
+	{
+		TLiveData<int32> LiveData;
+
+		TestEqual(TEXT("AwaitAndModify가 Guard를 기다렸다가 잘 실행되는지 테스트"), LiveData.Get(), 0);
+		
+		auto Handle = LiveData.Observe([&](int32 Value)
+		{
+			if (Value >= 100)
+			{
+				return;
+			}
+			
+			LiveData.AwaitAndModify([](int32& Value) { Value++; });
+			LiveData.AwaitAndModify([](int32& Value) { Value++; });
+			LiveData.AwaitAndModify([](int32& Value) { Value++; });
+		});
+
+		// 한 번 Observe가 실행될 때마다 AwaitAndModify가 3개 예약됨
+		// 이걸 100번 예약하고 예약된 걸 전부다 flush하면 값이 300이 되어야 함
+		// 공식 = 3n (n은 observe를 호출한 횟수)
+		TestEqual(TEXT("AwaitAndModify가 Guard를 기다렸다가 잘 실행되는지 테스트"), LiveData.Get(), 300);
+	}
+
 	return true;
 }

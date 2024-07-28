@@ -94,17 +94,58 @@ class FLiveDataBase
 {
 protected:
 	bool bExecutingCallbacks = false;
+	TArray<TCancellablePromise<void>> CallbackGuardAwaiters;
+
+	struct FScopedCallbackGuard
+	{
+		FScopedCallbackGuard(FLiveDataBase* InThis)
+			: This(InThis)
+		{
+			// 여기 걸리면 콜백 호출 도중에 LiveData를 수정하려고 한 것임
+			// Array 순회 도중에 Array를 수정하려고 한 것과 비슷함
+			check(!This->bExecutingCallbacks);
+			This->bExecutingCallbacks = true;
+		}
+
+		~FScopedCallbackGuard()
+		{
+			LetAwaitersIn();
+			This->bExecutingCallbacks = false;
+		}
+
+	private:
+		FLiveDataBase* This;
+
+		void LetAwaitersIn()
+		{
+			while (This->CallbackGuardAwaiters.Num() > 0)
+			{
+				PopFront(This->CallbackGuardAwaiters).SetValue();
+			}
+		}
+	};
 
 	template <typename FuncType>
-	void GuardCallbackInvocation(const FuncType& Func)
+	void AwaitCallbackGuard(FuncType&& Func)
 	{
-		// 여기 걸리면 콜백 호출 도중에 LiveData를 수정하려고 한 것임
-		// Array 순회 도중에 Array를 수정하려고 한 것과 비슷함
-		check(!bExecutingCallbacks);
+		if (!bExecutingCallbacks)
+		{
+			FScopedCallbackGuard S{this};
+			Func();
+			return;
+		}
 
-		bExecutingCallbacks = true;
-		Func();
-		bExecutingCallbacks = false;
+		auto [Promise, Future] = MakePromise<void>();
+
+		Future.Then([Func = Forward<FuncType>(Func)](const auto& Result)
+		{
+			if (Result.Succeeded())
+			{
+				Func();
+			}
+		});
+
+		CallbackGuardAwaiters.Add(MoveTemp(Promise));
 	}
 
 	template <typename Validator, typename FuncType>
@@ -176,22 +217,33 @@ public:
 		Notify();
 	}
 
-	template <typename FuncType>
-	void Modify(const FuncType& Func)
+	void Modify(const auto& Func)
 	{
 		// TODO static assert Func takes a non-const lvalue reference
 		Func(Value);
 		Notify();
 	}
 
+	template <typename FuncType>
+	void AwaitAndModify(FuncType&& Func)
+	{
+		AwaitCallbackGuard([this, Func = Forward<FuncType>(Func)]()
+		{
+			Func(Value);
+			OnChanged.Broadcast(Get());
+		});
+	}
+
 	void Notify()
 	{
-		GuardCallbackInvocation([&]() { OnChanged.Broadcast(Get()); });
+		FScopedCallbackGuard S{this};
+		OnChanged.Broadcast(Get());
 	}
 
 	template <typename FuncType>
 	void Observe(UObject* Lifetime, FuncType&& Func)
 	{
+		FScopedCallbackGuard S{this};
 		Func(Get());
 		OnChanged.AddWeakLambda(Lifetime, Forward<FuncType>(Func));
 	}
@@ -199,6 +251,7 @@ public:
 	template <typename T, typename FuncType>
 	void Observe(const TSharedRef<T>& Lifetime, FuncType&& Func)
 	{
+		FScopedCallbackGuard S{this};
 		Func(Get());
 		OnChanged.Add(FOnChanged::FDelegate::CreateSPLambda(Lifetime, Forward<FuncType>(Func)));
 	}
@@ -214,6 +267,7 @@ public:
 	template <typename FuncType>
 	void ObserveIfValid(UObject* Lifetime, FuncType&& Func)
 	{
+		FScopedCallbackGuard S{this};
 		auto ValidCheckingFunc = RelayValidRefTo<Validator>(Forward<FuncType>(Func));
 		ValidCheckingFunc(Get());
 		OnChanged.AddWeakLambda(Lifetime, MoveTemp(ValidCheckingFunc));
@@ -222,6 +276,7 @@ public:
 	template <typename T, typename FuncType>
 	void ObserveIfValid(const TSharedRef<T>& Lifetime, FuncType&& Func)
 	{
+		FScopedCallbackGuard S{this};
 		auto ValidCheckingFunc = RelayValidRefTo<Validator>(Forward<FuncType>(Func));
 		ValidCheckingFunc(Get());
 		OnChanged.Add(FOnChanged::FDelegate::CreateSPLambda(Lifetime, MoveTemp(ValidCheckingFunc)));
@@ -306,6 +361,13 @@ public:
 	TLiveData operator=(const TLiveData&) = delete;
 
 	template <typename T>
+	void SetValueSilent(T&& NewArray)
+	{
+		check(!bExecutingCallbacks);
+		Array = Forward<T>(NewArray);
+	}
+
+	template <typename T>
 	void Add(T&& Element) requires std::is_convertible_v<T, ElementType>
 	{
 		Array.Add(Forward<T>(Element));
@@ -367,9 +429,11 @@ public:
 	template <typename FuncType>
 	void ObserveAdd(UObject* Lifetime, FuncType&& Func)
 	{
+		FScopedCallbackGuard S{this};
+
 		for (const ElementType& Each : Array)
 		{
-			this->GuardCallbackInvocation([&]() { Func(Each); });
+			Func(Each);
 		}
 
 		OnElementAdded.AddWeakLambda(Lifetime, Forward<FuncType>(Func));
@@ -378,9 +442,11 @@ public:
 	template <typename T, typename FuncType>
 	void ObserveAdd(const TSharedRef<T>& Lifetime, FuncType&& Func)
 	{
+		FScopedCallbackGuard S{this};
+
 		for (const ElementType& Each : Array)
 		{
-			this->GuardCallbackInvocation([&]() { Func(Each); });
+			Func(Each);
 		}
 
 		OnElementAdded.Add(FElementEvent::FDelegate::CreateSPLambda(Lifetime, Forward<FuncType>(Func)));
@@ -461,15 +527,8 @@ private:
 
 	TArray<FDelegateHandle> StrictAddStreamHandles;
 
-	void NotifyAdd(const ElementType& Element)
+	void CloseStrictAddStreams()
 	{
-		this->GuardCallbackInvocation([&]() { OnElementAdded.Broadcast(Element); });
-	}
-
-	void NotifyRemove(const ElementType& Element)
-	{
-		this->GuardCallbackInvocation([&]() { OnElementRemoved.Broadcast(Element); });
-
 		// 델리게이트를 unbind하면 델리게이트가 파괴되면서 stream을 종료함
 		// 그 때 콜백으로 다시 CreateStrictAddStream이 호출될 수 있기 때문에 Array가 순회 도중 수정되는 것을
 		// 피하기 위해 먼저 비운다음에 델리게이트를 unbind 한다
@@ -478,6 +537,19 @@ private:
 		{
 			OnElementAdded.Remove(Each);
 		}
+	}
+
+	void NotifyAdd(const ElementType& Element)
+	{
+		FScopedCallbackGuard S{this};
+		OnElementAdded.Broadcast(Element);
+	}
+
+	void NotifyRemove(const ElementType& Element)
+	{
+		FScopedCallbackGuard S{this};
+		OnElementRemoved.Broadcast(Element);
+		CloseStrictAddStreams();
 	}
 };
 
@@ -541,7 +613,7 @@ public:
 	{
 		return Filter(CreateStream(), [Predicate = Forward<PredicateType>(Predicate)](const auto& Value) { return Predicate(Value); });
 	}
-	
+
 	//
 	// ~Live Data View Convenience Functions
 	//

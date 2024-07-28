@@ -144,8 +144,8 @@ private:
 		}
 		else
 		{
-			PathTail.Empty();
-			PathTail.NotifyDiff(RepPathTail.PathTail);
+			PathTail.SetValueSilent(RepPathTail.PathTail);
+			PathTail.NotifyDiff(Old.PathTail);
 		}
 	}
 

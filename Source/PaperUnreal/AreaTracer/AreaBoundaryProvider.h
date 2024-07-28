@@ -22,5 +22,5 @@ class IAreaBoundaryProvider
 	GENERATED_BODY()
 
 public:
-	virtual TLiveDataView<FLoopedSegmentArray2D> GetBoundary() = 0;
+	virtual TLiveDataView<FLoopedSegmentArray2D> GetBoundary() const = 0;
 };

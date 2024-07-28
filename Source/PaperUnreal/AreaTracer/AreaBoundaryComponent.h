@@ -14,7 +14,7 @@ class UAreaBoundaryComponent : public UActorComponent2, public IAreaBoundaryProv
 	GENERATED_BODY()
 
 public:
-	virtual TLiveDataView<FLoopedSegmentArray2D> GetBoundary() override { return AreaBoundary; }
+	virtual TLiveDataView<FLoopedSegmentArray2D> GetBoundary() const override { return AreaBoundary; }
 
 	bool IsValid() const
 	{
@@ -160,5 +160,5 @@ public:
 	}
 
 private:
-	TLiveData<FLoopedSegmentArray2D> AreaBoundary;
+	mutable TLiveData<FLoopedSegmentArray2D> AreaBoundary;
 };
