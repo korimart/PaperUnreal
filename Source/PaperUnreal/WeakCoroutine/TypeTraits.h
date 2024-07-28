@@ -111,12 +111,12 @@ public:
 
 
 template <typename WrapperType>
-struct TUObjectWrapperTypeTraitsImpl
+struct TUObjectUnsafeWrapperTypeTraitsImpl
 {
 };
 
 template <typename ObjectType>
-struct TUObjectWrapperTypeTraitsImpl<ObjectType*>
+struct TUObjectUnsafeWrapperTypeTraitsImpl<ObjectType*>
 {
 	using RawPtrType = ObjectType*;
 	static ObjectType* GetUObject(ObjectType* Object) { return Object; }
@@ -124,7 +124,7 @@ struct TUObjectWrapperTypeTraitsImpl<ObjectType*>
 };
 
 template <typename InterfaceType>
-struct TUObjectWrapperTypeTraitsImpl<TScriptInterface<InterfaceType>>
+struct TUObjectUnsafeWrapperTypeTraitsImpl<TScriptInterface<InterfaceType>>
 {
 	using RawPtrType = InterfaceType*;
 	static UObject* GetUObject(const TScriptInterface<InterfaceType>& Interface) { return Interface.GetObject(); }
@@ -134,21 +134,29 @@ struct TUObjectWrapperTypeTraitsImpl<TScriptInterface<InterfaceType>>
 template <typename InterfaceType>
 	requires !std::is_base_of_v<UObject, std::decay_t<InterfaceType>>
 	&& requires { typename InterfaceType::UClassType; }
-struct TUObjectWrapperTypeTraitsImpl<InterfaceType*>
+struct TUObjectUnsafeWrapperTypeTraitsImpl<InterfaceType*>
 {
 	using RawPtrType = InterfaceType*;
 	static UObject* GetUObject(InterfaceType* Interface) { return Cast<UObject>(Interface); }
 	static InterfaceType* GetRaw(InterfaceType* Interface) { return Interface; }
 };
 
+
+/**
+ * UPROPERTY()의 도움 없이는 자신이 dangling pointer인지 스스로 판단할 수 없는 타입들의 Type Traits
+ * UObject*, 언리얼 인터페이스 포인터, TScriptInterface 등이 여기에 속할 수 있음
+ * TWeakObjectPtr, TSoftObjectPtr는 스스로 IsValid 등을 동해 valid pointer 여부를 체크할 수 있으므로 여기 속하지 않음
+ * 
+ * @tparam WrapperType UObject를 상속하는 포인터, 언리얼 인터페이스 포인터, TScriptInterface<T> 등등
+ */
 template <typename WrapperType>
-struct TUObjectWrapperTypeTraits : TUObjectWrapperTypeTraitsImpl<std::decay_t<WrapperType>>
+struct TUObjectUnsafeWrapperTypeTraits : TUObjectUnsafeWrapperTypeTraitsImpl<std::decay_t<WrapperType>>
 {
 };
 
 
 template <typename T>
-concept CUObjectWrapper = requires(T Arg) { { TUObjectWrapperTypeTraits<T>::GetUObject(Arg) }; };
+concept CUObjectUnsafeWrapper = requires(T Arg) { { TUObjectUnsafeWrapperTypeTraits<T>::GetUObject(Arg) }; };
 
 template <typename T>
 concept CDelegate = TIsInstantiationOf_V<T, TDelegate>;

@@ -139,7 +139,7 @@ T* ValidOrNull(T** Object)
 template <typename... ArgTypes>
 bool AllValid(const ArgTypes&... Check)
 {
-	return (::IsValid(TUObjectWrapperTypeTraits<ArgTypes>::GetUObject(Check)) && ...);
+	return (::IsValid(TUObjectUnsafeWrapperTypeTraits<ArgTypes>::GetUObject(Check)) && ...);
 }
 
 

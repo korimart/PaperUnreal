@@ -333,6 +333,19 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 
 		Promise.SetValue(Dummy);
 	}
+	
+	{
+		auto [Promise, Future] = MakePromise<TWeakObjectPtr<UDummy>>();
+		UDummy* Dummy = NewObject<UDummy>();
+
+		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			TWeakObjectPtr<UDummy> Result = co_await MoveTemp(Future);
+			TestTrue(TEXT("Safe UObject Wrapper 타입은 TAbortPtr로 Transform 안 되어야 되는 것 테스트"), Result == Dummy);
+		});
+
+		Promise.SetValue(Dummy);
+	}
 
 	{
 		auto [Promise, Future] = MakePromise<UDummy*>();

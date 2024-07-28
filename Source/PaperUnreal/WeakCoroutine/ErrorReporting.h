@@ -78,24 +78,36 @@ private:
 };
 
 
-template <typename ResultType> requires std::is_base_of_v<UObject, std::decay_t<ResultType>>
-struct TFailableResultStorage<ResultType*>
+template <CUObjectUnsafeWrapper ResultType>
+struct TFailableResultStorage<ResultType>
 {
-	TFailableResultStorage(ResultType* ValidResult)
-		: Result(ValidResult)
+	TFailableResultStorage(const ResultType& Value)
+		: Result(Value), StrongResult(TUObjectUnsafeWrapperTypeTraits<ResultType>::GetUObject(Value))
 	{
-		if (ValidResult == nullptr)
+		if (StrongResult.Get() == nullptr)
+		{
+			bInitializedWithNull = true;
+		}
+	}
+	
+	TFailableResultStorage(ResultType&& Value)
+		: Result(MoveTemp(Value)), StrongResult(TUObjectUnsafeWrapperTypeTraits<ResultType>::GetUObject(Value))
+	{
+		if (StrongResult.Get() == nullptr)
 		{
 			bInitializedWithNull = true;
 		}
 	}
 
-	bool Expired() const { return !bInitializedWithNull && !::IsValid(Result.Get()); }
-	ResultType* Get() const { return Result.Get(); }
+	bool Expired() const { return !bInitializedWithNull && !::IsValid(StrongResult.Get()); }
+	
+	ResultType& Get() { return Result; }
+	const ResultType& Get() const { return Result; }
 
 private:
 	bool bInitializedWithNull = false;
-	TStrongObjectPtr<ResultType> Result;
+	ResultType Result;
+	TStrongObjectPtr<UObject> StrongResult;
 };
 
 

@@ -272,16 +272,16 @@ public:
 		return !*bCoroutineFinished && Algo::AllOf(WeakList, [](const auto& Each) { return Each.IsValid(); });
 	}
 
-	template <CUObjectWrapper U>
+	template <CUObjectUnsafeWrapper U>
 	void AddToWeakList(const U& Weak)
 	{
-		WeakList.Emplace(TUObjectWrapperTypeTraits<U>::GetUObject(Weak));
+		WeakList.Emplace(TUObjectUnsafeWrapperTypeTraits<U>::GetUObject(Weak));
 	}
 
 	template <typename U>
 	void RemoveFromWeakList(const U& Weak)
 	{
-		WeakList.Remove(TUObjectWrapperTypeTraits<U>::GetUObject(Weak));
+		WeakList.Remove(TUObjectUnsafeWrapperTypeTraits<U>::GetUObject(Weak));
 	}
 
 	void SetSourceLocation(std::source_location SL)
@@ -405,9 +405,9 @@ decltype(auto) TWeakCoroutinePromiseTypeBase<Derived, T>::AsAbortPtrReturning(Aw
 {
 	using ResultType = typename std::decay_t<AwaitableType>::ResultType;
 
-	if constexpr (CUObjectWrapper<ResultType>)
+	if constexpr (CUObjectUnsafeWrapper<ResultType>)
 	{
-		using AbortPtrType = TAbortPtr<std::remove_pointer_t<typename TUObjectWrapperTypeTraits<ResultType>::RawPtrType>>;
+		using AbortPtrType = TAbortPtr<std::remove_pointer_t<typename TUObjectUnsafeWrapperTypeTraits<ResultType>::RawPtrType>>;
 		auto Handle = std::coroutine_handle<Derived>::from_promise(*static_cast<Derived*>(this));
 
 		return TTransformingAwaitable
@@ -417,7 +417,7 @@ decltype(auto) TWeakCoroutinePromiseTypeBase<Derived, T>::AsAbortPtrReturning(Aw
 			{
 				if (Result.Succeeded())
 				{
-					return {InPlace, Handle, TUObjectWrapperTypeTraits<ResultType>::GetRaw(Result.GetResult())};
+					return {InPlace, Handle, TUObjectUnsafeWrapperTypeTraits<ResultType>::GetRaw(Result.GetResult())};
 				}
 
 				return Result.GetErrors();
@@ -436,9 +436,9 @@ decltype(auto) TWeakCoroutinePromiseTypeBase<Derived, T>::AsAbortPtrReturning(Aw
 {
 	using ResultType = decltype(Awaitable.await_resume());
 
-	if constexpr (CUObjectWrapper<ResultType>)
+	if constexpr (CUObjectUnsafeWrapper<ResultType>)
 	{
-		using AbortPtrType = TAbortPtr<std::remove_pointer_t<typename TUObjectWrapperTypeTraits<ResultType>::RawPtrType>>;
+		using AbortPtrType = TAbortPtr<std::remove_pointer_t<typename TUObjectUnsafeWrapperTypeTraits<ResultType>::RawPtrType>>;
 		auto Handle = std::coroutine_handle<Derived>::from_promise(*static_cast<Derived*>(this));
 
 		return TTransformingAwaitable
@@ -446,7 +446,7 @@ decltype(auto) TWeakCoroutinePromiseTypeBase<Derived, T>::AsAbortPtrReturning(Aw
 			Forward<AwaitableType>(Awaitable),
 			[Handle](ResultType&& Result) -> AbortPtrType
 			{
-				return {Handle, MoveTemp(Result)};
+				return {Handle, TUObjectUnsafeWrapperTypeTraits<ResultType>::GetRaw(MoveTemp(Result))};
 			},
 		};
 	}

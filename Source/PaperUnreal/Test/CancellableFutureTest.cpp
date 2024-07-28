@@ -234,7 +234,23 @@ bool FCancellableFutureTest::RunTest(const FString& Parameters)
 			bReceived = Result.GetErrors()[0]->template IsA<UErrorReportingError>();
 		});
 
-		TestTrue(TEXT("이미 파괴된 UObject가 Future에서 dangling pointer가 되지 않고 적절한 에러를 반환하는지 테스트"), bReceived);
+		TestTrue(TEXT("Then 호출 전에 파괴된 UObject가 Then에서 dangling pointer가 되지 않고 적절한 에러를 반환하는지 테스트"), bReceived);
+	}
+	
+	{
+		UDummy* Dummy = NewObject<UDummy>();
+
+		auto [Promise, Future] = MakePromise<TScriptInterface<UDummy>>();
+		Promise.SetValue(Dummy);
+		Dummy->MarkAsGarbage();
+
+		bool bReceived = false;
+		Future.Then([&](const auto& Result)
+		{
+			bReceived = Result.GetErrors()[0]->template IsA<UErrorReportingError>();
+		});
+
+		TestTrue(TEXT("Then 호출 전에 파괴된 UObject Wrapper의 UObject가 Then에서 dangling pointer가 되지 않고 적절한 에러를 반환하는지 테스트"), bReceived);
 	}
 
 	return true;
