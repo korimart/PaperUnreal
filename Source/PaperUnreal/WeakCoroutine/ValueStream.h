@@ -9,14 +9,14 @@
 
 
 UCLASS()
-class UValueStreamError : public UFailableResultError
+class UEndOfStreamError : public UFailableResultError
 {
 	GENERATED_BODY()
 
 public:
-	static UValueStreamError* StreamClosed()
+	static UEndOfStreamError* NewError()
 	{
-		return NewError<UValueStreamError>(TEXT("StreamClosed"));
+		return ::NewError<UEndOfStreamError>(TEXT("스트림의 끝에 도달했습니다."));
 	}
 };
 
@@ -40,9 +40,9 @@ public:
 			return PopFront(UnclaimedFutures);
 		}
 		
-		if (bEnded)
+		if (bClosed)
 		{
-			return UValueStreamError::StreamClosed();
+			return UEndOfStreamError::NewError();
 		}
 
 		auto [Promise, Future] = MakePromise<T>();
@@ -53,7 +53,7 @@ public:
 	template <typename U>
 	void ReceiveValue(U&& Value)
 	{
-		check(!bEnded);
+		check(!bClosed);
 
 		if (Promises.Num() == 0)
 		{
@@ -64,19 +64,18 @@ public:
 		PopFront(Promises).SetValue(Forward<U>(Value));
 	}
 
-	// TODO rename
-	void End()
+	void Close()
 	{
-		bEnded = true;
+		bClosed = true;
 
 		while (Promises.Num() > 0)
 		{
-			PopFront(Promises).SetValue(UValueStreamError::StreamClosed());
+			PopFront(Promises).SetValue(UEndOfStreamError::NewError());
 		}
 	}
 
 private:
-	bool bEnded = false;
+	bool bClosed = false;
 	TArray<TCancellableFuture<T>> UnclaimedFutures;
 	TArray<TCancellablePromise<T>> Promises;
 };
@@ -109,149 +108,6 @@ public:
 
 private:
 	TSharedPtr<ReceiverType> Receiver = MakeShared<ReceiverType>();
-};
-
-
-bool AllValid(const auto&... Check);
-
-
-// TODO dangling pointer for uobject types
-template <typename T>
-class TValueStreamer
-{
-public:
-	using ValueType = T;
-
-	DECLARE_MULTICAST_DELEGATE_OneParam(FOnValueReceived, const T&);
-
-	TValueStreamer() = default;
-	TValueStreamer(const TValueStreamer&) = delete;
-	TValueStreamer& operator=(const TValueStreamer&) = delete;
-
-	TValueStream<T> CreateStream(bool bPutHistoryInStream = true) const
-	{
-		TValueStream<T> Ret;
-		Receivers.Add(Ret.GetReceiver());
-
-		if (bPutHistoryInStream)
-		{
-			for (const auto& Each : History)
-			{
-				Receivers.Last().Pin()->ReceiveValue(Each);
-			}
-		}
-
-		return Ret;
-	}
-
-	const TArray<T>& GetHistory() const
-	{
-		return History;
-	}
-
-	template <typename FuncType>
-	void Observe(UObject* Object, FuncType&& Func) const
-	{
-		for (const T& Each : History)
-		{
-			Func(Each);
-		}
-
-		OnValueReceivedDelegate.AddWeakLambda(Object, Forward<FuncType>(Func));
-	}
-
-	// TODO rename
-	template <typename FuncType>
-	void OnStreamEnd(UObject* Object, FuncType&& Func) const
-	{
-		OnStreamEndDelegate.AddWeakLambda(Object, Forward<FuncType>(Func));
-	}
-
-	void ReceiveValue(const T& NewValue)
-	{
-		if constexpr (std::is_pointer_v<T>)
-		{
-			if (!AllValid(NewValue))
-			{
-				return;
-			}
-		}
-
-		History.Add(NewValue);
-		OnValueReceivedDelegate.Broadcast(NewValue);
-
-		for (int32 i = Receivers.Num() - 1; i >= 0; --i)
-		{
-			if (!Receivers[i].IsValid())
-			{
-				Receivers.RemoveAt(i);
-			}
-		}
-
-		auto ReceiversCopy = Receivers;
-		for (auto& Each : ReceiversCopy)
-		{
-			if (auto Pinned = Each.Pin())
-			{
-				Pinned->ReceiveValue(NewValue);
-			}
-		}
-	}
-
-	void ReceiveValues(const TArray<T>& NewValues)
-	{
-		for (const T& Each : NewValues)
-		{
-			ReceiveValue(Each);
-		}
-	}
-
-	template <typename U> requires std::is_convertible_v<U, T>
-	void ReceiveValueIfNotInHistory(U&& NewValue)
-	{
-		if (!History.Contains(NewValue))
-		{
-			ReceiveValue(Forward<U>(NewValue));
-		}
-	}
-
-	void ReceiveValuesIfNotInHistory(const TArray<T>& NewValues)
-	{
-		for (const T& Each : NewValues)
-		{
-			ReceiveValueIfNotInHistory(Each);
-		}
-	}
-
-	void ClearHistory()
-	{
-		History.Empty();
-	}
-
-	void EndStreams(bool bClearHistory = true)
-	{
-		if (bClearHistory)
-		{
-			ClearHistory();
-		}
-
-		auto ReceiversCopy = MoveTemp(Receivers);
-		for (const auto& Each : ReceiversCopy)
-		{
-			if (auto Pinned = Each.Pin())
-			{
-				Pinned->End();
-			}
-		}
-
-		OnStreamEndDelegate.Broadcast();
-	}
-
-private:
-	TArray<T> History;
-	mutable TArray<TWeakPtr<TValueStreamValueReceiver<T>>> Receivers;
-	mutable FOnValueReceived OnValueReceivedDelegate;
-	mutable FSimpleMulticastDelegate OnStreamEndDelegate;
 };
 
 
@@ -295,7 +151,7 @@ TTuple<TValueStream<T>, FDelegateHandle> CreateMulticastValueStream(
 		{
 			if (auto Pinned = Receiver.Pin())
 			{
-				Pinned->End();
+				Pinned->Close();
 			}
 		}
 

@@ -45,8 +45,8 @@ private:
 	TLiveData<AAreaActor*&> HomeArea{RepHomeArea};
 
 	UPROPERTY(ReplicatedUsing=OnRep_TracerPathProvider)
-	TScriptInterface<ITracerPathStream> RepTracerPathProvider;
-	TLiveData<TScriptInterface<ITracerPathStream>&> TracerPathProvider{RepTracerPathProvider};
+	TScriptInterface<ITracerPathProvider> RepTracerPathProvider;
+	TLiveData<TScriptInterface<ITracerPathProvider>&> TracerPathProvider{RepTracerPathProvider};
 
 	UFUNCTION()
 	void OnRep_HomeArea() { HomeArea.Notify(); }
@@ -91,7 +91,7 @@ private:
 		auto TracerPath = NewObject<UTracerPathComponent>(GetOwner());
 		TracerPath->SetNoPathArea(HomeArea.Get()->ServerAreaBoundary);
 		TracerPath->RegisterComponent();
-		TracerPathProvider = TScriptInterface<ITracerPathStream>{TracerPath};
+		TracerPathProvider = TScriptInterface<ITracerPathProvider>{TracerPath};
 
 		if (GetNetMode() != NM_Standalone)
 		{

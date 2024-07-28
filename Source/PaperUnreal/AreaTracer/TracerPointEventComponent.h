@@ -4,7 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "TracerPointEventListener.h"
-#include "TracerPathGenerator.h"
+#include "TracerPathProvider.h"
+#include "PaperUnreal/GameFramework2/ActorComponent2.h"
+#include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 #include "TracerPointEventComponent.generated.h"
 
 
@@ -14,7 +16,7 @@ class UTracerPointEventComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	void SetEventSource(ITracerPathStream* Source)
+	void SetEventSource(ITracerPathProvider* Source)
 	{
 		check(!HasBeenInitialized());
 		EventSource = Cast<UObject>(Source);
@@ -28,7 +30,7 @@ public:
 
 private:
 	UPROPERTY()
-	TScriptInterface<ITracerPathStream> EventSource;
+	TScriptInterface<ITracerPathProvider> EventSource;
 
 	UTracerPointEventComponent()
 	{
@@ -54,8 +56,8 @@ private:
 
 				// 두 번째 점을 기다리는 동안에 Tail Stream이 종료되는 걸 방지하기 위해 두 번째 거 먼저 기다림
 				// 두 번째 점이 있으면 첫 번째 점은 자동으로 있음
-				const FTracerPathPoint2 SecondPoint = co_await EventSource->GetRunningPathHead();
-				const TFailableResult<FTracerPathPoint2> FirstPoint = co_await WithError<UValueStreamError>(Stream);
+				const FVector2D SecondPoint = co_await EventSource->GetRunningPathHead();
+				const TFailableResult<FVector2D> FirstPoint = co_await WithError<UEndOfStreamError>(Stream);
 
 				if (!FirstPoint)
 				{
@@ -63,23 +65,22 @@ private:
 				}
 
 				Listener->OnTracerBegin();
-				Listener->AddPoint(FirstPoint.GetResult().Point);
-				Listener->AddPoint(SecondPoint.Point);
+				Listener->AddPoint(FirstPoint.GetResult());
+				Listener->AddPoint(SecondPoint);
 				
-				bool bNextHeadIsNewPoint = false;
+				bool bLastPointIsHead = true;
 
 				// 여기의 &캡쳐는 Handle이 코루틴 프레임과 수명을 같이하고 &가 코루틴 프레임에 대한 캡쳐기 때문에 안전함
-				FDelegateSPHandle Handle = EventSource->GetRunningPathHead().ObserveIfValid([&](const FTracerPathPoint2& Head)
+				FDelegateSPHandle Handle = EventSource->GetRunningPathHead().ObserveIfValid([&](const FVector2D& Head)
 				{
-					bNextHeadIsNewPoint ? Listener->AddPoint(Head.Point) : Listener->SetPoint(-1, Head.Point);
-					bNextHeadIsNewPoint = false;
+					bLastPointIsHead ? Listener->SetPoint(-1, Head) : Listener->AddPoint(Head);
+					bLastPointIsHead = true;
 				});
 
-				while (TFailableResult<FTracerPathPoint2> Point = co_await WithError<UValueStreamError>(Stream))
+				while (TFailableResult<FVector2D> Point = co_await WithError<UEndOfStreamError>(Stream))
 				{
-					check(!bNextHeadIsNewPoint);
-					Listener->SetPoint(-1, Point.GetResult().Point);
-					bNextHeadIsNewPoint = true;
+					bLastPointIsHead ? Listener->SetPoint(-1, Point.GetResult()) : Listener->AddPoint(Point.GetResult());
+					bLastPointIsHead = false;
 				}
 
 				Listener->OnTracerEnd();

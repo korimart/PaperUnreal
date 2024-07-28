@@ -4,25 +4,18 @@
 
 #include "CoreMinimal.h"
 #include "AreaBoundaryComponent.h"
-#include "TracerPathGenerator.h"
+#include "TracerPathProvider.h"
 #include "TracerPathComponent.generated.h"
 
 
 UCLASS()
-class UTracerPathComponent : public UActorComponent2, public ITracerPathStream
+class UTracerPathComponent : public UActorComponent2, public ITracerPathProvider
 {
 	GENERATED_BODY()
 
 public:
-	virtual TLiveDataView<TOptional<FTracerPathPoint2>> GetRunningPathHead() const override
-	{
-		return PathHead;
-	}
-
-	virtual TLiveDataView<TArray<FTracerPathPoint2>> GetRunningPathTail() const override
-	{
-		return PathTail;
-	}
+	virtual TLiveDataView<TOptional<FVector2D>> GetRunningPathHead() const override { return PathHead; }
+	virtual TLiveDataView<TArray<FVector2D>> GetRunningPathTail() const override { return PathTail; }
 
 	const FSegmentArray2D& GetRunningPathAsSegments() const
 	{
@@ -39,8 +32,8 @@ private:
 	UPROPERTY()
 	UAreaBoundaryComponent* NoPathArea;
 
-	mutable TLiveData<TOptional<FTracerPathPoint2>> PathHead;
-	mutable TLiveData<TArray<FTracerPathPoint2>> PathTail;
+	mutable TLiveData<TOptional<FVector2D>> PathHead;
+	mutable TLiveData<TArray<FVector2D>> PathTail;
 	FSegmentArray2D Path;
 	FTickingSwitch Switch;
 
@@ -97,33 +90,32 @@ private:
 		{
 			const FVector2D Attached = NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint();
 			Path.SetPoint(-1, Attached);
-			PathHead.SetValue(FTracerPathPoint2{Attached, PathHead.GetValid().PathDirection});
+			PathHead.SetValue(Attached);
 		}
 	}
 
-	void AddPoint(const FVector2D& Location, const FVector2D& Direction)
+	void AddPoint(const FVector2D& Location)
 	{
-		PathHead.SetValue(TOptional<FTracerPathPoint2>{});
+		PathHead.SetValue(TOptional<FVector2D>{});
 		Path.AddPoint(Location);
-		PathTail.Add(FTracerPathPoint2{Location, Direction});
-		PathHead.SetValue(FTracerPathPoint2{Location, Direction});
+		PathTail.Add(Location);
+		PathHead.SetValue(Location);
 	}
 
 	void EmptyPoints()
 	{
 		Path.Empty();
-		PathHead.SetValue(TOptional<FTracerPathPoint2>{});
+		PathHead.SetValue(TOptional<FVector2D>{});
 		PathTail.Empty();
 	}
 
 	void Generate()
 	{
 		const FVector2D ActorLocation2D{GetOwner()->GetActorLocation()};
-		const FVector2D ActorDirection2D{GetOwner()->GetActorForwardVector()};
 
 		if (Path.PointCount() == 0)
 		{
-			AddPoint(ActorLocation2D, ActorDirection2D);
+			AddPoint(ActorLocation2D);
 			return;
 		}
 
@@ -134,7 +126,7 @@ private:
 
 		if (Path.PointCount() < 3)
 		{
-			AddPoint(ActorLocation2D, ActorDirection2D);
+			AddPoint(ActorLocation2D);
 			return;
 		}
 
@@ -166,12 +158,12 @@ private:
 
 		if (Curvature > 0.005f || CurrentDeviation > 1.f)
 		{
-			AddPoint(ActorLocation2D, ActorDirection2D);
+			AddPoint(ActorLocation2D);
 		}
 		else
 		{
 			Path.SetPoint(-1, ActorLocation2D);
-			PathHead.SetValue(FTracerPathPoint2{ActorLocation2D, ActorDirection2D});
+			PathHead.SetValue(ActorLocation2D);
 		}
 	}
 };
