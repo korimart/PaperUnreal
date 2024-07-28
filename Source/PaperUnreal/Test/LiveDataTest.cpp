@@ -3,7 +3,7 @@
 #include "PaperUnreal/WeakCoroutine/LiveData.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLiveDataTest, "PaperUnreal.PaperUnreal.Test.LiveDataTest", EAutomationTestFlags::EditorContext | EAutomationTestFlags::SmokeFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLiveDataTest, "PaperUnreal.PaperUnreal.Test.LiveDataTest", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 
 bool FLiveDataTest::RunTest(const FString& Parameters)
 {

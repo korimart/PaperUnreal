@@ -1,7 +1,7 @@
 ﻿#include "Misc/AutomationTest.h"
 #include "PaperUnreal/AreaTracer/SegmentArray.h"
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(SegmentArrayTest, "PaperUnreal.PaperUnreal.Test.SegmentArrayTest", EAutomationTestFlags::EditorContext | EAutomationTestFlags::SmokeFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(SegmentArrayTest, "PaperUnreal.PaperUnreal.Test.SegmentArrayTest", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 
 bool SegmentArrayTest::RunTest(const FString& Parameters)
 {

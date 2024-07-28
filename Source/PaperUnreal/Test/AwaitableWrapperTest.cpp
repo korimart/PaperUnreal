@@ -4,7 +4,7 @@
 #include "PaperUnreal/WeakCoroutine/ValueStream.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAwaitableWrapperTest, "PaperUnreal.PaperUnreal.Test.AwaitableWrapperTest", EAutomationTestFlags::EditorContext | EAutomationTestFlags::SmokeFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAwaitableWrapperTest, "PaperUnreal.PaperUnreal.Test.AwaitableWrapperTest", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 
 bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 {

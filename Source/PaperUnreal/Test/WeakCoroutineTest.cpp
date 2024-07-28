@@ -3,7 +3,7 @@
 #include "PaperUnreal/WeakCoroutine/CancellableFuture.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWeakCoroutineTest, "PaperUnreal.PaperUnreal.Test.WeakCoroutineTest", EAutomationTestFlags::EditorContext | EAutomationTestFlags::SmokeFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWeakCoroutineTest, "PaperUnreal.PaperUnreal.Test.WeakCoroutineTest", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 
 bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 {
