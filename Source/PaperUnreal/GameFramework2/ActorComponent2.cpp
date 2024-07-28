@@ -9,6 +9,7 @@ void UActorComponent2::BeginPlay()
 {
 	Super::BeginPlay();
 	GetWorld()->GetSubsystem<UComponentRegistry>()->OnComponentBeginPlay(this);
+	OnBeginPlay.Broadcast();
 }
 
 void UActorComponent2::EndPlay(const EEndPlayReason::Type EndPlayReason)

@@ -13,6 +13,7 @@ class UActorComponent2 : public UActorComponent
 	GENERATED_BODY()
 
 public:
+	FSimpleMulticastDelegate OnBeginPlay;
 	FSimpleMulticastDelegate OnEndPlay;
 	
 	virtual void BeginPlay() override;

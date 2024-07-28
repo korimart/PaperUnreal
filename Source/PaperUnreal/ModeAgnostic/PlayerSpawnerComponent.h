@@ -9,6 +9,7 @@
 #include "PlayerSpawnerComponent.generated.h"
 
 
+// TODO rename
 UCLASS()
 class UPlayerSpawnerComponent : public UActorComponent2
 {
@@ -17,18 +18,20 @@ class UPlayerSpawnerComponent : public UActorComponent2
 public:
 	TLiveDataView<TArray<APawn*>&> GetSpawnedPlayers() { return Players; }
 
-	template <typename FuncType>
-	APawn* SpawnAtLocation(UClass* Class, const FVector& Location, const FuncType& Initializer)
+	APawn* SpawnAtLocation(UClass* Class, const FVector& Location, const auto& Initializer)
 	{
 		check(GetNetMode() != NM_Client);
 		
 		APawn* Spawned = CastChecked<APawn>(GetWorld()->SpawnActor(Class, &Location));
+		
 		Initializer(Spawned);
 		
-		const TArray<APawn*> Prev = RepPlayers;
-		RepPlayers.Add(Spawned);
-		OnRep_SpawnedPlayers(Prev);
-
+		auto NewComponent = NewObject<UActorComponent2>(Spawned);
+		NewComponent->RegisterComponent();
+		NewComponent->OnEndPlay.AddWeakLambda(this, [this, Spawned]() { Players.Remove(Spawned); });
+		
+		Players.Add(Spawned);
+		
 		return Spawned;
 	}
 

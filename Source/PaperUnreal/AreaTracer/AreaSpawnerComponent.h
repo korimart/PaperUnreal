@@ -134,22 +134,12 @@ class UAreaSpawnerComponent : public UActorComponent2
 public:
 	TLiveDataView<TArray<AAreaActor*>&> GetSpawnedAreas() { return SpawnedAreas; }
 
-	template <typename FuncType>
-	AAreaActor* SpawnAreaAtRandomEmptyLocation(const FuncType& Initializer)
+	AAreaActor* SpawnAreaAtRandomEmptyLocation(const auto& Initializer)
 	{
 		check(GetNetMode() != NM_Client);
 
-		const TOptional<FBox2D> CellToSpawnAreaIn = [&]()
-		{
-			SpawnLocationCalculator.ClearGrid();
-			for (AAreaActor* Each : RepSpawnedAreas)
-			{
-				const auto AreaBoundary = Each->FindComponentByClass<UAreaBoundaryComponent>();
-				SpawnLocationCalculator.OccupyGrid(AreaBoundary->GetBoundary().Get());
-			}
-			return SpawnLocationCalculator.GetRandomEmptyCell();
-		}();
-
+		const TOptional<FBox2D> CellToSpawnAreaIn = FindEmptyCell();
+		
 		if (!CellToSpawnAreaIn)
 		{
 			return nullptr;
@@ -157,11 +147,15 @@ public:
 
 		const FVector SpawnLocation{CellToSpawnAreaIn->GetCenter(), 50.f};
 		AAreaActor* Ret = GetWorld()->SpawnActor<AAreaActor>(SpawnLocation, {});
+
 		Initializer(Ret);
 
-		const TArray<AAreaActor*> Prev = RepSpawnedAreas;
-		RepSpawnedAreas.Add(Ret);
-		OnRep_SpawnedAreas(Prev);
+		auto NewComponent = NewObject<UActorComponent2>(Ret);
+		NewComponent->RegisterComponent();
+		NewComponent->OnEndPlay.AddWeakLambda(this, [this, Ret]() { SpawnedAreas.Remove(Ret); });
+
+		SpawnedAreas.Add(Ret);
+		
 		return Ret;
 	}
 
@@ -180,7 +174,7 @@ private:
 	}
 
 	FAreaSpawnLocationCalculator SpawnLocationCalculator;
-
+	
 	UAreaSpawnerComponent()
 	{
 		bWantsInitializeComponent = true;
@@ -195,4 +189,15 @@ private:
 		SpawnLocationCalculator.Configure(
 			{FVector2D::Zero(), {3000.f, 3000.f}}, 300.f);
 	}
+	
+	TOptional<FBox2D> FindEmptyCell()
+	{
+		SpawnLocationCalculator.ClearGrid();
+		for (AAreaActor* Each : SpawnedAreas.Get())
+		{
+			const auto AreaBoundary = Each->FindComponentByClass<UAreaBoundaryComponent>();
+			SpawnLocationCalculator.OccupyGrid(AreaBoundary->GetBoundary().Get());
+		}
+		return SpawnLocationCalculator.GetRandomEmptyCell();
+	};
 };
