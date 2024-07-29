@@ -165,3 +165,6 @@ ReplicatedAreaExpander
 4. 게임 시작 전 자유행동 구현
 5. 방설정/장비설정/결과창 UI 구현
 6. co_await에 lvalue를 허용하도록 구현?
+7. weak coroutine labmda capture 저장 방식 변경 필요
+7-1. context를 unique ptr로 만들지 않고 promise_type의 constructor를 활용해서 설정할 수 있음
+7-2. unique ptr에 캡쳐하지 않고 fminimal coroutine 안에서 실행하면 더 깔끔함
