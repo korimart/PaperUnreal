@@ -36,38 +36,38 @@ void APVPBattlePlayerController::BeginPlay()
 		RunWeakCoroutine(this, [this, Subsystem](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
 			TOptional<FWeakCoroutine> WaitingForDeath;
-		
+
 			for (auto PawnStream = GetPossessedPawn().CreateStream();;)
 			{
 				auto PossessedPawn = co_await PawnStream;
-				
+
 				if (WaitingForDeath)
 				{
 					WaitingForDeath->Abort();
 					WaitingForDeath.Reset();
 				}
-				
-				if (!PossessedPawn)
+
+				if (!PossessedPawn || PossessedPawn->IsA<ASpectatorPawn>())
 				{
 					Subsystem->RemoveMappingContext(DefaultMappingContext);
 					continue;
 				}
-				
-				ULifeComponent* LifeComponent = PossessedPawn->FindComponentByClass<ULifeComponent>();
-				if (!LifeComponent)
+
+				if (ULifeComponent* LifeComponent = PossessedPawn->FindComponentByClass<ULifeComponent>())
 				{
-					Subsystem->RemoveMappingContext(DefaultMappingContext);
-					continue;
+					WaitingForDeath = RunWeakCoroutine(this, [this, LifeComponent, Subsystem](FWeakCoroutineContext& Context) -> FWeakCoroutine
+					{
+						Context.AbortIfNotValid(LifeComponent);
+
+						Subsystem->AddMappingContext(DefaultMappingContext, 0);
+						co_await LifeComponent->GetbAlive().If(false);
+						Subsystem->RemoveMappingContext(DefaultMappingContext);
+					});
 				}
-				
-				WaitingForDeath = RunWeakCoroutine(this, [this, LifeComponent, Subsystem](FWeakCoroutineContext& Context) -> FWeakCoroutine
+				else
 				{
-					Context.AbortIfNotValid(LifeComponent);
-					
 					Subsystem->AddMappingContext(DefaultMappingContext, 0);
-					co_await LifeComponent->GetbAlive().If(false);
-					Subsystem->RemoveMappingContext(DefaultMappingContext);
-				});
+				}
 			}
 		});
 	}

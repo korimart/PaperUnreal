@@ -16,6 +16,11 @@ class UPawnSpawnerComponent : public UActorComponent2
 
 public:
 	TLiveDataView<TArray<APawn*>&> GetSpawnedPawns() { return Pawns; }
+	
+	APawn* SpawnAtLocation(UClass* Class, const FVector& Location)
+	{
+		return SpawnAtLocation(Class, Location, [](auto){});
+	}
 
 	APawn* SpawnAtLocation(UClass* Class, const FVector& Location, const auto& Initializer)
 	{
@@ -34,6 +39,11 @@ public:
 		return Spawned;
 	}
 
+	void DestroyPawnsOnEndPlay()
+	{
+		bDestroyPawnsOnEndPlay = true;
+	}
+
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_SpawnedPawns)
 	TArray<APawn*> RepPawns;
@@ -47,9 +57,28 @@ private:
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 		DOREPLIFETIME(ThisClass, RepPawns);
 	}
+
+	bool bDestroyPawnsOnEndPlay = false;
 	
 	UPawnSpawnerComponent()
 	{
 		SetIsReplicatedByDefault(true);
+	}
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override
+	{
+		Super::EndPlay(EndPlayReason);
+
+		if (bDestroyPawnsOnEndPlay)
+		{
+			TArray<APawn*> ToDestroy = MoveTemp(Pawns.Get());
+			for (APawn* Each : ToDestroy)
+			{
+				if (IsValid(Each))
+				{
+					Each->Destroy();
+				}
+			}
+		}
 	}
 };

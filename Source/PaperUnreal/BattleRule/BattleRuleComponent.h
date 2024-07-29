@@ -66,18 +66,13 @@ class UBattleRuleComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	void SetPawnClass(UClass* Class)
-	{
-		check(!HasBegunPlay());
-		PawnClass = Class;
-	}
-
-	TCancellableFuture<FBattleRuleResult> Start(int32 TeamCount, int32 EachTeamMemberCount)
+	TCancellableFuture<FBattleRuleResult> Start(UClass* InPawnClass, int32 TeamCount, int32 EachTeamMemberCount)
 	{
 		check(HasBegunPlay());
-
-		TeamAllocator.Configure(TeamCount, EachTeamMemberCount);
 		
+		PawnClass = InPawnClass;
+		TeamAllocator.Configure(TeamCount, EachTeamMemberCount);
+
 		GameState = NewChildComponent<UBattleRuleGameStateComponent>(GetWorld()->GetGameState());
 		GameState->RegisterComponent();
 
@@ -90,11 +85,13 @@ public:
 
 		PlayerStateArray.ObserveRemoveIfValid(this, [this](APlayerState* Player)
 		{
-			const int32 TeamIndex = Player->FindComponentByClass<UTeamComponent>()->GetTeamIndex().Get();
-			if (TeamIndex >= 0)
+			if (APawn* Pawn = Player->GetPawn())
 			{
-				UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어가 접속을 종료함에 따라 영역 파괴를 검토하는 중"), Player);
-				KillAreaIfNobodyAlive(TeamIndex);
+				if (auto PawnComponent = Pawn->FindComponentByClass<UBattleRulePawnComponent>())
+				{
+					UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어가 접속을 종료함에 따라 폰을 사망시킵니다"), Player);
+					PawnComponent->GetServerLife()->SetbAlive(false);
+				}
 			}
 		});
 
@@ -127,20 +124,20 @@ private:
 		SoftSolidRedLight,
 	};
 
-	void InitiatePawnSpawnSequence(APlayerState* ReadyPlayer)
+	void InitiatePawnSpawnSequence(APlayerState* Player)
 	{
-		RunWeakCoroutine(this, [this, ReadyPlayer](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this, Player](FWeakCoroutineContext& Context) -> FWeakCoroutine
 		{
-			Context.AbortIfNotValid(ReadyPlayer);
+			Context.AbortIfNotValid(Player);
 
-			auto TeamComponent = ReadyPlayer->FindComponentByClass<UTeamComponent>();
-			auto ReadyState = ReadyPlayer->FindComponentByClass<UReadyStateComponent>();
-			auto Inventory = ReadyPlayer->FindComponentByClass<UInventoryComponent>();
+			auto TeamComponent = Player->FindComponentByClass<UTeamComponent>();
+			auto ReadyState = Player->FindComponentByClass<UReadyStateComponent>();
+			auto Inventory = Player->FindComponentByClass<UInventoryComponent>();
 
 			// 이 컴포넌트들은 디펜던시: 이 컴포넌트들을 가지는 PlayerState에 대해서만 이 클래스를 사용할 수 있음
 			check(AllValid(TeamComponent, ReadyState, Inventory));
 
-			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어의 준비 완료를 기다리는 중"), ReadyPlayer);
+			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어의 준비 완료를 기다리는 중"), Player);
 			co_await ReadyState->GetbReady().If(true);
 
 			// 죽은 다음에 다시 스폰하는 경우에는 팀이 이미 있음
@@ -174,7 +171,7 @@ private:
 
 			Inventory->SetTracerMaterial(TracerMaterials[ThisPlayerTeamIndex % TracerMaterials.Num()]);
 
-			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어 폰을 스폰합니다"), ReadyPlayer);
+			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어 폰을 스폰합니다"), Player);
 			APawn* Pawn = GameState->ServerPawnSpawner->SpawnAtLocation(
 				PawnClass,
 				ThisPlayerArea->ServerAreaBoundary->GetRandomPointInside(),
@@ -184,22 +181,30 @@ private:
 					PawnComponent->SetDependencies(GameState, ThisPlayerArea);
 					PawnComponent->RegisterComponent();
 				});
-			ReadyPlayer->GetOwningController()->Possess(Pawn);
+			Player->GetOwningController()->Possess(Pawn);
 
-			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어의 사망을 기다리는 중"), ReadyPlayer);
-			Context.AbortIfNotValid(Pawn);
-			co_await Pawn->FindComponentByClass<ULifeComponent>()->GetbAlive().If(false);
-
-			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어가 사망함에 따라 영역 파괴를 검토하는 중"), ReadyPlayer);
-			KillAreaIfNobodyAlive(ThisPlayerTeamIndex);
+			co_await InitiatePawnLifeSequence(Pawn->FindComponentByClass<UBattleRulePawnComponent>(), ThisPlayerTeamIndex);
 
 			constexpr float RespawnCool = 5.f;
 			co_await WaitForSeconds(GetWorld(), RespawnCool);
-			Pawn->Destroy();
 
-			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어 리스폰 시퀀스를 시작합니다"), ReadyPlayer);
-			InitiatePawnSpawnSequence(ReadyPlayer);
+			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어 리스폰 시퀀스를 시작합니다"), Player);
+			InitiatePawnSpawnSequence(Player);
 		});
+	}
+
+	TCancellableFuture<void> InitiatePawnLifeSequence(UBattleRulePawnComponent* Pawn, int32 TeamIndex)
+	{
+		return RunWeakCoroutine(this, [this, Pawn, TeamIndex](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		{
+			Context.AbortIfNotValid(Pawn);
+
+			UE_LOG(LogBattleRule, Log, TEXT("%p 폰의 사망을 기다리는 중"), Pawn);
+			co_await Pawn->GetServerLife()->GetbAlive().If(false);
+
+			UE_LOG(LogBattleRule, Log, TEXT("%p 폰이 사망함에 따라 영역 파괴를 검토하는 중"), Pawn);
+			KillAreaIfNobodyAlive(TeamIndex);
+		}).ReturnValue();
 	}
 
 	TCancellableFuture<FBattleRuleResult> InitiateGameFlow()

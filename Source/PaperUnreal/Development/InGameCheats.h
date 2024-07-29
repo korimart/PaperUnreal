@@ -27,18 +27,6 @@ public:
 
 private:
 	UFUNCTION(Exec, BlueprintAuthorityOnly)
-	void SpawnAreaForTeam(int32 TeamIndex)
-	{
-		GetWorld()
-			->GetGameState<APVPBattleGameState>()
-			->AreaSpawnerComponent
-			->SpawnAreaAtRandomEmptyLocation([&](auto Spawned)
-			{
-				Spawned->TeamComponent->SetTeamIndex(TeamIndex);
-			});
-	}
-
-	UFUNCTION(Exec, BlueprintAuthorityOnly)
 	void DestroyAllCharacters()
 	{
 		for (TActorIterator<ACharacter2> It{GetWorld()}; It; ++It)
@@ -55,21 +43,6 @@ private:
 			if (UTracerPathComponent* Tracer = It->FindComponentByClass<UTracerPathComponent>())
 			{
 				Tracer->DestroyComponent();
-			}
-		}
-	}
-
-	UFUNCTION(Exec, BlueprintAuthorityOnly)
-	void KillArea(int32 TeamIndex)
-	{
-		for (TActorIterator<AAreaActor> It{GetWorld()}; It; ++It)
-		{
-			if (UTeamComponent* Team = It->FindComponentByClass<UTeamComponent>())
-			{
-				if (Team->GetTeamIndex().Get() == TeamIndex)
-				{
-					It->LifeComponent->SetbAlive(false);
-				}
 			}
 		}
 	}

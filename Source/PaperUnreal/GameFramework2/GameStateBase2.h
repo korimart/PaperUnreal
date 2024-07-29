@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameStateBase.h"
+#include "GameFramework/PlayerState.h"
 #include "PaperUnreal/WeakCoroutine/LiveData.h"
 #include "GameStateBase2.generated.h"
 

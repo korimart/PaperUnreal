@@ -8,6 +8,7 @@
 #include "PVPBattlePlayerState.h"
 #include "PaperUnreal/Development/InGameCheats.h"
 #include "PaperUnreal/BattleRule/BattleRuleComponent.h"
+#include "PaperUnreal/FreeRule/FreeRuleComponent.h"
 #include "PaperUnreal/ModeAgnostic/FixedCameraPawn.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -46,19 +47,25 @@ void APVPBattleGameMode::BeginPlay()
 
 	RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 	{
-		// TODO 자유 행동 game mode 설정
-		
-		// TODO 방설정 완료될 때까지 대기
+		{
+			auto FreeRule = NewObject<UFreeRuleComponent>(this);
+			FreeRule->RegisterComponent();
+			FreeRule->Start(DefaultPawnClass);
+			auto F = Finally([&](){ FreeRule->DestroyComponent(); });
 
-		auto AtLeast2Ready = GetGameState<APVPBattleGameState>()->ReadyStateTrackerComponent->ReadyCountIsAtLeast(2);
-		auto ReadyByCheat = MakeFutureFromDelegate(UInGameCheats::OnStartGameByCheat);
-		co_await AnyOf(MoveTemp(AtLeast2Ready), MoveTemp(ReadyByCheat));
+			// TODO 방설정 완료될 때까지 대기
 
-		auto BattleMode = NewObject<UBattleRuleComponent>(this);
-		BattleMode->SetPawnClass(DefaultPawnClass);
-		BattleMode->RegisterComponent();
-		
-		const FBattleRuleResult GameResult = co_await BattleMode->Start(2, 2);
+			auto AtLeast2Ready = GetGameState<APVPBattleGameState>()->ReadyStateTrackerComponent->ReadyCountIsAtLeast(2);
+			auto ReadyByCheat = MakeFutureFromDelegate(UInGameCheats::OnStartGameByCheat);
+			co_await AnyOf(MoveTemp(AtLeast2Ready), MoveTemp(ReadyByCheat));
+		}
+
+		const FBattleRuleResult GameResult = co_await [&]()
+		{
+			auto BattleRule = NewObject<UBattleRuleComponent>(this);
+			BattleRule->RegisterComponent();
+			return BattleRule->Start(DefaultPawnClass, 2, 2);
+		}();
 
 		GetGameState<APVPBattleGameState>()->StageComponent->SetCurrentStage(PVPBattleStage::Result);
 

@@ -28,6 +28,12 @@ class UBattleRulePawnComponent : public UComponentAttacherComponent
 	GENERATED_BODY()
 
 public:
+	ULifeComponent* GetServerLife() const
+	{
+		check(GetNetMode() != NM_Client);
+		return RepLife;
+	}
+	
 	void SetDependencies(
 		UBattleRuleGameStateComponent* InGameState,
 		AAreaActor* InHomeArea)
@@ -46,18 +52,26 @@ private:
 	UPROPERTY(ReplicatedUsing=OnRep_TracerPathProvider)
 	TScriptInterface<ITracerPathProvider> RepTracerPathProvider;
 	TLiveData<TScriptInterface<ITracerPathProvider>&> TracerPathProvider{RepTracerPathProvider};
+	
+	UPROPERTY(ReplicatedUsing=OnRep_Life)
+	ULifeComponent* RepLife;
+	TLiveData<ULifeComponent*&> Life{RepLife};
 
 	UFUNCTION()
 	void OnRep_HomeArea() { HomeArea.Notify(); }
 
 	UFUNCTION()
 	void OnRep_TracerPathProvider() { TracerPathProvider.Notify(); }
+	
+	UFUNCTION()
+	void OnRep_Life() { Life.Notify(); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 		DOREPLIFETIME_CONDITION(ThisClass, RepHomeArea, COND_InitialOnly);
 		DOREPLIFETIME_CONDITION(ThisClass, RepTracerPathProvider, COND_InitialOnly);
+		DOREPLIFETIME_CONDITION(ThisClass, RepLife, COND_InitialOnly);
 	}
 
 	UPROPERTY()
@@ -134,16 +148,21 @@ private:
 		Killer->SetOverlapChecker(ServerOverlapChecker);
 		Killer->RegisterComponent();
 
-		auto Life = NewChildComponent<ULifeComponent>(GetOwner());
-		Life->RegisterComponent();
+		Life = NewChildComponent<ULifeComponent>(GetOwner());
+		Life.Get()->RegisterComponent();
 
-		RunWeakCoroutine(this, [this, Life](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			co_await Life->GetbAlive().If(false);
+			co_await Life.Get()->GetbAlive().If(false);
 
 			// 현재 얘만 파괴해주면 나머지 컴포넌트는 디펜던시가 사라짐에 따라 알아서 사라짐
 			// Path를 파괴해서 상호작용을 없애 게임에 영향을 미치지 않게 한다
 			FindAndDestroyComponent<UTracerPathComponent>(GetOwner());
+
+			// 클라이언트에서 데스 애니메이션을 플레이하고 액터를 숨기기에 충분한 시간을 준다
+			co_await WaitForSeconds(GetWorld(), 10.f);
+
+			GetOwner()->Destroy();
 		});
 	}
 
@@ -174,6 +193,13 @@ private:
 					auto Material = co_await RequestAsyncLoad(SoftMaterial);
 					ClientTracerMesh->ConfigureMaterialSet({Material});
 				}
+			});
+
+			RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+			{
+				co_await Life;
+				co_await Life.Get()->GetbAlive().If(false);
+				// TODO play death animation and hide actor
 			});
 		});
 	}
