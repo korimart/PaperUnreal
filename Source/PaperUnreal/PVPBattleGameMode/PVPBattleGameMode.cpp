@@ -7,7 +7,7 @@
 #include "PVPBattleHUD.h"
 #include "PVPBattlePlayerState.h"
 #include "PaperUnreal/Development/InGameCheats.h"
-#include "PaperUnreal/GameRule/BattleRuleComponent.h"
+#include "PaperUnreal/BattleRule/BattleRuleComponent.h"
 #include "PaperUnreal/ModeAgnostic/FixedCameraPawn.h"
 #include "UObject/ConstructorHelpers.h"
 
