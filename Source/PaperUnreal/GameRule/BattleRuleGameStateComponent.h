@@ -27,24 +27,15 @@ public:
 	UPawnSpawnerComponent* ServerPawnSpawner;
 
 private:
-	virtual void AttachServerMachineComponents()
+	virtual void AttachServerMachineComponents() override
 	{
-		ServerWorldTimer = NewObject<UWorldTimerComponent>(GetOuterAGameStateBase());
+		ServerWorldTimer = NewChildComponent<UWorldTimerComponent>(GetOuterAGameStateBase());
 		ServerWorldTimer->RegisterComponent();
 		
-		ServerAreaSpawner = NewObject<UAreaSpawnerComponent>(GetOuterAGameStateBase());
+		ServerAreaSpawner = NewChildComponent<UAreaSpawnerComponent>(GetOuterAGameStateBase());
 		ServerAreaSpawner->RegisterComponent();
 		
-		ServerPawnSpawner = NewObject<UPawnSpawnerComponent>(GetOuterAGameStateBase());
+		ServerPawnSpawner = NewChildComponent<UPawnSpawnerComponent>(GetOuterAGameStateBase());
 		ServerPawnSpawner->RegisterComponent();
-	}
-
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override
-	{
-		Super::EndPlay(EndPlayReason);
-
-		DestroyIfValid(ServerWorldTimer);
-		DestroyIfValid(ServerAreaSpawner);
-		DestroyIfValid(ServerPawnSpawner);
 	}
 };

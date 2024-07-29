@@ -76,10 +76,10 @@ public:
 	{
 		check(HasBegunPlay());
 
-		GameState = NewObject<UBattleRuleGameStateComponent>(GetWorld()->GetGameState());
-		GameState->RegisterComponent();
-
 		TeamAllocator.Configure(TeamCount, EachTeamMemberCount);
+		
+		GameState = NewChildComponent<UBattleRuleGameStateComponent>(GetWorld()->GetGameState());
+		GameState->RegisterComponent();
 
 		auto PlayerStateArray = GetWorld()->GetGameState<AGameStateBase2>()->GetPlayerStateArray();
 
@@ -175,12 +175,15 @@ private:
 			Inventory->SetTracerMaterial(TracerMaterials[ThisPlayerTeamIndex % TracerMaterials.Num()]);
 
 			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어 폰을 스폰합니다"), ReadyPlayer);
-			APawn* Pawn = GameState->ServerPawnSpawner->SpawnAtLocation(PawnClass, ThisPlayerArea->ServerAreaBoundary->GetRandomPointInside(), [&](APawn* ToInit)
-			{
-				auto PawnComponent = NewObject<UBattleRulePawnComponent>(ToInit);
-				PawnComponent->SetDependencies(GameState, ThisPlayerArea);
-				PawnComponent->RegisterComponent();
-			});
+			APawn* Pawn = GameState->ServerPawnSpawner->SpawnAtLocation(
+				PawnClass,
+				ThisPlayerArea->ServerAreaBoundary->GetRandomPointInside(),
+				[&](APawn* ToInit)
+				{
+					auto PawnComponent = NewObject<UBattleRulePawnComponent>(ToInit);
+					PawnComponent->SetDependencies(GameState, ThisPlayerArea);
+					PawnComponent->RegisterComponent();
+				});
 			ReadyPlayer->GetOwningController()->Possess(Pawn);
 
 			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어의 사망을 기다리는 중"), ReadyPlayer);

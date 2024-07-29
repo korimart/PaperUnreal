@@ -84,20 +84,20 @@ private:
 
 	virtual void AttachServerMachineComponents() override
 	{
-		auto TracerPath = NewObject<UTracerPathComponent>(GetOwner());
+		auto TracerPath = NewChildComponent<UTracerPathComponent>(GetOwner());
 		TracerPath->SetNoPathArea(HomeArea.Get()->ServerAreaBoundary);
 		TracerPath->RegisterComponent();
 		TracerPathProvider = TScriptInterface<ITracerPathProvider>{TracerPath};
 
 		if (GetNetMode() != NM_Standalone)
 		{
-			auto TracerPathReplicator = NewObject<UReplicatedTracerPathComponent>(GetOwner());
+			auto TracerPathReplicator = NewChildComponent<UReplicatedTracerPathComponent>(GetOwner());
 			TracerPathReplicator->SetTracerPathSource(TracerPath);
 			TracerPathReplicator->RegisterComponent();
 			TracerPathProvider = TracerPathReplicator;
 		}
 
-		ServerOverlapChecker = NewObject<UTracerOverlapCheckerComponent>(GetOwner());
+		ServerOverlapChecker = NewChildComponent<UTracerOverlapCheckerComponent>(GetOwner());
 		ServerOverlapChecker->SetTracer(TracerPath);
 		ServerOverlapChecker->RegisterComponent();
 
@@ -112,7 +112,7 @@ private:
 			}
 		});
 
-		ServerTracerToAreaConverter = NewObject<UTracerToAreaConverterComponent>(GetOwner());
+		ServerTracerToAreaConverter = NewChildComponent<UTracerToAreaConverterComponent>(GetOwner());
 		ServerTracerToAreaConverter->SetTracer(TracerPath);
 		ServerTracerToAreaConverter->SetConversionDestination(HomeArea.Get()->ServerAreaBoundary);
 		ServerTracerToAreaConverter->RegisterComponent();
@@ -121,20 +121,20 @@ private:
 		{
 			if (NewArea != HomeArea.Get())
 			{
-				auto AreaSlasher = NewObject<UAreaSlasherComponent>(GetOwner());
+				auto AreaSlasher = NewChildComponent<UAreaSlasherComponent>(GetOwner());
 				AreaSlasher->SetSlashTarget(NewArea->ServerAreaBoundary);
 				AreaSlasher->SetTracerToAreaConverter(ServerTracerToAreaConverter);
 				AreaSlasher->RegisterComponent();
 			}
 		});
 
-		auto Killer = NewObject<UTracerKillerComponent>(GetOwner());
+		auto Killer = NewChildComponent<UTracerKillerComponent>(GetOwner());
 		Killer->SetTracer(TracerPath);
 		Killer->SetArea(HomeArea.Get()->ServerAreaBoundary);
 		Killer->SetOverlapChecker(ServerOverlapChecker);
 		Killer->RegisterComponent();
 
-		auto Life = NewObject<ULifeComponent>(GetOwner());
+		auto Life = NewChildComponent<ULifeComponent>(GetOwner());
 		Life->RegisterComponent();
 
 		RunWeakCoroutine(this, [this, Life](FWeakCoroutineContext&) -> FWeakCoroutine
@@ -154,10 +154,10 @@ private:
 			co_await HomeArea;
 			co_await TracerPathProvider;
 
-			ClientTracerMesh = NewObject<ULineMeshComponent>(GetOwner());
+			ClientTracerMesh = NewChildComponent<ULineMeshComponent>(GetOwner());
 			ClientTracerMesh->RegisterComponent();
 			
-			auto TracerPointEvent = NewObject<UTracerPointEventComponent>(GetOwner());
+			auto TracerPointEvent = NewChildComponent<UTracerPointEventComponent>(GetOwner());
 			TracerPointEvent->SetEventSource(TracerPathProvider.Get().GetInterface());
 			TracerPointEvent->RegisterComponent();
 			TracerPointEvent->AddEventListener(ClientTracerMesh);

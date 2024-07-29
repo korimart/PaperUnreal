@@ -240,15 +240,6 @@ void FindAndDestroyComponent(AActor* Actor)
 }
 
 
-inline void DestroyIfValid(UActorComponent* Component)
-{
-	if (IsValid(Component))
-	{
-		Component->DestroyComponent();
-	}
-}
-
-
 #define AS_WEAK(name) name = ToWeak(name)
 
 
