@@ -219,7 +219,7 @@ public:
 	}
 	
 	template <typename... ErrorTypes>
-	bool ContainsAny() const
+	bool ContainsAnyOf() const
 	{
 		const TArray<UClass*> WantedUClasses{ErrorTypes::StaticClass()...};
 		for (const auto& Error : Errors)
@@ -456,7 +456,7 @@ public:
 
 		if ([&]<typename... NeverAllowedErrorTypes>(TTypeList<NeverAllowedErrorTypes...>)
 		{
-			return Result->template ContainsAny<NeverAllowedErrorTypes...>();
+			return Result->template ContainsAnyOf<NeverAllowedErrorTypes...>();
 		}(NeverAllowedTypeList{}))
 		{
 			Handle.promise().SetErrors(Result->GetErrors());

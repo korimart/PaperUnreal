@@ -33,7 +33,11 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 		LiveData.SetValueNoComparison(5);
 		TestEqual(TEXT("non validable type인 live data의 observe 테스트"), Received.Num(), 4);
 		TestEqual(TEXT("non validable type인 live data의 observe 테스트"), Received.Last(), 5);
-		LiveData.Modify([&](int32& Value) { Value = 6; });
+		LiveData.Modify([&](int32& Value)
+		{
+			Value = 6;
+			return true;
+		});
 		TestEqual(TEXT("non validable type인 live data의 observe 테스트"), Received.Num(), 5);
 		TestEqual(TEXT("non validable type인 live data의 observe 테스트"), Received.Last(), 6);
 	}
@@ -67,7 +71,11 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 		LiveData.SetValueNoComparison(5);
 		TestEqual(TEXT("non validable type인 live data의 CreateStream 테스트"), Received.Num(), 4);
 		TestEqual(TEXT("non validable type인 live data의 CreateStream 테스트"), Received.Last(), 5);
-		LiveData.Modify([&](int32& Value) { Value = 6; });
+		LiveData.Modify([&](int32& Value)
+		{
+			Value = 6;
+			return true;
+		});
 		TestEqual(TEXT("non validable type인 live data의 CreateStream 테스트"), Received.Num(), 5);
 		TestEqual(TEXT("non validable type인 live data의 CreateStream 테스트"), Received.Last(), 6);
 	}
@@ -109,7 +117,11 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 		LiveData.SetValueNoComparison(5);
 		TestEqual(TEXT("validable type(TOptional)인 live data의 observe 테스트"), Received.Num(), 5);
 		TestEqual(TEXT("validable type(TOptional)인 live data의 observe 테스트"), *Received.Last(), 5);
-		LiveData.Modify([&](TOptional<int32>& Value) { Value = 6; });
+		LiveData.Modify([&](TOptional<int32>& Value)
+		{
+			Value = 6;
+			return true;
+		});
 		TestEqual(TEXT("validable type(TOptional)인 live data의 observe 테스트"), Received.Num(), 6);
 		TestEqual(TEXT("validable type(TOptional)인 live data의 observe 테스트"), *Received.Last(), 6);
 		LiveData = TOptional<int32>{};
@@ -142,7 +154,11 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 		LiveData.SetValueNoComparison(5);
 		TestEqual(TEXT("validable type(TOptional)인 live data의 observe 테스트"), Received.Num(), 4);
 		TestEqual(TEXT("validable type(TOptional)인 live data의 observe 테스트"), Received.Last(), 5);
-		LiveData.Modify([&](TOptional<int32>& Value) { Value = 6; });
+		LiveData.Modify([&](TOptional<int32>& Value)
+		{
+			Value = 6;
+			return true;
+		});
 		TestEqual(TEXT("validable type(TOptional)인 live data의 observe 테스트"), Received.Num(), 5);
 		TestEqual(TEXT("validable type(TOptional)인 live data의 observe 테스트"), Received.Last(), 6);
 		LiveData = TOptional<int32>{};
@@ -244,23 +260,111 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 		TLiveData<int32> LiveData;
 
 		TestEqual(TEXT("AwaitAndModify가 Guard를 기다렸다가 잘 실행되는지 테스트"), LiveData.Get(), 0);
-		
+
 		auto Handle = LiveData.Observe([&](int32 Value)
 		{
 			if (Value >= 100)
 			{
 				return;
 			}
-			
-			LiveData.AwaitAndModify([](int32& Value) { Value++; });
-			LiveData.AwaitAndModify([](int32& Value) { Value++; });
-			LiveData.AwaitAndModify([](int32& Value) { Value++; });
+
+			LiveData.AwaitAndModify([](int32& Value)
+			{
+				Value++;
+				return true;
+			});
+
+			LiveData.AwaitAndModify([](int32& Value)
+			{
+				Value++;
+				return true;
+			});
+
+			LiveData.AwaitAndModify([](int32& Value)
+			{
+				Value++;
+				return true;
+			});
 		});
 
 		// 한 번 Observe가 실행될 때마다 AwaitAndModify가 3개 예약됨
 		// 이걸 100번 예약하고 예약된 걸 전부다 flush하면 값이 300이 되어야 함
 		// 공식 = 3n (n은 observe를 호출한 횟수)
 		TestEqual(TEXT("AwaitAndModify가 Guard를 기다렸다가 잘 실행되는지 테스트"), LiveData.Get(), 300);
+	}
+
+	{
+		TLiveData<int32> LiveData;
+		LiveData.Modify([&](int32& Value)
+		{
+			TestEqual(TEXT("AwaitAndModify가 Guard를 기다렸다가 잘 실행되는지 테스트"), Value, 0);
+
+			LiveData.AwaitAndModify([](int32& Value)
+			{
+				Value++;
+				return true;
+			});
+			TestEqual(TEXT("AwaitAndModify가 Guard를 기다렸다가 잘 실행되는지 테스트"), Value, 0);
+
+			LiveData.AwaitAndModify([](int32& Value)
+			{
+				Value++;
+				return true;
+			});
+			TestEqual(TEXT("AwaitAndModify가 Guard를 기다렸다가 잘 실행되는지 테스트"), Value, 0);
+
+			LiveData.AwaitAndModify([](int32& Value)
+			{
+				Value++;
+				return true;
+			});
+			TestEqual(TEXT("AwaitAndModify가 Guard를 기다렸다가 잘 실행되는지 테스트"), Value, 0);
+
+			return true;
+		});
+
+		TestEqual(TEXT(""), LiveData.Get(), 3);
+	}
+
+	{
+		TLiveData<TArray<int32>> LiveData;
+		int32 LoopCount = 0;
+
+		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			while (LoopCount < 100)
+			{
+				co_await LiveData.CreateStrictAddStream().EndOfStream();
+				LoopCount++;
+			}
+		});
+
+		LiveData.Add(42);
+		LiveData.Add(42);
+		LiveData.Add(42);
+		LiveData.Add(99);
+		LiveData.Add(99);
+		LiveData.Add(99);
+		LiveData.Add(99);
+		LiveData.Add(99);
+		TestEqual(TEXT("LiveData의 remove 함수들이 적절한 타이밍에 strict add stream을 종료하는지 테스트"), LoopCount, 0);
+		LiveData.RemoveAt(0);
+		TestEqual(TEXT("LiveData의 remove 함수들이 적절한 타이밍에 strict add stream을 종료하는지 테스트"), LoopCount, 1);
+		LiveData.Remove(42);
+		TestEqual(TEXT("LiveData의 remove 함수들이 적절한 타이밍에 strict add stream을 종료하는지 테스트"), LoopCount, 2);
+		LiveData.Empty();
+		TestEqual(TEXT("LiveData의 remove 함수들이 적절한 타이밍에 strict add stream을 종료하는지 테스트"), LoopCount, 3);
+
+		LiveData.Add(42);
+		LiveData.Add(42);
+		LiveData.Add(42);
+		LiveData.Add(99);
+		LiveData.Add(99);
+		TArray<int32> Old = LiveData.Get();
+		LiveData.SetValueSilent(TArray<int32>{});
+		TestEqual(TEXT("LiveData의 remove 함수들이 적절한 타이밍에 strict add stream을 종료하는지 테스트"), LoopCount, 3);
+		LiveData.NotifyDiff(Old);
+		TestEqual(TEXT("LiveData의 remove 함수들이 적절한 타이밍에 strict add stream을 종료하는지 테스트"), LoopCount, 4);
 	}
 
 	return true;

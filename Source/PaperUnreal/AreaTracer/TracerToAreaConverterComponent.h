@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "TracerPathComponent.h"
+#include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 #include "TracerToAreaConverterComponent.generated.h"
 
 
@@ -45,7 +46,7 @@ private:
 	UPROPERTY()
 	UAreaBoundaryComponent* ConversionDestination;
 
-	bool bImConversionInstigator = false;
+	bool bAreaExpansionAlreadyPending = false;
 
 	UTracerToAreaConverterComponent()
 	{
@@ -59,33 +60,36 @@ private:
 		AddLifeDependency(Tracer);
 		AddLifeDependency(ConversionDestination);
 
-		// TODO
-		// Tracer->GetTracerPathStreamer().OnStreamEnd(this, [this]()
-		// {
-		// 	ConvertPathToArea();
-		// });
-
 		ConversionDestination->GetBoundary().Observe(this, [this](auto&)
 		{
-			ConvertPathToArea();
+			ConvertPathToArea(Tracer->GetRunningPath());
+		});
+
+		Tracer->GetLastCompletePath().ObserveIfValid(this, [this](const FSegmentArray2D& CompletePath)
+		{
+			ConvertPathToArea(CompletePath);
 		});
 	}
 
-	void ConvertPathToArea()
+	void ConvertPathToArea(const FSegmentArray2D& Path)
 	{
-		using FExpansionResult = UAreaBoundaryComponent::FExpansionResult;
-
-		if (bImConversionInstigator)
+		if (bAreaExpansionAlreadyPending)
 		{
 			return;
 		}
 
-		bImConversionInstigator = true;
-		// TODO
-		// for (const FExpansionResult& Each : ConversionDestination->ExpandByPath(Tracer->GetTracerPath()))
-		// {
-		// 	OnTracerToAreaConversion.Broadcast(Each.CorrectlyAlignedPath);
-		// }
-		bImConversionInstigator = false;
+		bAreaExpansionAlreadyPending = true;
+
+		// 여기 Path = Path를 쓰지 않으면 const ref로 캡쳐돼서 MoveTemp에서 컴파일러 에러 발생함
+		// 컴파일러 버그인지 coroutine lambda가 mutable일 때 capture의 특수 상황인지에 대해 조사 필요
+		RunWeakCoroutine(this, [this, Path = Path](FWeakCoroutineContext&) mutable -> FWeakCoroutine
+		{
+			using FExpansionResult = UAreaBoundaryComponent::FExpansionResult;
+			for (const FExpansionResult& Each : co_await ConversionDestination->ExpandByPath(MoveTemp(Path)))
+			{
+				OnTracerToAreaConversion.Broadcast(Each.CorrectlyAlignedPath);
+			}
+			bAreaExpansionAlreadyPending = false;
+		});
 	}
 };

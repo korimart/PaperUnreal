@@ -137,7 +137,7 @@ protected:
 
 		auto [Promise, Future] = MakePromise<void>();
 
-		Future.Then([Func = Forward<FuncType>(Func)](const auto& Result)
+		Future.Then([Func = Forward<FuncType>(Func)](const auto& Result) mutable
 		{
 			if (Result.Succeeded())
 			{
@@ -219,18 +219,24 @@ public:
 
 	void Modify(const auto& Func)
 	{
+		FScopedCallbackGuard S{this};
+		
 		// TODO static assert Func takes a non-const lvalue reference
-		Func(Value);
-		Notify();
+		if (Func(Value))
+		{
+			OnChanged.Broadcast(Get());
+		}
 	}
 
 	template <typename FuncType>
 	void AwaitAndModify(FuncType&& Func)
 	{
-		AwaitCallbackGuard([this, Func = Forward<FuncType>(Func)]()
+		AwaitCallbackGuard([this, Func = Forward<FuncType>(Func)]() mutable
 		{
-			Func(Value);
-			OnChanged.Broadcast(Get());
+			if (Func(Value))
+			{
+				OnChanged.Broadcast(Get());
+			}
 		});
 	}
 
@@ -399,21 +405,32 @@ public:
 
 	void Empty()
 	{
+		FScopedCallbackGuard S{this};
+		
 		// OnElementRemoved의 콜백에서 Array가 비었음을 즉시 볼 수 있도록 미리 비움
 		auto Removed = MoveTemp(Array);
 		for (const ElementType& Each : Removed)
 		{
-			NotifyRemove(Each);
+			OnElementRemoved.Broadcast(Each);
+		}
+
+		if (Removed.Num() > 0)
+		{
+			CloseStrictAddStreams();
 		}
 	}
 
 	void NotifyDiff(const TArray<ElementType>& OldArray)
 	{
+		FScopedCallbackGuard S{this};
+
+		bool bAnyRemoved = false;
 		for (const ElementType& Each : OldArray)
 		{
 			if (!Array.Contains(Each))
 			{
-				NotifyRemove(Each);
+				OnElementRemoved.Broadcast(Each);
+				bAnyRemoved = true;
 			}
 		}
 
@@ -421,8 +438,13 @@ public:
 		{
 			if (!OldArray.Contains(Each))
 			{
-				NotifyAdd(Each);
+				OnElementAdded.Broadcast(Each);
 			}
+		}
+
+		if (bAnyRemoved)
+		{
+			CloseStrictAddStreams();
 		}
 	}
 

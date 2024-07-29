@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "AreaBoundaryComponent.h"
 #include "TracerPathProvider.h"
+#include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 #include "TracerPathComponent.generated.h"
 
 
@@ -16,17 +17,13 @@ class UTracerPathComponent : public UActorComponent2, public ITracerPathProvider
 public:
 	virtual TLiveDataView<TOptional<FVector2D>> GetRunningPathHead() const override { return PathHead; }
 	virtual TLiveDataView<TArray<FVector2D>> GetRunningPathTail() const override { return PathTail; }
-
-	const FSegmentArray2D& GetRunningPathAsSegments() const
-	{
-		return Path;
-	}
+	
+	TLiveDataView<TOptional<FSegmentArray2D>> GetLastCompletePath() const { return LastCompletePath; }
+	
+	const FSegmentArray2D& GetRunningPath() const { return Path; }
 
 	// TODO remove dependency
-	void SetNoPathArea(UAreaBoundaryComponent* Area)
-	{
-		NoPathArea = Area;
-	}
+	void SetNoPathArea(UAreaBoundaryComponent* Area) { NoPathArea = Area; }
 
 private:
 	UPROPERTY()
@@ -34,7 +31,9 @@ private:
 
 	mutable TLiveData<TOptional<FVector2D>> PathHead;
 	mutable TLiveData<TArray<FVector2D>> PathTail;
+	mutable TLiveData<TOptional<FSegmentArray2D>> LastCompletePath;
 	FSegmentArray2D Path;
+	
 	FTickingSwitch Switch;
 
 	UTracerPathComponent()
@@ -64,14 +63,14 @@ private:
 		const bool bAreaHasNonZeroArea = NoPathArea->IsValid();
 		const bool bOwnerIsOutsideArea = !NoPathArea->IsInside(GetOwner()->GetActorLocation());
 		const bool bGeneratePath = bAreaHasNonZeroArea && bOwnerIsOutsideArea;
-		
+
 		Switch.Tick(bGeneratePath);
 
 		Switch.IfTrueThisFrame([&]()
 		{
 			Generate();
 		});
-		
+
 		Switch.IfSwitchedOnThisFrame([&]()
 		{
 			AttachHeadToArea();
@@ -104,9 +103,9 @@ private:
 
 	void EmptyPoints()
 	{
-		Path.Empty();
 		PathHead.SetValue(TOptional<FVector2D>{});
 		PathTail.Empty();
+		LastCompletePath.SetValueNoComparison(MoveTemp(Path));
 	}
 
 	void Generate()

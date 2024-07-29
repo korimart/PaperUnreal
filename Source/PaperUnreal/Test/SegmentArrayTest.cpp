@@ -474,5 +474,33 @@ bool SegmentArrayTest::RunTest(const FString& Parameters)
 		}
 	}
 	
+	{
+		const TArray<FVector2D> VertexPositions
+		{
+			{-1.f, -1.f},
+			{1.f, -1.f},
+			{1.f, 1.f},
+			{-1.f, 1.f},
+		};
+
+		const TArray<FVector2D> Path
+		{
+			{-1.f, -1.f},
+			{1.f, -1.f},
+			{1.f, 1.f},
+		};
+
+		{
+			FLoopedSegmentArray2D SegmentArray{VertexPositions};
+			TArray<FUnionResult> Results = SegmentArray.Union(Path);
+			TestEqual(TEXT("TestCase 10"), Results.Num(), 0);
+			
+			auto ReversedPath = Path;
+			std::reverse(ReversedPath.begin(), ReversedPath.end());
+			TArray<FUnionResult> Results2 = SegmentArray.Union(ReversedPath);
+			TestEqual(TEXT("TestCase 10"), Results2.Num(), 0);
+		}
+	}
+	
 	return true;
 }

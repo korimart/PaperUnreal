@@ -45,26 +45,29 @@ public:
 	using FExpansionResult = FUnionResult;
 
 	template <CSegmentArray2D SegmentArrayType>
-	TArray<FExpansionResult> ExpandByPath(SegmentArrayType&& Path)
+	TCancellableFuture<TArray<FExpansionResult>> ExpandByPath(SegmentArrayType&& Path)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("expand by path %p"), this);
 		if (!Path.IsValid())
 		{
-			return {};
+			return TArray<FExpansionResult>{};
 		}
 
-		TArray<FExpansionResult> Ret;
-		AreaBoundary.Modify([&](FLoopedSegmentArray2D& Boundary)
-		{
-			TArray<FUnionResult> UnionResult = Boundary.Union(Forward<SegmentArrayType>(Path));
-			if (!UnionResult.IsEmpty())
+		TCancellablePromise<TArray<FExpansionResult>> Promise;
+		TCancellableFuture<TArray<FExpansionResult>> Future = Promise.GetFuture();
+
+		AreaBoundary.AwaitAndModify([
+				Path = Forward<SegmentArrayType>(Path),
+				Promise = MoveTemp(Promise)
+			](FLoopedSegmentArray2D& Boundary) mutable
 			{
-				for (FUnionResult& Each : UnionResult)
-				{
-					Ret.Add(MoveTemp(Each));
-				}
-			}
-		});
-		return Ret;
+				TArray<FExpansionResult> Results = Boundary.Union(MoveTemp(Path));
+				const bool bNotify = Results.Num() > 0;
+				Promise.SetValue(MoveTemp(Results));
+				return bNotify;
+			});
+
+		return Future;
 	}
 
 	template <CSegmentArray2D SegmentArrayType>
@@ -74,7 +77,7 @@ public:
 		{
 			AreaBoundary.Modify([&](FLoopedSegmentArray2D& Boundary)
 			{
-				Boundary.Difference(Forward<SegmentArrayType>(Path));
+				return Boundary.Difference(Forward<SegmentArrayType>(Path));
 			});
 		}
 	}

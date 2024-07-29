@@ -130,6 +130,11 @@ public:
 		: Points(InitPoints)
 	{
 	}
+	
+	TSegmentArray2D(TArray<FVector2D>&& InitPoints)
+		: Points(MoveTemp(InitPoints))
+	{
+	}
 
 	const TArray<FVector2D>& GetPoints() const &
 	{
@@ -483,7 +488,7 @@ public:
 	auto Union(SegmentArrayType&& Path) requires bLoop;
 
 	template <CSegmentArray2D SegmentArrayType>
-	void Difference(SegmentArrayType&& Path) requires bLoop;
+	bool Difference(SegmentArrayType&& Path) requires bLoop;
 
 	void ReverseVertexOrder()
 	{
@@ -622,7 +627,7 @@ auto TSegmentArray2D<bLoop>::Union(SegmentArrayType&& Path) requires bLoop
 
 template <bool bLoop>
 template <CSegmentArray2D SegmentArrayType>
-void TSegmentArray2D<bLoop>::Difference(SegmentArrayType&& Path) requires bLoop
+bool TSegmentArray2D<bLoop>::Difference(SegmentArrayType&& Path) requires bLoop
 {
 	TArray<FSegmentArray2D> CleanPaths = SplitIntoCleanPaths(Forward<SegmentArrayType>(Path));
 	
@@ -642,8 +647,14 @@ void TSegmentArray2D<bLoop>::Difference(SegmentArrayType&& Path) requires bLoop
 
 	if (FLoopedSegmentArray2D* LargestArea = Algo::MaxElementBy(Islands, &FLoopedSegmentArray2D::CalculateArea))
 	{
-		Points = MoveTemp(LargestArea->Points);
+		if (LargestArea->CalculateArea() < CalculateArea())
+		{
+			Points = MoveTemp(LargestArea->Points);
+			return true;
+		}
 	}
+	
+	return false;
 }
 
 
@@ -730,6 +741,14 @@ auto TSegmentArray2D<bLoop>::UnionAssumeTwoIntersections(FSegmentArray2D Path) r
 
 	const float Area0 = SrcToDestReplaced.CalculateArea();
 	const float Area1 = DestToSrcReplaced.CalculateArea();
+	const float CurrentArea = CalculateArea();
+
+	// 모종의 이유로 맨 위의 조기 리턴 체크에서 걸러지지 않는 경우가 있음
+	// TODO 원인에 대해서 조사해야 됨 (대략 path가 area의 경계와 완전히 겹치는 경우에 발생 가능)
+	if (CurrentArea >= Area0 && CurrentArea >= Area1)
+	{
+		return TOptional<FUnionResult>{};
+	}
 
 	FSegmentArray2D& UsedPath = Area0 < Area1 ? ReversedPath : Path;
 	Points = Area0 < Area1 ? MoveTemp(DestToSrcReplaced.Points) : MoveTemp(SrcToDestReplaced.Points);

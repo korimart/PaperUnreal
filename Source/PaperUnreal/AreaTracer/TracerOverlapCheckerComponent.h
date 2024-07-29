@@ -75,9 +75,9 @@ private:
 	void OnMaybeOverlappingSelf(const FSegment2D& Movement)
 	{
 		// TODO fix
-		const int32 SegmentCount = OverlapInstigator->GetRunningPathAsSegments().SegmentCount();
+		const int32 SegmentCount = OverlapInstigator->GetRunningPath().SegmentCount();
 		if (SegmentCount >= 3
-			&& OverlapInstigator->GetRunningPathAsSegments()
+			&& OverlapInstigator->GetRunningPath()
 			                    .SubArray(0, SegmentCount - 3)
 			                    .FindIntersection(Movement))
 		{
@@ -89,7 +89,7 @@ private:
 	{
 		for (UTracerPathComponent* Each : OverlapTargets)
 		{
-			if (IsValid(Each) && Each->GetRunningPathAsSegments().FindIntersection(Movement))
+			if (IsValid(Each) && Each->GetRunningPath().FindIntersection(Movement))
 			{
 				OnTracerBumpedInto.Broadcast(Each);
 			}

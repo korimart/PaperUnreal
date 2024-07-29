@@ -62,7 +62,7 @@ private:
 
 		Area->GetBoundary().Observe(this, [this](const FLoopedSegmentArray2D& Boundary)
 		{
-			const FSegmentArray2D& RunningTracerPath = Tracer->GetRunningPathAsSegments();
+			const FSegmentArray2D& RunningTracerPath = Tracer->GetRunningPath();
 			
 			if (RunningTracerPath.IsValid())
 			{

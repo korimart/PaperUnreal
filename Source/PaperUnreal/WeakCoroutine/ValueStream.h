@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AwaitableWrappers.h"
 #include "CancellableFuture.h"
 #include "PaperUnreal/GameFramework2/Utils.h"
 #include "ValueStream.generated.h"
@@ -39,7 +40,7 @@ public:
 		{
 			return PopFront(UnclaimedFutures);
 		}
-		
+
 		if (bClosed)
 		{
 			return UEndOfStreamError::NewError();
@@ -103,8 +104,26 @@ public:
 		return Receiver;
 	}
 
-	friend TCancellableFutureAwaitable<T>
-	operator co_await(TValueStream& Stream) { return operator co_await(Stream.Receiver->NextValue()); }
+	friend TCancellableFutureAwaitable<T> operator co_await(TValueStream& Stream)
+	{
+		return operator co_await(Stream.Receiver->NextValue());
+	}
+
+	auto EndOfStream()
+	{
+		return Transform
+		(
+			Filter(*this, [](const TFailableResult<ResultType>& Result)
+			{
+				return Result.template ContainsAnyOf<UEndOfStreamError>();
+			}),
+			[](const TFailableResult<ResultType>& Result)
+			{
+				// TODO TFailalbeResult<void>가 가능해지면 return;으로 수정
+				return std::monostate{};
+			}
+		);
+	}
 
 private:
 	TSharedPtr<ReceiverType> Receiver = MakeShared<ReceiverType>();
@@ -140,10 +159,23 @@ TTuple<TValueStream<T>, FDelegateHandle> CreateMulticastValueStream(
 	struct FCopyChecker
 	{
 		TWeakPtr<TValueStreamValueReceiver<T>> Receiver;
-		
-		FCopyChecker(TWeakPtr<TValueStreamValueReceiver<T>> InReceiver) : Receiver(InReceiver) {}
-		FCopyChecker(const FCopyChecker&) { AssertNoCopy(); }
-		FCopyChecker& operator=(const FCopyChecker&) { AssertNoCopy(); return *this; }
+
+		FCopyChecker(TWeakPtr<TValueStreamValueReceiver<T>> InReceiver)
+			: Receiver(InReceiver)
+		{
+		}
+
+		FCopyChecker(const FCopyChecker&)
+		{
+			AssertNoCopy();
+		}
+
+		FCopyChecker& operator=(const FCopyChecker&)
+		{
+			AssertNoCopy();
+			return *this;
+		}
+
 		FCopyChecker(FCopyChecker&&) = default;
 		FCopyChecker& operator=(FCopyChecker&&) = default;
 
@@ -165,7 +197,7 @@ TTuple<TValueStream<T>, FDelegateHandle> CreateMulticastValueStream(
 			Receiver,
 			Predicate = Forward<PredicateType>(Predicate),
 			TransformFunc = Forward<TransformFuncType>(TransformFunc),
-			CopyChecker = FCopyChecker{ Receiver }
+			CopyChecker = FCopyChecker{Receiver}
 		]<typename... ArgTypes>(ArgTypes&&... NewValues)
 		{
 			if (Predicate(Forward<ArgTypes>(NewValues)...))
