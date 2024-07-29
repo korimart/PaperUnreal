@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "BattleRuleGameStateComponent.h"
 #include "GameFramework/PlayerState.h"
 #include "PaperUnreal/AreaTracer/AreaSlasherComponent.h"
 #include "PaperUnreal/AreaTracer/AreaSpawnerComponent.h"
@@ -18,24 +19,22 @@
 #include "PaperUnreal/ModeAgnostic/InventoryComponent.h"
 #include "PaperUnreal/GameFramework2/Character2.h"
 #include "PaperUnreal/ModeAgnostic/LineMeshComponent.h"
-#include "BattlePlayerAttacherComponent.generated.h"
+#include "BattleRulePawnComponent.generated.h"
 
 
 UCLASS(Within=Character2)
-class UBattlePlayerAttacherComponent : public UComponentAttacherComponent
+class UBattleRulePawnComponent : public UComponentAttacherComponent
 {
 	GENERATED_BODY()
 
 public:
 	void SetDependencies(
-		UAreaSpawnerComponent* AreaSpawner,
-		UPawnSpawnerComponent* PawnSpawner,
+		UBattleRuleGameStateComponent* InGameState,
 		AAreaActor* InHomeArea)
 	{
 		check(GetNetMode() != NM_Client);
 		check(!HasBeenInitialized());
-		ServerAreaSpawner = AreaSpawner;
-		ServerPawnSpawner = PawnSpawner;
+		ServerGameState = InGameState;
 		HomeArea = InHomeArea;
 	}
 
@@ -62,10 +61,7 @@ private:
 	}
 
 	UPROPERTY()
-	UAreaSpawnerComponent* ServerAreaSpawner;
-
-	UPROPERTY()
-	UPawnSpawnerComponent* ServerPawnSpawner;
+	UBattleRuleGameStateComponent* ServerGameState;
 
 	UPROPERTY()
 	UTracerOverlapCheckerComponent* ServerOverlapChecker;
@@ -82,7 +78,7 @@ private:
 
 		if (GetNetMode() != NM_Client)
 		{
-			check(AllValid(ServerAreaSpawner, ServerPawnSpawner, RepHomeArea));
+			check(AllValid(ServerGameState, RepHomeArea));
 		}
 	}
 
@@ -105,9 +101,9 @@ private:
 		ServerOverlapChecker->SetTracer(TracerPath);
 		ServerOverlapChecker->RegisterComponent();
 
-		ServerPawnSpawner->GetSpawnedPawns().ObserveAddIfValid(this, [this](APawn* NewPlayer)
+		ServerGameState->ServerPawnSpawner->GetSpawnedPawns().ObserveAddIfValid(this, [this](APawn* NewPlayer)
 		{
-			auto NewPlayerHome = NewPlayer->FindComponentByClass<UBattlePlayerAttacherComponent>()->HomeArea.Get();
+			auto NewPlayerHome = NewPlayer->FindComponentByClass<UBattleRulePawnComponent>()->HomeArea.Get();
 			auto NewPlayerTracer = NewPlayer->FindComponentByClass<UTracerPathComponent>();
 
 			if (NewPlayerHome != HomeArea.Get())
@@ -121,7 +117,7 @@ private:
 		ServerTracerToAreaConverter->SetConversionDestination(HomeArea.Get()->ServerAreaBoundary);
 		ServerTracerToAreaConverter->RegisterComponent();
 
-		ServerAreaSpawner->GetSpawnedAreas().ObserveAddIfValid(this, [this](AAreaActor* NewArea)
+		ServerGameState->ServerAreaSpawner->GetSpawnedAreas().ObserveAddIfValid(this, [this](AAreaActor* NewArea)
 		{
 			if (NewArea != HomeArea.Get())
 			{

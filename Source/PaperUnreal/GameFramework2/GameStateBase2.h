@@ -15,10 +15,10 @@ class AGameStateBase2 : public AGameStateBase
 {
 	GENERATED_BODY()
 
-	TLiveData<TArray<TObjectPtr<APlayerState>>&> PlayerStateArray{PlayerArray};
+	mutable TLiveData<TArray<TObjectPtr<APlayerState>>&> PlayerStateArray{PlayerArray};
 
 public:
-	TLiveDataView<TArray<TObjectPtr<APlayerState>>&> GetPlayerStateArray() { return PlayerStateArray; }
+	TLiveDataView<TArray<TObjectPtr<APlayerState>>&> GetPlayerStateArray() const { return PlayerStateArray; }
 
 	double GetLatestServerWorldTimeSeconds() const
 	{
