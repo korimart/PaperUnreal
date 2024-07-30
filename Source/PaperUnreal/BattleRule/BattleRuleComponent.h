@@ -5,12 +5,11 @@
 #include "CoreMinimal.h"
 #include "BattleRuleGameStateComponent.h"
 #include "BattleRulePawnComponent.h"
-#include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
 #include "PaperUnreal/AreaTracer/AreaSpawnerComponent.h"
 #include "PaperUnreal/AreaTracer/AreaStateTrackerComponent.h"
 #include "PaperUnreal/Development/InGameCheats.h"
-#include "PaperUnreal/GameFramework2/ActorComponent2.h"
+#include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
 #include "PaperUnreal/ModeAgnostic/InventoryComponent.h"
 #include "PaperUnreal/ModeAgnostic/PawnSpawnerComponent.h"
 #include "PaperUnreal/ModeAgnostic/ReadyStateComponent.h"
@@ -61,7 +60,7 @@ struct FBattleRuleResult
 
 
 UCLASS(Within=GameModeBase)
-class UBattleRuleComponent : public UActorComponent2
+class UBattleRuleComponent : public UComponentGroupComponent
 {
 	GENERATED_BODY()
 

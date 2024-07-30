@@ -9,7 +9,7 @@
 #include "GameFramework/PlayerState.h"
 #include "Net/UnrealNetwork.h"
 #include "PaperUnreal/GameFramework2/Character2.h"
-#include "PaperUnreal/ModeAgnostic/ComponentAttacherComponent.h"
+#include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
 #include "PaperUnreal/ModeAgnostic/ComponentRegistry.h"
 #include "PaperUnreal/ModeAgnostic/InventoryComponent.h"
 #include "PaperUnreal/ModeAgnostic/LineMeshComponent.h"
@@ -18,7 +18,7 @@
 
 
 UCLASS(Within=Character2)
-class UTracerComponent : public UComponentAttacherComponent
+class UTracerComponent : public UComponentGroupComponent
 {
 	GENERATED_BODY()
 

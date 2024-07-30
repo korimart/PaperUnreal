@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "PaperUnreal/AreaTracer/TracerComponent.h"
-#include "PaperUnreal/GameFramework2/ActorComponent2.h"
+#include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
 #include "PaperUnreal/GameFramework2/GameStateBase2.h"
 #include "PaperUnreal/ModeAgnostic/PawnSpawnerComponent.h"
 #include "PaperUnreal/ModeAgnostic/ReadyStateComponent.h"
@@ -13,7 +13,7 @@
 
 
 UCLASS(Within=GameModeBase)
-class UFreeRuleComponent : public UActorComponent2
+class UFreeRuleComponent : public UComponentGroupComponent
 {
 	GENERATED_BODY()
 

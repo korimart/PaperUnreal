@@ -4,16 +4,16 @@
 
 #include "CoreMinimal.h"
 #include "PaperUnreal/GameFramework2/ActorComponent2.h"
-#include "ComponentAttacherComponent.generated.h"
+#include "ComponentGroupComponent.generated.h"
 
 
-UCLASS()
-class UComponentAttacherComponent : public UActorComponent2
+UCLASS(Abstract)
+class UComponentGroupComponent : public UActorComponent2
 {
 	GENERATED_BODY()
 
-public:
-	UComponentAttacherComponent()
+protected:
+	UComponentGroupComponent()
 	{
 		bWantsInitializeComponent = true;
 		SetIsReplicatedByDefault(true);
@@ -34,7 +34,14 @@ public:
 		}
 	}
 
-protected:
 	virtual void AttachServerMachineComponents() {}
 	virtual void AttachPlayerMachineComponents() {}
+	
+	template <typename T>
+	T* NewChildComponent(AActor* Actor)
+	{
+		T* Component = NewObject<T>(Actor);
+		Component->AddLifeDependency(this);
+		return Component;
+	}
 };

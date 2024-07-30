@@ -11,14 +11,14 @@
 #include "PaperUnreal/AreaTracer/TracerKillerComponent.h"
 #include "PaperUnreal/AreaTracer/TracerOverlapCheckerComponent.h"
 #include "PaperUnreal/AreaTracer/TracerToAreaConverterComponent.h"
-#include "PaperUnreal/ModeAgnostic/ComponentAttacherComponent.h"
+#include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
 #include "PaperUnreal/ModeAgnostic/PawnSpawnerComponent.h"
 #include "PaperUnreal/ModeAgnostic/LineMeshComponent.h"
 #include "BattleRulePawnComponent.generated.h"
 
 
 UCLASS()
-class UBattleRulePawnComponent : public UComponentAttacherComponent
+class UBattleRulePawnComponent : public UComponentGroupComponent
 {
 	GENERATED_BODY()
 

@@ -20,12 +20,4 @@ public:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	void AddLifeDependency(UActorComponent2* Dependency);
-
-	template <typename T>
-	T* NewChildComponent(AActor* Actor)
-	{
-		T* Component = NewObject<T>(Actor);
-		Component->AddLifeDependency(this);
-		return Component;
-	}
 };

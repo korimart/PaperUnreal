@@ -5,14 +5,14 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameStateBase.h"
 #include "PaperUnreal/AreaTracer/AreaSpawnerComponent.h"
-#include "PaperUnreal/ModeAgnostic/ComponentAttacherComponent.h"
+#include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
 #include "PaperUnreal/ModeAgnostic/PawnSpawnerComponent.h"
 #include "PaperUnreal/ModeAgnostic/WorldTimerComponent.h"
 #include "BattleRuleGameStateComponent.generated.h"
 
 
 UCLASS(Within=GameStateBase)
-class UBattleRuleGameStateComponent : public UComponentAttacherComponent
+class UBattleRuleGameStateComponent : public UComponentGroupComponent
 {
 	GENERATED_BODY()
 
