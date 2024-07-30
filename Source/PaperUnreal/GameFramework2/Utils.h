@@ -254,13 +254,4 @@ inline FLinearColor ALittleBrighter(const FLinearColor& Color)
 }
 
 
-#define AS_WEAK(name) name = ToWeak(name)
-
-
-#define DEFINE_REPPED_VAR_SETTER(VarName, NewValue)\
-	check(GetNetMode() != NM_Client);\
-	Rep##VarName = NewValue;\
-	OnRep_##VarName();
-
-
 #define RETURN_IF_FALSE(boolean) if (!boolean) return true;

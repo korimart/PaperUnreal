@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "PaperUnreal/GameFramework2/PlayerController2.h"
 #include "Templates/SubclassOf.h"
-#include "PVPBattlePlayerController.generated.h"
+#include "ThirdPersonTemplatePlayerController.generated.h"
 
 /** Forward declaration to improve compiling times */
 class UNiagaraSystem;
@@ -15,12 +15,12 @@ class UInputAction;
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 UCLASS()
-class APVPBattlePlayerController : public APlayerController2
+class AThirdPersonTemplatePlayerController : public APlayerController2
 {
 	GENERATED_BODY()
 
 public:
-	APVPBattlePlayerController();
+	AThirdPersonTemplatePlayerController();
 
 	/** Time Threshold to know if it was a short press */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input)

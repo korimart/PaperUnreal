@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "PVPBattlePlayerController.h"
+#include "ThirdPersonTemplatePlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Blueprint/AIBlueprintHelperLibrary.h"
 #include "NiagaraSystem.h"
@@ -13,11 +13,11 @@
 #include "GameFramework/CheatManager.h"
 #include "PaperUnreal/Development/InGameCheats.h"
 #include "PaperUnreal/ModeAgnostic/LifeComponent.h"
-#include "PaperUnreal/WeakCoroutine/AwaitableWrappers.h"
+#include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
-APVPBattlePlayerController::APVPBattlePlayerController()
+AThirdPersonTemplatePlayerController::AThirdPersonTemplatePlayerController()
 {
 	bShowMouseCursor = true;
 	DefaultMouseCursor = EMouseCursor::Default;
@@ -25,7 +25,7 @@ APVPBattlePlayerController::APVPBattlePlayerController()
 	FollowTime = 0.f;
 }
 
-void APVPBattlePlayerController::BeginPlay()
+void AThirdPersonTemplatePlayerController::BeginPlay()
 {
 	// Call the base class  
 	Super::BeginPlay();
@@ -76,7 +76,7 @@ void APVPBattlePlayerController::BeginPlay()
 	CheatManager->AddCheatManagerExtension(NewObject<UInGameCheats>(CheatManager));
 }
 
-void APVPBattlePlayerController::SetupInputComponent()
+void AThirdPersonTemplatePlayerController::SetupInputComponent()
 {
 	// set up gameplay key bindings
 	Super::SetupInputComponent();
@@ -85,16 +85,16 @@ void APVPBattlePlayerController::SetupInputComponent()
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent))
 	{
 		// Setup mouse input events
-		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Started, this, &APVPBattlePlayerController::OnInputStarted);
-		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Triggered, this, &APVPBattlePlayerController::OnSetDestinationTriggered);
-		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Completed, this, &APVPBattlePlayerController::OnSetDestinationReleased);
-		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Canceled, this, &APVPBattlePlayerController::OnSetDestinationReleased);
+		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Started, this, &AThirdPersonTemplatePlayerController::OnInputStarted);
+		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Triggered, this, &AThirdPersonTemplatePlayerController::OnSetDestinationTriggered);
+		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Completed, this, &AThirdPersonTemplatePlayerController::OnSetDestinationReleased);
+		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Canceled, this, &AThirdPersonTemplatePlayerController::OnSetDestinationReleased);
 
 		// Setup touch input events
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Started, this, &APVPBattlePlayerController::OnInputStarted);
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Triggered, this, &APVPBattlePlayerController::OnTouchTriggered);
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Completed, this, &APVPBattlePlayerController::OnTouchReleased);
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Canceled, this, &APVPBattlePlayerController::OnTouchReleased);
+		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Started, this, &AThirdPersonTemplatePlayerController::OnInputStarted);
+		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Triggered, this, &AThirdPersonTemplatePlayerController::OnTouchTriggered);
+		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Completed, this, &AThirdPersonTemplatePlayerController::OnTouchReleased);
+		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Canceled, this, &AThirdPersonTemplatePlayerController::OnTouchReleased);
 	}
 	else
 	{
@@ -102,13 +102,13 @@ void APVPBattlePlayerController::SetupInputComponent()
 	}
 }
 
-void APVPBattlePlayerController::OnInputStarted()
+void AThirdPersonTemplatePlayerController::OnInputStarted()
 {
 	StopMovement();
 }
 
 // Triggered every frame when the input is held down
-void APVPBattlePlayerController::OnSetDestinationTriggered()
+void AThirdPersonTemplatePlayerController::OnSetDestinationTriggered()
 {
 	// We flag that the input is being pressed
 	FollowTime += GetWorld()->GetDeltaSeconds();
@@ -140,7 +140,7 @@ void APVPBattlePlayerController::OnSetDestinationTriggered()
 	}
 }
 
-void APVPBattlePlayerController::OnSetDestinationReleased()
+void AThirdPersonTemplatePlayerController::OnSetDestinationReleased()
 {
 	// If it was a short press
 	if (FollowTime <= ShortPressThreshold)
@@ -154,13 +154,13 @@ void APVPBattlePlayerController::OnSetDestinationReleased()
 }
 
 // Triggered every frame when the input is held down
-void APVPBattlePlayerController::OnTouchTriggered()
+void AThirdPersonTemplatePlayerController::OnTouchTriggered()
 {
 	bIsTouch = true;
 	OnSetDestinationTriggered();
 }
 
-void APVPBattlePlayerController::OnTouchReleased()
+void AThirdPersonTemplatePlayerController::OnTouchReleased()
 {
 	bIsTouch = false;
 	OnSetDestinationReleased();

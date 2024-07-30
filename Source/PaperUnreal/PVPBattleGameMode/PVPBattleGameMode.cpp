@@ -2,7 +2,6 @@
 
 #include "PVPBattleGameMode.h"
 
-#include "PVPBattlePlayerController.h"
 #include "PVPBattleGameState.h"
 #include "PVPBattleHUD.h"
 #include "PVPBattlePlayerState.h"
@@ -10,6 +9,7 @@
 #include "PaperUnreal/BattleRule/BattleRuleComponent.h"
 #include "PaperUnreal/FreeRule/FreeRuleComponent.h"
 #include "PaperUnreal/ModeAgnostic/FixedCameraPawn.h"
+#include "PaperUnreal/ModeAgnostic/ThirdPersonTemplatePlayerController.h"
 #include "UObject/ConstructorHelpers.h"
 
 
@@ -19,7 +19,7 @@ DEFINE_LOG_CATEGORY(LogPVPBattleGameMode);
 APVPBattleGameMode::APVPBattleGameMode()
 {
 	GameStateClass = APVPBattleGameState::StaticClass();
-	PlayerControllerClass = APVPBattlePlayerController::StaticClass();
+	PlayerControllerClass = AThirdPersonTemplatePlayerController::StaticClass();
 	PlayerStateClass = APVPBattlePlayerState::StaticClass();
 	SpectatorClass = AFixedCameraPawn::StaticClass();
 	HUDClass = APVPBattleHUD::StaticClass();
