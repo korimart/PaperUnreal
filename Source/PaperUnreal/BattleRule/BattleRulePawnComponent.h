@@ -12,6 +12,7 @@
 #include "PaperUnreal/AreaTracer/TracerOverlapCheckerComponent.h"
 #include "PaperUnreal/AreaTracer/TracerToAreaConverterComponent.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
+#include "PaperUnreal/ModeAgnostic/CharacterMeshFromInventory.h"
 #include "PaperUnreal/ModeAgnostic/PawnSpawnerComponent.h"
 #include "PaperUnreal/ModeAgnostic/LineMeshComponent.h"
 #include "BattleRulePawnComponent.generated.h"
@@ -91,7 +92,7 @@ private:
 		auto Tracer = NewChildComponent<UTracerComponent>(GetOwner());
 		Tracer->RegisterComponent();
 		Tracer->ServerTracerPath->SetNoPathArea(ServerHomeArea->ServerAreaBoundary);
-		
+
 		ServerOverlapChecker = NewChildComponent<UTracerOverlapCheckerComponent>(GetOwner());
 		ServerOverlapChecker->SetTracer(Tracer->ServerTracerPath);
 		ServerOverlapChecker->RegisterComponent();
@@ -149,6 +150,8 @@ private:
 
 	virtual void AttachPlayerMachineComponents() override
 	{
+		NewChildComponent<UCharacterMeshFromInventory>(GetOwner())->RegisterComponent();
+
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
 			co_await Life;

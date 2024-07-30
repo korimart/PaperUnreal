@@ -10,7 +10,6 @@
 #include "PaperUnreal/BattleRule/BattleRuleComponent.h"
 #include "PaperUnreal/FreeRule/FreeRuleComponent.h"
 #include "PaperUnreal/ModeAgnostic/FixedCameraPawn.h"
-#include "PaperUnreal/ModeAgnostic/ThirdPersonTemplateCharacter.h"
 #include "UObject/ConstructorHelpers.h"
 
 
@@ -22,9 +21,15 @@ APVPBattleGameMode::APVPBattleGameMode()
 	GameStateClass = APVPBattleGameState::StaticClass();
 	PlayerControllerClass = APVPBattlePlayerController::StaticClass();
 	PlayerStateClass = APVPBattlePlayerState::StaticClass();
-	DefaultPawnClass = AThirdPersonTemplateCharacter::StaticClass();
 	SpectatorClass = AFixedCameraPawn::StaticClass();
 	HUDClass = APVPBattleHUD::StaticClass();
+
+	// set default pawn class to our Blueprinted character
+	static ConstructorHelpers::FClassFinder<APawn> PlayerPawnBPClass(TEXT("/Game/TopDown/Blueprints/BP_TopDownCharacter"));
+	if (PlayerPawnBPClass.Class != nullptr)
+	{
+		DefaultPawnClass = PlayerPawnBPClass.Class;
+	}
 
 	// set default controller to our Blueprinted controller
 	static ConstructorHelpers::FClassFinder<APlayerController> PlayerControllerBPClass(TEXT("/Game/TopDown/Blueprints/BP_TopDownPlayerController"));

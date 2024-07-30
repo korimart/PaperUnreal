@@ -3,9 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "PaperUnreal/AreaTracer/TracerComponent.h"
+#include "FreeRulePawnComponent.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
 #include "PaperUnreal/GameFramework2/GameStateBase2.h"
+#include "PaperUnreal/ModeAgnostic/CharacterMeshFromInventory.h"
 #include "PaperUnreal/ModeAgnostic/PawnSpawnerComponent.h"
 #include "PaperUnreal/ModeAgnostic/ReadyStateComponent.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
@@ -60,7 +61,7 @@ private:
 			APawn* Pawn = PawnSpawner->SpawnAtLocation(
 				PawnClass,
 				{1500.f, 1500.f, 100.f},
-				[&](APawn* Spawned) { NewChildComponent<UTracerComponent>(Spawned)->RegisterComponent(); });
+				[&](APawn* Spawned) { NewChildComponent<UFreeRulePawnComponent>(Spawned)->RegisterComponent(); });
 
 			Player->GetOwningController()->Possess(Pawn);
 		});

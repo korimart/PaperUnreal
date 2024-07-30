@@ -7,6 +7,7 @@
 #include "GameFramework/CheatManager.h"
 #include "PaperUnreal/AreaTracer/TracerPathComponent.h"
 #include "PaperUnreal/GameFramework2/Character2.h"
+#include "PaperUnreal/ModeAgnostic/InventoryComponent.h"
 #include "PaperUnreal/PVPBattleGameMode/PVPBattleGameState.h"
 #include "InGameCheats.generated.h"
 
@@ -21,7 +22,7 @@ class UInGameCheats : public UCheatManagerExtension
 
 public:
 	inline static bool bDoNotEndGameUntilCheat{true};
-	
+
 	inline static FSimpleMulticastDelegate OnStartGameByCheat{};
 	inline static FSimpleMulticastDelegate OnEndGameByCheat{};
 
@@ -67,10 +68,30 @@ private:
 	{
 		OnStartGameByCheat.Broadcast();
 	}
-	
+
 	UFUNCTION(Exec, BlueprintAuthorityOnly)
 	void EndGame()
 	{
 		OnEndGameByCheat.Broadcast();
+	}
+
+	UFUNCTION(Exec, BlueprintAuthorityOnly)
+	void SetMannyInInventory()
+	{
+		GetPlayerController()->PlayerState->FindComponentByClass<UInventoryComponent>()->SetCharacterMesh(
+			TSoftObjectPtr<USkeletalMesh>
+			{
+				FSoftObjectPath{TEXT("/Script/Engine.SkeletalMesh'/Game/Characters/Mannequins/Meshes/SKM_Manny.SKM_Manny'")}
+			});
+	}
+
+	UFUNCTION(Exec, BlueprintAuthorityOnly)
+	void SetQuinnInInventory()
+	{
+		GetPlayerController()->PlayerState->FindComponentByClass<UInventoryComponent>()->SetCharacterMesh(
+			TSoftObjectPtr<USkeletalMesh>
+			{
+				FSoftObjectPath{TEXT("/Script/Engine.SkeletalMesh'/Game/Characters/Mannequins/Meshes/SKM_Quinn.SKM_Quinn'")}
+			});
 	}
 };

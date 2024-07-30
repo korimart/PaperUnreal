@@ -498,24 +498,38 @@ inline TCancellableFuture<void> WaitForSeconds(UWorld* World, float Seconds)
 }
 
 
-template <typename SoftObjectType>
-TCancellableFuture<SoftObjectType*> RequestAsyncLoad(const TSoftObjectPtr<SoftObjectType>& SoftPointer)
+auto RequestAsyncLoadImpl(const auto& SoftPointer)
 {
+	using OutputType = decltype(SoftPointer.Get());
+	using RetType = TCancellableFuture<OutputType>;
+	
 	if (SoftPointer.IsNull())
 	{
-		return nullptr;
+		return RetType{nullptr};
 	}
 	
 	if (SoftPointer.IsValid())
 	{
-		return SoftPointer.Get();
+		return RetType{SoftPointer.Get()};
 	}
 	
 	FStreamableDelegate Delegate;
-	auto Ret = MakeFutureFromDelegate<SoftObjectType*>(
+	auto Ret = MakeFutureFromDelegate<OutputType>(
 		Delegate,
 		[]() { return true; },
 		[SoftPointer]() { return SoftPointer.Get(); });
 	UAssetManager::GetStreamableManager().RequestAsyncLoad(SoftPointer.ToSoftObjectPath(), Delegate);
 	return Ret;
+}
+
+template <typename SoftType>
+TCancellableFuture<UClass*> RequestAsyncLoad(const TSoftClassPtr<SoftType>& SoftPointer)
+{
+	return RequestAsyncLoadImpl(SoftPointer);
+}
+
+template <typename SoftType>
+TCancellableFuture<SoftType*> RequestAsyncLoad(const TSoftObjectPtr<SoftType>& SoftPointer)
+{
+	return RequestAsyncLoadImpl(SoftPointer);
 }

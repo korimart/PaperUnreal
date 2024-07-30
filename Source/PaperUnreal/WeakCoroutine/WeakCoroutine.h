@@ -393,6 +393,8 @@ public:
 	T* operator->() const { return Ptr; }
 	T& operator*() const { return *Ptr; }
 
+	T* Get() const { return Ptr; }
+
 private:
 	T* Ptr;
 	TFunction<void(T*)> NoAbort;
