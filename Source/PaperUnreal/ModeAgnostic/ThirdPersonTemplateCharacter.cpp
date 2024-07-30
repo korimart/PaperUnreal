@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "PVPBattleCharacter.h"
+#include "ThirdPersonTemplateCharacter.h"
 
 #include "UObject/ConstructorHelpers.h"
 #include "Camera/CameraComponent.h"
@@ -11,7 +11,7 @@
 #include "Materials/Material.h"
 #include "Engine/World.h"
 
-APVPBattleCharacter::APVPBattleCharacter()
+AThirdPersonTemplateCharacter::AThirdPersonTemplateCharacter()
 {
 	// Set size for player capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);

@@ -4,15 +4,15 @@
 
 #include "CoreMinimal.h"
 #include "PaperUnreal/GameFramework2/Character2.h"
-#include "PVPBattleCharacter.generated.h"
+#include "ThirdPersonTemplateCharacter.generated.h"
 
 UCLASS(Blueprintable)
-class APVPBattleCharacter : public ACharacter2
+class AThirdPersonTemplateCharacter : public ACharacter2
 {
 	GENERATED_BODY()
 
 public:
-	APVPBattleCharacter();
+	AThirdPersonTemplateCharacter();
 
 	/** Returns TopDownCameraComponent subobject **/
 	FORCEINLINE class UCameraComponent* GetTopDownCameraComponent() const { return TopDownCameraComponent; }
