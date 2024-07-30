@@ -13,6 +13,7 @@
 #include "PaperUnreal/ModeAgnostic/ComponentRegistry.h"
 #include "PaperUnreal/ModeAgnostic/InventoryComponent.h"
 #include "PaperUnreal/ModeAgnostic/LineMeshComponent.h"
+#include "PaperUnreal/ModeAgnostic/SolidColorMaterial.h"
 #include "PaperUnreal/WeakCoroutine/LiveData.h"
 #include "TracerComponent.generated.h"
 
@@ -39,7 +40,7 @@ private:
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 		DOREPLIFETIME_CONDITION(ThisClass, RepTracerPathProvider, COND_InitialOnly);
 	}
-	
+
 	UPROPERTY()
 	ULineMeshComponent* ClientTracerMesh;
 
@@ -66,7 +67,7 @@ private:
 
 			ClientTracerMesh = NewChildComponent<ULineMeshComponent>(GetOwner());
 			ClientTracerMesh->RegisterComponent();
-			
+
 			auto TracerPointEvent = NewChildComponent<UTracerPointEventComponent>(GetOwner());
 			TracerPointEvent->SetEventSource(TracerPathProvider.Get().GetInterface());
 			TracerPointEvent->RegisterComponent();
@@ -75,14 +76,18 @@ private:
 			// 일단 위에까지 완료했으면 플레이는 가능한 거임 여기부터는 미적인 요소들을 준비한다
 			auto PlayerState = co_await GetOuterACharacter2()->WaitForPlayerState();
 			auto Inventory = co_await WaitForComponent<UInventoryComponent>(PlayerState);
-			
+
 			RunWeakCoroutine(this, [this, &Inventory](FWeakCoroutineContext&) -> FWeakCoroutine
 			{
-				for (auto MaterialStream = Inventory->GetTracerMaterial().CreateStream();;)
+				auto ColorStream = Inventory->GetTracerBaseColor().CreateStream();
+				auto FirstColor = co_await ColorStream;
+				auto Material = co_await FSolidColorMaterial::Create(FirstColor);
+				
+				ClientTracerMesh->ConfigureMaterialSet({Material.Get()});
+
+				while (true)
 				{
-					auto SoftMaterial = co_await Filter(MaterialStream, [](const auto& Soft) { return !Soft.IsNull(); });
-					auto Material = co_await RequestAsyncLoad(SoftMaterial);
-					ClientTracerMesh->ConfigureMaterialSet({Material});
+					Material.SetColor(co_await ColorStream);
 				}
 			});
 		});

@@ -105,24 +105,8 @@ private:
 	UBattleRuleGameStateComponent* GameState;
 
 	FTeamAllocator TeamAllocator;
-
-	const TSoftObjectPtr<UMaterialInstance> SoftSolidBlue{FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Blue.MI_Solid_Blue'")}};
-	const TSoftObjectPtr<UMaterialInstance> SoftSolidBlueLight{FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Blue_Light.MI_Solid_Blue_Light'")}};
-	const TSoftObjectPtr<UMaterialInstance> SoftSolidRed{FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Red.MI_Solid_Red'")}};
-	const TSoftObjectPtr<UMaterialInstance> SoftSolidRedLight{FSoftObjectPath{TEXT("/Script/Engine.MaterialInstanceConstant'/Game/LevelPrototyping/Materials/MI_Solid_Red_Light.MI_Solid_Red_Light'")}};
-
-	const TArray<TSoftObjectPtr<UMaterialInstance>> AreaMaterials
-	{
-		SoftSolidBlue,
-		SoftSolidRed,
-	};
-
-	const TArray<TSoftObjectPtr<UMaterialInstance>> TracerMaterials
-	{
-		SoftSolidBlueLight,
-		SoftSolidRedLight,
-	};
-
+	TMap<int32, FLinearColor> TeamColors;
+	
 	void InitiatePawnSpawnSequence(APlayerState* Player)
 	{
 		RunWeakCoroutine(this, [this, Player](FWeakCoroutineContext& Context) -> FWeakCoroutine
@@ -168,7 +152,7 @@ private:
 				co_return;
 			}
 
-			Inventory->SetTracerMaterial(TracerMaterials[ThisPlayerTeamIndex % TracerMaterials.Num()]);
+			Inventory->SetTracerBaseColor(ALittleBrighter(TeamColors[ThisPlayerTeamIndex]));
 
 			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어 폰을 스폰합니다"), Player);
 			APawn* Pawn = GameState->ServerPawnSpawner->SpawnAtLocation(
@@ -272,7 +256,13 @@ private:
 		return GameState->ServerAreaSpawner->SpawnAreaAtRandomEmptyLocation([&](AAreaActor* Area)
 		{
 			Area->TeamComponent->SetTeamIndex(TeamIndex);
-			Area->SetAreaMaterial(AreaMaterials[TeamIndex % AreaMaterials.Num()]);
+
+			if (!TeamColors.Contains(TeamIndex))
+			{
+				TeamColors.FindOrAdd(TeamIndex) = NonEyeSoaringRandomColor();
+			}
+			
+			Area->SetAreaBaseColor(TeamColors.FindRef(TeamIndex));
 
 			RunWeakCoroutine(this, [this, Area, TeamIndex](FWeakCoroutineContext& Context) -> FWeakCoroutine
 			{

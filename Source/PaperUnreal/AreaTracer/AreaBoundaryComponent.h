@@ -47,7 +47,6 @@ public:
 	template <CSegmentArray2D SegmentArrayType>
 	TCancellableFuture<TArray<FExpansionResult>> ExpandByPath(SegmentArrayType&& Path)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("expand by path %p"), this);
 		if (!Path.IsValid())
 		{
 			return TArray<FExpansionResult>{};

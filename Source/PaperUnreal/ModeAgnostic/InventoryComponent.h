@@ -16,28 +16,28 @@ class UInventoryComponent : public UActorComponent2
 
 public:
 	DECLARE_LIVE_DATA_GETTER_SETTER(CharacterMesh);
-	DECLARE_LIVE_DATA_GETTER_SETTER(TracerMaterial);
+	DECLARE_LIVE_DATA_GETTER_SETTER(TracerBaseColor);
 
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_CharacterMesh)
 	TSoftObjectPtr<USkeletalMesh> RepCharacterMesh;
 	mutable TLiveData<TSoftObjectPtr<USkeletalMesh>&> CharacterMesh{RepCharacterMesh};
 	
-	UPROPERTY(ReplicatedUsing=OnRep_TracerMaterial)
-	TSoftObjectPtr<UMaterialInstance> RepTracerMaterial;
-	mutable TLiveData<TSoftObjectPtr<UMaterialInstance>&> TracerMaterial{RepTracerMaterial};
+	UPROPERTY(ReplicatedUsing=OnRep_TracerBaseColor)
+	FLinearColor RepTracerBaseColor;
+	mutable TLiveData<FLinearColor&> TracerBaseColor{RepTracerBaseColor};
 
 	UFUNCTION()
 	void OnRep_CharacterMesh() { CharacterMesh.Notify(); }
 	
 	UFUNCTION()
-	void OnRep_TracerMaterial() { TracerMaterial.Notify(); }
+	void OnRep_TracerBaseColor() { TracerBaseColor.Notify(); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 		DOREPLIFETIME(ThisClass, RepCharacterMesh);
-		DOREPLIFETIME(ThisClass, RepTracerMaterial);
+		DOREPLIFETIME(ThisClass, RepTracerBaseColor);
 	}
 	
 	UInventoryComponent()

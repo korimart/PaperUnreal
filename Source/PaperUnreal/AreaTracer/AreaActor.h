@@ -8,6 +8,7 @@
 #include "ReplicatedAreaBoundaryComponent.h"
 #include "PaperUnreal/GameFramework2/Actor2.h"
 #include "PaperUnreal/ModeAgnostic/LifeComponent.h"
+#include "PaperUnreal/ModeAgnostic/SolidColorMaterial.h"
 #include "PaperUnreal/ModeAgnostic/TeamComponent.h"
 #include "AreaActor.generated.h"
 
@@ -23,27 +24,27 @@ public:
 
 	UPROPERTY()
 	UTeamComponent* TeamComponent;
-	
+
 	UPROPERTY()
 	UAreaBoundaryComponent* ServerAreaBoundary;
-	
+
 	UPROPERTY()
 	UAreaMeshComponent* ClientAreaMesh;
 
-	DECLARE_LIVE_DATA_GETTER_SETTER(AreaMaterial);
-	
+	DECLARE_LIVE_DATA_GETTER_SETTER(AreaBaseColor);
+
 private:
-	UPROPERTY(ReplicatedUsing=OnRep_AreaMaterial)
-	TSoftObjectPtr<UMaterialInstance> RepAreaMaterial;
-	mutable TLiveData<TSoftObjectPtr<UMaterialInstance>&> AreaMaterial{RepAreaMaterial};
+	UPROPERTY(ReplicatedUsing=OnRep_AreaBaseColor)
+	FLinearColor RepAreaBaseColor;
+	mutable TLiveData<FLinearColor&> AreaBaseColor{RepAreaBaseColor};
 
 	UFUNCTION()
-	void OnRep_AreaMaterial() { AreaMaterial.Notify(); }
+	void OnRep_AreaBaseColor() { AreaBaseColor.Notify(); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-		DOREPLIFETIME(ThisClass, RepAreaMaterial);
+		DOREPLIFETIME(ThisClass, RepAreaBaseColor);
 	}
 
 	AAreaActor()
@@ -107,11 +108,15 @@ private:
 
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			for (auto MaterialStream = AreaMaterial.CreateStream();;)
+			auto ColorStream = AreaBaseColor.CreateStream();
+			auto FirstColor = co_await ColorStream;
+			auto Material = co_await FSolidColorMaterial::Create(FirstColor);
+
+			ClientAreaMesh->ConfigureMaterialSet({Material.Get()});
+
+			while (true)
 			{
-				auto SoftMaterial = co_await Filter(MaterialStream, [](const auto& Soft) { return !Soft.IsNull(); });
-				auto Material = co_await RequestAsyncLoad(SoftMaterial);
-				ClientAreaMesh->ConfigureMaterialSet({Material});
+				Material.SetColor(co_await ColorStream);
 			}
 		});
 	}

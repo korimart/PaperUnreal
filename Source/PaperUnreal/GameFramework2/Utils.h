@@ -25,7 +25,7 @@ namespace Utils_Private
 			Func = Other.Func;
 			Other.Func.Reset();
 		}
-		
+
 		TFinally& operator=(TFinally&& Other) noexcept
 		{
 			Func = Other.Func;
@@ -91,7 +91,7 @@ public:
 			Func();
 		}
 	}
-	
+
 private:
 	bool bPrevTick = false;
 	bool bThisTick = false;
@@ -237,6 +237,20 @@ void FindAndDestroyComponent(AActor* Actor)
 	{
 		Found->DestroyComponent();
 	}
+}
+
+
+inline FLinearColor NonEyeSoaringRandomColor()
+{
+	return FLinearColor::MakeFromHSV8(FMath::RandRange(0, 255), 220, 100);
+}
+
+
+inline FLinearColor ALittleBrighter(const FLinearColor& Color)
+{
+	FLinearColor HSV = Color.LinearRGBToHSV();
+	HSV.B *= 1.75f;
+	return HSV.HSVToLinearRGB();
 }
 
 

@@ -94,4 +94,10 @@ private:
 				FSoftObjectPath{TEXT("/Script/Engine.SkeletalMesh'/Game/Characters/Mannequins/Meshes/SKM_Quinn.SKM_Quinn'")}
 			});
 	}
+
+	UFUNCTION(Exec, BlueprintAuthorityOnly)
+	void SetTracerColorInInventory(float R, float G, float B)
+	{
+		GetPlayerController()->PlayerState->FindComponentByClass<UInventoryComponent>()->SetTracerBaseColor(FLinearColor{R, G, B});
+	}
 };

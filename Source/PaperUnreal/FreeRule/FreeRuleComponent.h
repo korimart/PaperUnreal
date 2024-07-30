@@ -56,6 +56,8 @@ private:
 		{
 			Context.AbortIfNotValid(Player);
 
+			Player->FindComponentByClass<UInventoryComponent>()->SetTracerBaseColor(NonEyeSoaringRandomColor());
+
 			co_await Player->FindComponentByClass<UReadyStateComponent>()->GetbReady().If(true);
 
 			APawn* Pawn = PawnSpawner->SpawnAtLocation(
