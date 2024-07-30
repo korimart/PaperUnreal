@@ -168,3 +168,7 @@ ReplicatedAreaExpander
 7. weak coroutine labmda capture 저장 방식 변경 필요
 7-1. context를 unique ptr로 만들지 않고 promise_type의 constructor를 활용해서 설정할 수 있음
 7-2. unique ptr에 캡쳐하지 않고 fminimal coroutine 안에서 실행하면 더 깔끔함
+8. stencil buffer를 사용해서 가장 늦게 그려진 tracer가 가장 위에 그려지도록
+9. shareable live data? -> replace state tracker?
+10. game rule이 pawn의 uclass를 받는 대신 팩토리를 받도록 수정
+11. refactor enhanced input handling in player controller
