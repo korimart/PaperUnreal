@@ -43,13 +43,10 @@ private:
 
 		AddLifeDependency(Cast<UActorComponent2>(MeshSource.GetObject()));
 		AddLifeDependency(MeshDest);
-
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		
+		MeshSource->GetBoundary().Observe(this, [this](const FLoopedSegmentArray2D& Boundary)
 		{
-			for (auto BoundaryStream = MeshSource->GetBoundary().CreateStream();;)
-			{
-				MeshDest->SetMeshByWorldBoundary(co_await BoundaryStream);
-			}
+			MeshDest->SetMeshByWorldBoundary(Boundary);
 		});
 	}
 };

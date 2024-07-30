@@ -145,7 +145,7 @@ public:
 			return nullptr;
 		}
 
-		const FVector SpawnLocation{CellToSpawnAreaIn->GetCenter(), 50.f};
+		const FVector SpawnLocation{CellToSpawnAreaIn->GetCenter(), AreaHeight};
 		AAreaActor* Ret = GetWorld()->SpawnActor<AAreaActor>(SpawnLocation, {});
 
 		Initializer(Ret);
@@ -160,6 +160,8 @@ public:
 	}
 
 private:
+	static constexpr float AreaHeight = 1.f;
+	
 	UPROPERTY(ReplicatedUsing=OnRep_SpawnedAreas)
 	TArray<AAreaActor*> RepSpawnedAreas;
 	TLiveData<TArray<AAreaActor*>&> SpawnedAreas{RepSpawnedAreas};

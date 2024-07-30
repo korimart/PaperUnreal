@@ -129,7 +129,7 @@ public:
 
 private:
 	static constexpr float HalfWidth = 30.f;
-	static constexpr float MeshHeight = 51.f;
+	static constexpr float MeshHeight = 2.f;
 
 	UPROPERTY()
 	UDynamicMeshComponent* DynamicMeshComponent;
