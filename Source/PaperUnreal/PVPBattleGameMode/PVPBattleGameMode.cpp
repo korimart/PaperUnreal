@@ -51,7 +51,7 @@ void APVPBattleGameMode::BeginPlay()
 			auto FreeRule = NewObject<UFreeRuleComponent>(this);
 			FreeRule->RegisterComponent();
 			FreeRule->Start(DefaultPawnClass);
-			auto F = Finally([&](){ FreeRule->DestroyComponent(); });
+			auto F = FinallyIfValid(FreeRule, [FreeRule](){ FreeRule->DestroyComponent(); });
 
 			// TODO 방설정 완료될 때까지 대기
 

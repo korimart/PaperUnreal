@@ -5,7 +5,6 @@
 #include "CoreMinimal.h"
 #include "AreaBoundaryComponent.h"
 #include "TracerPathProvider.h"
-#include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 #include "TracerPathComponent.generated.h"
 
 
@@ -42,13 +41,6 @@ private:
 		bWantsInitializeComponent = true;
 	}
 
-	virtual void InitializeComponent() override
-	{
-		Super::InitializeComponent();
-
-		AddLifeDependency(NoPathArea);
-	}
-
 	virtual void UninitializeComponent() override
 	{
 		Super::UninitializeComponent();
@@ -60,9 +52,10 @@ private:
 	{
 		Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-		const bool bAreaHasNonZeroArea = NoPathArea->IsValid();
-		const bool bOwnerIsOutsideArea = !NoPathArea->IsInside(GetOwner()->GetActorLocation());
-		const bool bGeneratePath = bAreaHasNonZeroArea && bOwnerIsOutsideArea;
+		const bool bAlwaysGenerate = !IsValid(NoPathArea);
+		const bool bAreaHasNonZeroArea = IsValid(NoPathArea) && NoPathArea->IsValid();
+		const bool bOwnerIsOutsideArea = IsValid(NoPathArea) && !NoPathArea->IsInside(GetOwner()->GetActorLocation());
+		const bool bGeneratePath = bAlwaysGenerate || (bAreaHasNonZeroArea && bOwnerIsOutsideArea);
 
 		Switch.Tick(bGeneratePath);
 
@@ -85,7 +78,7 @@ private:
 
 	void AttachHeadToArea()
 	{
-		if (NoPathArea->IsValid())
+		if (IsValid(NoPathArea) && NoPathArea->IsValid())
 		{
 			const FVector2D Attached = NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint();
 			Path.SetPoint(-1, Attached);

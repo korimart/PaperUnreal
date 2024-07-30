@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "PaperUnreal/AreaTracer/TracerComponent.h"
 #include "PaperUnreal/GameFramework2/ActorComponent2.h"
 #include "PaperUnreal/GameFramework2/GameStateBase2.h"
 #include "PaperUnreal/ModeAgnostic/PawnSpawnerComponent.h"
@@ -56,7 +57,11 @@ private:
 
 			co_await Player->FindComponentByClass<UReadyStateComponent>()->GetbReady().If(true);
 
-			APawn* Pawn = PawnSpawner->SpawnAtLocation(PawnClass, {1500.f, 1500.f, 100.f});
+			APawn* Pawn = PawnSpawner->SpawnAtLocation(
+				PawnClass,
+				{1500.f, 1500.f, 100.f},
+				[&](APawn* Spawned) { NewChildComponent<UTracerComponent>(Spawned)->RegisterComponent(); });
+
 			Player->GetOwningController()->Possess(Pawn);
 		});
 	}
