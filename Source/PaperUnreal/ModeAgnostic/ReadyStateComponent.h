@@ -5,7 +5,6 @@
 #include "CoreMinimal.h"
 #include "Net/UnrealNetwork.h"
 #include "PaperUnreal/GameFramework2/ActorComponent2.h"
-#include "PaperUnreal/GameFramework2/Utils.h"
 #include "PaperUnreal/WeakCoroutine/LiveData.h"
 #include "ReadyStateComponent.generated.h"
 
@@ -17,9 +16,6 @@ class UReadyStateComponent : public UActorComponent2
 
 public:
 	DECLARE_LIVE_DATA_GETTER_SETTER(bReady);
-
-	UFUNCTION(Server, Reliable)
-	void ServerSetReady(bool bNewReady);
 
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_bReady)

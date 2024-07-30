@@ -2,8 +2,3 @@
 
 
 #include "ReadyStateComponent.h"
-
-void UReadyStateComponent::ServerSetReady_Implementation(bool bNewReady)
-{
-	SetbReady(bNewReady);
-}

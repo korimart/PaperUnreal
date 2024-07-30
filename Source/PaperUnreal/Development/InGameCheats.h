@@ -47,10 +47,10 @@ private:
 		}
 	}
 
-	UFUNCTION(Exec)
+	UFUNCTION(Exec, BlueprintAuthorityOnly)
 	void SetReady(bool bReady)
 	{
-		GetPlayerController()->PlayerState->FindComponentByClass<UReadyStateComponent>()->ServerSetReady(bReady);
+		GetPlayerController()->PlayerState->FindComponentByClass<UReadyStateComponent>()->SetbReady(bReady);
 	}
 
 	UFUNCTION(Exec, BlueprintAuthorityOnly)
