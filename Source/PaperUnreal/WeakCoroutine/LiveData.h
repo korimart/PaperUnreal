@@ -313,7 +313,7 @@ public:
 
 	friend auto operator co_await(TLiveData& LiveData) requires Validator::bSupported
 	{
-		return TCancellableFutureAwaitable<typename Validator::ValidType>
+		return TCancellableFutureAwaitable<TCancellableFuture<typename Validator::ValidType>>
 		{
 			[&]() -> TCancellableFuture<typename Validator::ValidType>
 			{

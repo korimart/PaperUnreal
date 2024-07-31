@@ -16,7 +16,7 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 		int32 CompletedIndex = -1;
 		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			CompletedIndex = co_await AnyOf(MoveTemp(Array[0].Get<1>()), MoveTemp(Array[1].Get<1>()));
+			CompletedIndex = co_await AnyOf(Array[0].Get<1>(), Array[1].Get<1>());
 		});
 
 		TestEqual(TEXT("AnyOf 테스트: 두 개 중에 앞에 거가 먼저 완료되면 AnyOf도 완료하는지 테스트"), CompletedIndex, -1);
@@ -32,7 +32,7 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 		int32 CompletedIndex = -1;
 		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			CompletedIndex = co_await AnyOf(MoveTemp(Array[0].Get<1>()), MoveTemp(Array[1].Get<1>()));
+			CompletedIndex = co_await AnyOf(Array[0].Get<1>(), Array[1].Get<1>());
 		});
 
 		TestEqual(TEXT("AnyOf 테스트: 두 개 중에 뒤에 거가 먼저 완료되면 AnyOf도 완료하는지 테스트"), CompletedIndex, -1);
@@ -49,7 +49,7 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 		int32 CompletedIndex = -1;
 		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			CompletedIndex = co_await AnyOf(MoveTemp(Array[0].Get<1>()), MoveTemp(Array[1].Get<1>()));
+			CompletedIndex = co_await AnyOf(Array[0].Get<1>(), Array[1].Get<1>());
 		});
 
 		TestEqual(TEXT("AnyOf 테스트: 이미 완료 거를 기다리기 시작해도 잘 되는지 테스트"), CompletedIndex, 1);
@@ -64,7 +64,7 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 		int32 CompletedIndex = -1;
 		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			CompletedIndex = co_await AnyOf(MoveTemp(Array[0].Get<1>()), MoveTemp(Array[1].Get<1>()));
+			CompletedIndex = co_await AnyOf(Array[0].Get<1>(), Array[1].Get<1>());
 			bAborted = false;
 		});
 
@@ -102,7 +102,7 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 		int32 Received = 0;
 		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			int32 Result = co_await Transform(MoveTemp(Future), [](const TFailableResult<std::monostate>&)
+			int32 Result = co_await Transform(Future, [](const TFailableResult<std::monostate>&)
 			{
 				return 3;
 			});

@@ -104,7 +104,7 @@ public:
 		return Receiver;
 	}
 
-	friend TCancellableFutureAwaitable<T> operator co_await(TValueStream& Stream)
+	friend auto operator co_await(TValueStream& Stream)
 	{
 		return operator co_await(Stream.Receiver->NextValue());
 	}

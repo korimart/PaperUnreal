@@ -38,11 +38,11 @@ namespace WeakCoroutine_Private
 	};
 
 
-	template <typename InAwaitableType, typename PromiseType>
+	template <typename InnerAwaitableType, typename PromiseType>
 	class TWeakAwaitable
 	{
 	public:
-		using AwaitableType = typename TEnsureErrorReporting<InAwaitableType>::Type;
+		using AwaitableType = typename TEnsureErrorReporting<InnerAwaitableType>::Type;
 		using ResultType = typename TErrorReportResultType<AwaitableType>::Type;
 
 		/**
@@ -56,26 +56,27 @@ namespace WeakCoroutine_Private
 		 * @param InHandle 위에서 설명한 핸들
 		 * @param InAwaitable Inner Awaitable
 		 */
-		TWeakAwaitable(std::coroutine_handle<PromiseType> InHandle, InAwaitableType&& InAwaitable)
-			: Handle(InHandle), Awaitable(MoveTemp(InAwaitable))
+		template <typename AwaitableType>
+		TWeakAwaitable(std::coroutine_handle<PromiseType> InHandle, AwaitableType&& Awaitable)
+			: Handle(InHandle), InnerAwaitable(Forward<AwaitableType>(Awaitable))
 		{
 			static_assert(CErrorReportingAwaitable<TWeakAwaitable>);
 		}
 
 		bool await_ready() const
 		{
-			return Awaitable.await_ready();
+			return InnerAwaitable.await_ready();
 		}
 
 		template <typename HandleType>
 		auto await_suspend(HandleType&& Handle)
 		{
-			return Awaitable.await_suspend(Forward<HandleType>(Handle));
+			return InnerAwaitable.await_suspend(Forward<HandleType>(Handle));
 		}
 
 		TFailableResult<ResultType> await_resume()
 		{
-			TFailableResult<ResultType> Ret = Awaitable.await_resume();
+			TFailableResult<ResultType> Ret = InnerAwaitable.await_resume();
 
 			if (!Handle.promise().IsValid())
 			{
@@ -87,8 +88,12 @@ namespace WeakCoroutine_Private
 
 	private:
 		std::coroutine_handle<PromiseType> Handle;
-		AwaitableType Awaitable;
+		AwaitableType InnerAwaitable;
 	};
+	
+	template <typename PromiseType, typename AwaitableType>
+	TWeakAwaitable(std::coroutine_handle<PromiseType> InHandle, AwaitableType&& Awaitable)
+		-> TWeakAwaitable<AwaitableType, PromiseType>;
 }
 
 

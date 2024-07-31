@@ -27,10 +27,12 @@ private:
 		{
 			auto PlayerState = co_await GetOuterACharacter2()->WaitForPlayerState();
 			auto Inventory = co_await WaitForComponent<UInventoryComponent>(PlayerState);
+			auto Stream = Inventory->GetCharacterMesh().CreateStream();
+			auto NonNullStream = Filter(Stream, [](const auto& SoftMesh) { return !SoftMesh.IsNull(); });
 
-			for (auto Stream = Inventory->GetCharacterMesh().CreateStream();;)
+			while (true)
 			{
-				auto SoftMesh = co_await Filter(Stream, [](const auto& SoftMesh) { return !SoftMesh.IsNull(); });
+				auto SoftMesh = co_await NonNullStream;
 				auto Mesh = co_await RequestAsyncLoad(SoftMesh);
 				GetOuterACharacter2()->GetMesh()->SetSkeletalMesh(Mesh);
 			}

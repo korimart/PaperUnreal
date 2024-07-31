@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "ErrorReporting.h"
+#include "AwaitableWrappers.h"
 #include "TypeTraits.h"
 #include "GameFramework/GameStateBase.h"
 #include "Engine/AssetManager.h"
@@ -315,24 +316,18 @@ private:
 };
 
 
-template <typename T>
+template <typename FutureType>
 class TCancellableFutureAwaitable
 {
 public:
-	using FutureType = TCancellableFuture<T>;
-	using ResultType = typename FutureType::ResultType;
+	using ResultType = typename std::decay_t<FutureType>::ResultType;
 
-	TCancellableFutureAwaitable(FutureType&& InFuture)
-		: Future(MoveTemp(InFuture))
+	template <typename T>
+	TCancellableFutureAwaitable(T&& InFuture)
+		: Future(Forward<T>(InFuture))
 	{
 		static_assert(CErrorReportingAwaitable<TCancellableFutureAwaitable>);
 	}
-
-	TCancellableFutureAwaitable(const TCancellableFutureAwaitable&) = delete;
-	TCancellableFutureAwaitable& operator=(const TCancellableFutureAwaitable&) = delete;
-
-	TCancellableFutureAwaitable(TCancellableFutureAwaitable&& Other) noexcept = default;
-	TCancellableFutureAwaitable& operator=(TCancellableFutureAwaitable&& Other) = delete;
 
 	bool await_ready() const
 	{
@@ -359,12 +354,14 @@ private:
 	FutureType Future;
 };
 
+template <typename T>
+TCancellableFutureAwaitable(T&&) -> TCancellableFutureAwaitable<T>;
 
 template <typename T>
-TCancellableFutureAwaitable<T> operator co_await(TCancellableFuture<T>&& Future)
-{
-	return {MoveTemp(Future)};
-}
+auto operator co_await(TCancellableFuture<T>& Future) { return TCancellableFutureAwaitable{Future}; }
+
+template <typename T>
+auto operator co_await(TCancellableFuture<T>&& Future) { return TCancellableFutureAwaitable{MoveTemp(Future)}; }
 
 
 template <typename T>

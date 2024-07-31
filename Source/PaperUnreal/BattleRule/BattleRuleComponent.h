@@ -68,7 +68,7 @@ public:
 	TCancellableFuture<FBattleRuleResult> Start(UClass* InPawnClass, int32 TeamCount, int32 EachTeamMemberCount)
 	{
 		check(HasBegunPlay());
-		
+
 		PawnClass = InPawnClass;
 		TeamAllocator.Configure(TeamCount, EachTeamMemberCount);
 
@@ -106,7 +106,7 @@ private:
 
 	FTeamAllocator TeamAllocator;
 	TMap<int32, FLinearColor> TeamColors;
-	
+
 	void InitiatePawnSpawnSequence(APlayerState* Player)
 	{
 		RunWeakCoroutine(this, [this, Player](FWeakCoroutineContext& Context) -> FWeakCoroutine
@@ -213,7 +213,7 @@ private:
 			});
 
 			const int32 CompletedAwaitableIndex = co_await AnyOf(
-				MoveTemp(Timeout), MoveTemp(LastManStanding), UInGameCheats::OnEndGameByCheat);
+				Timeout, LastManStanding, UInGameCheats::OnEndGameByCheat);
 
 			if (CompletedAwaitableIndex != 2 && UInGameCheats::bDoNotEndGameUntilCheat)
 			{
@@ -261,7 +261,7 @@ private:
 			{
 				TeamColors.FindOrAdd(TeamIndex) = NonEyeSoaringRandomColor();
 			}
-			
+
 			Area->SetAreaBaseColor(TeamColors.FindRef(TeamIndex));
 
 			RunWeakCoroutine(this, [this, Area, TeamIndex](FWeakCoroutineContext& Context) -> FWeakCoroutine
