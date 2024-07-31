@@ -18,6 +18,7 @@ class APlayerController2 : public APlayerController
 
 public:
 	TLiveDataView<APawn*> GetPossessedPawn() { return PossessedPawn; }
+	TLiveDataView<TObjectPtr<APlayerState>&> GetPlayerState() { return PlayerStateLiveData; }
 	
 protected:
 	virtual void BeginPlay() override
@@ -67,9 +68,16 @@ protected:
 	{
 		Super::SetViewTarget(GetSpectatorPawn() ? GetSpectatorPawn() : NewViewTarget, TransitionParams);
 	}
+	
+	virtual void OnRep_PlayerState() override
+	{
+		Super::OnRep_PlayerState();
+		PlayerStateLiveData.Notify();
+	}
 
 private:
 	TLiveData<APawn*> PossessedPawn;
+	TLiveData<TObjectPtr<APlayerState>&> PlayerStateLiveData{PlayerState};
 	
 	UFUNCTION()
 	void OnPossessedPawnChangedDynamicCallback(APawn* InOldPawn, APawn* InNewPawn)

@@ -12,6 +12,7 @@ DECLARE_LOG_CATEGORY_EXTERN(LogPVPBattleGameMode, Log, All);
 
 namespace PVPBattleStage
 {
+	inline FName WaitingForConfig{TEXT("PVPBattleStage_WaitingForConfig")};
 	inline FName Result{TEXT("PVPBattleStage_Result")};
 }
 

@@ -4,8 +4,11 @@
 
 #include "CoreMinimal.h"
 #include "PVPBattleGameMode.h"
-#include "GameFramework/HUD.h"
+#include "PVPBattlePlayerState.h"
 #include "GameFramework/GameStateBase.h"
+#include "PaperUnreal/GameFramework2/HUD2.h"
+#include "PaperUnreal/ModeAgnostic/PrivilegeComponent.h"
+#include "PaperUnreal/ModeAgnostic/ReadyStateComponent.h"
 #include "PaperUnreal/ModeAgnostic/StageComponent.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 #include "PVPBattleHUD.generated.h"
@@ -14,22 +17,24 @@
  * 
  */
 UCLASS()
-class APVPBattleHUD : public AHUD
+class APVPBattleHUD : public AHUD2
 {
 	GENERATED_BODY()
 
 private:
+	UPROPERTY()
+	UStageComponent* StageComponent;
+
 	virtual void BeginPlay() override
 	{
 		Super::BeginPlay();
 
 		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
 		{
-			auto GameState = co_await WaitForGameState(GetWorld());
-			auto StageComponent = GameState->FindComponentByClass<UStageComponent>();
+			StageComponent = (co_await WaitForGameState(GetWorld()))->FindComponentByClass<UStageComponent>();
 			check(IsValid(StageComponent));
 
-			// TODO 방장 여부 기다려서 방장이면 방 설정 화면 띄우기
+			InitiateHostSequence();
 
 			// TODO 캐릭터 선택 화면 띄우기
 
@@ -41,6 +46,17 @@ private:
 			UE_LOG(LogTemp, Warning, TEXT("결과창"));
 
 			// TODO 위에서부터 반복
+		});
+	}
+
+	void InitiateHostSequence()
+	{
+		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			auto PlayerState = co_await GetOwningPlayerState<APVPBattlePlayerState>();
+			co_await PlayerState->PrivilegeComponent->GetbHost().If(true);
+
+			// TODO open widget
 		});
 	}
 };

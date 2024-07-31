@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerState.h"
 #include "PaperUnreal/ModeAgnostic/InventoryComponent.h"
+#include "PaperUnreal/ModeAgnostic/PrivilegeComponent.h"
 #include "PaperUnreal/ModeAgnostic/ReadyStateComponent.h"
 #include "PaperUnreal/ModeAgnostic/TeamComponent.h"
 #include "PVPBattlePlayerState.generated.h"
@@ -26,6 +27,9 @@ public:
 	
 	UPROPERTY()
 	UInventoryComponent* InventoryComponent;
+	
+	UPROPERTY()
+	UPrivilegeComponent* PrivilegeComponent;
 
 private:
 	APVPBattlePlayerState()
@@ -33,5 +37,6 @@ private:
 		ReadyStateComponent = CreateDefaultSubobject<UReadyStateComponent>(TEXT("ReadyStateComponent"));
 		TeamComponent = CreateDefaultSubobject<UTeamComponent>(TEXT("TeamComponent"));
 		InventoryComponent = CreateDefaultSubobject<UInventoryComponent>(TEXT("InventoryComponent"));
+		PrivilegeComponent = CreateDefaultSubobject<UPrivilegeComponent>(TEXT("PrivilegeComponent"));
 	}
 };
