@@ -56,18 +56,6 @@ private:
 		TeamComponent = CreateDefaultSubobject<UTeamComponent>(TEXT("TeamComponent"));
 	}
 
-	virtual void PostInitializeComponents() override
-	{
-		Super::PostInitializeComponents();
-
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
-		{
-			co_await LifeComponent->GetbAlive().If(false);
-
-			// TODO play death animation
-		});
-	}
-
 	virtual void AttachServerMachineComponents() override
 	{
 		ServerAreaBoundary = NewObject<UAreaBoundaryComponent>(this);
@@ -118,6 +106,13 @@ private:
 			{
 				Material.SetColor(co_await ColorStream);
 			}
+		});
+	    
+		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		{
+			co_await LifeComponent->GetbAlive().If(false);
+
+			// TODO play death animation
 		});
 	}
 };
