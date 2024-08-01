@@ -33,7 +33,7 @@ void AThirdPersonTemplatePlayerController::BeginPlay()
 	//Add Input Mapping Context
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 	{
-		RunWeakCoroutine(this, [this, Subsystem](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this, Subsystem]() -> FWeakCoroutine
 		{
 			TOptional<FWeakCoroutine> WaitingForDeath;
 
@@ -55,9 +55,9 @@ void AThirdPersonTemplatePlayerController::BeginPlay()
 
 				if (ULifeComponent* LifeComponent = PossessedPawn->FindComponentByClass<ULifeComponent>())
 				{
-					WaitingForDeath = RunWeakCoroutine(this, [this, LifeComponent, Subsystem](FWeakCoroutineContext& Context) -> FWeakCoroutine
+					WaitingForDeath = RunWeakCoroutine(this, [this, LifeComponent, Subsystem]() -> FWeakCoroutine
 					{
-						Context.AbortIfNotValid(LifeComponent);
+						co_await AddToWeakList(LifeComponent);
 
 						Subsystem->AddMappingContext(DefaultMappingContext, 0);
 						co_await LifeComponent->GetbAlive().If(false);

@@ -29,7 +29,7 @@ private:
 	{
 		Super::BeginPlay();
 
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
 			StageComponent = (co_await WaitForGameState(GetWorld()))->FindComponentByClass<UStageComponent>();
 			check(IsValid(StageComponent));
@@ -51,7 +51,7 @@ private:
 
 	void InitiateHostSequence()
 	{
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
 			auto PlayerState = co_await GetOwningPlayerState<APVPBattlePlayerState>();
 			co_await PlayerState->PrivilegeComponent->GetbHost().If(true);

@@ -82,7 +82,7 @@ private:
 
 		// 여기 Path = Path를 쓰지 않으면 const ref로 캡쳐돼서 MoveTemp에서 컴파일러 에러 발생함
 		// 컴파일러 버그인지 coroutine lambda가 mutable일 때 capture의 특수 상황인지에 대해 조사 필요
-		RunWeakCoroutine(this, [this, Path = Path](FWeakCoroutineContext&) mutable -> FWeakCoroutine
+		RunWeakCoroutine(this, [this, Path = Path]() mutable -> FWeakCoroutine
 		{
 			using FExpansionResult = UAreaBoundaryComponent::FExpansionResult;
 			for (const FExpansionResult& Each : co_await ConversionDestination->ExpandByPath(MoveTemp(Path)))

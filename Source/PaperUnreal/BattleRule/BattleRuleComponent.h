@@ -109,9 +109,9 @@ private:
 
 	void InitiatePawnSpawnSequence(APlayerState* Player)
 	{
-		RunWeakCoroutine(this, [this, Player](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this, Player]() -> FWeakCoroutine
 		{
-			Context.AbortIfNotValid(Player);
+			co_await AddToWeakList(Player);
 
 			auto TeamComponent = Player->FindComponentByClass<UTeamComponent>();
 			auto ReadyState = Player->FindComponentByClass<UReadyStateComponent>();
@@ -178,9 +178,9 @@ private:
 
 	TCancellableFuture<void> InitiatePawnLifeSequence(UBattleRulePawnComponent* Pawn, int32 TeamIndex)
 	{
-		return RunWeakCoroutine(this, [this, Pawn, TeamIndex](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		return RunWeakCoroutine(this, [this, Pawn, TeamIndex]() -> FWeakCoroutine
 		{
-			Context.AbortIfNotValid(Pawn);
+			co_await AddToWeakList(Pawn);
 
 			UE_LOG(LogBattleRule, Log, TEXT("%p 폰의 사망을 기다리는 중"), Pawn);
 			co_await Pawn->GetServerLife()->GetbAlive().If(false);
@@ -192,18 +192,18 @@ private:
 
 	TCancellableFuture<FBattleRuleResult> InitiateGameFlow()
 	{
-		return RunWeakCoroutine(this, [this](TWeakCoroutineContext<FBattleRuleResult>&) -> TWeakCoroutine<FBattleRuleResult>
+		return RunWeakCoroutine(this, [this]() -> TWeakCoroutine<FBattleRuleResult>
 		{
 			UE_LOG(LogBattleRule, Log, TEXT("게임을 시작합니다"));
 
 			auto F = FinallyIfValid(this, [this]() { DestroyComponent(); });
 
-			auto Timeout = RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+			auto Timeout = RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 			{
 				co_await GameState->ServerWorldTimer->At(GetWorld()->GetTimeSeconds() + 60.f);
 			});
 
-			auto LastManStanding = RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+			auto LastManStanding = RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 			{
 				auto AreaStateTracker = NewObject<UAreaStateTrackerComponent>(GetOwner());
 				AreaStateTracker->SetSpawner(GameState->ServerAreaSpawner);
@@ -264,9 +264,9 @@ private:
 
 			Area->SetAreaBaseColor(TeamColors.FindRef(TeamIndex));
 
-			RunWeakCoroutine(this, [this, Area, TeamIndex](FWeakCoroutineContext& Context) -> FWeakCoroutine
+			RunWeakCoroutine(this, [this, Area, TeamIndex]() -> FWeakCoroutine
 			{
-				Context.AbortIfNotValid(Area);
+				co_await AddToWeakList(Area);
 
 				co_await Area->LifeComponent->GetbAlive().If(false);
 

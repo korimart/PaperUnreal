@@ -61,7 +61,7 @@ private:
 
 	virtual void AttachPlayerMachineComponents() override
 	{
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
 			co_await TracerPathProvider;
 
@@ -77,7 +77,7 @@ private:
 			auto PlayerState = co_await GetOuterACharacter2()->WaitForPlayerState();
 			auto Inventory = co_await WaitForComponent<UInventoryComponent>(PlayerState);
 
-			RunWeakCoroutine(this, [this, &Inventory](FWeakCoroutineContext&) -> FWeakCoroutine
+			RunWeakCoroutine(this, [this, &Inventory]() -> FWeakCoroutine
 			{
 				auto ColorStream = Inventory->GetTracerBaseColor().CreateStream();
 				auto FirstColor = co_await ColorStream;

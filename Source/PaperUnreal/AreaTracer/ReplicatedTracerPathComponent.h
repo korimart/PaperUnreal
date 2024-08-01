@@ -176,7 +176,7 @@ private:
 			RepPathHead = Head;
 		});
 
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
 			while (true)
 			{

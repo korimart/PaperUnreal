@@ -46,7 +46,7 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 		TLiveData<int32> LiveData;
 
 		TArray<int32> Received;
-		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
 			for (auto Stream = LiveData.CreateStream();;)
 			{
@@ -226,7 +226,7 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 		TLiveData<TArray<int32>> LiveData;
 
 		TArray<int32> Received;
-		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
 			for (auto Stream = LiveData.CreateStrictAddStream();;)
 			{
@@ -330,7 +330,7 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 		TLiveData<TArray<int32>> LiveData;
 		int32 LoopCount = 0;
 
-		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
 			while (LoopCount < 100)
 			{

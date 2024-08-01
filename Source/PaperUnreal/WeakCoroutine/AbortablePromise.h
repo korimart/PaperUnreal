@@ -7,23 +7,6 @@
 #include "CoreMinimal.h"
 
 
-struct FAbortablePromiseHandle
-{
-	FAbortablePromiseHandle(TFunction<void()> InAborter)
-		: Aborter(MoveTemp(InAborter))
-	{
-	}
-
-	void Abort()
-	{
-		Aborter();
-	}
-
-private:
-	TFunction<void()> Aborter;
-};
-
-
 template <typename Derived>
 struct TAbortablePromise
 {
@@ -39,21 +22,6 @@ struct TAbortablePromise
 	bool IsAbortRequested() const
 	{
 		return *bAbortRequested;
-	}
-
-	FAbortablePromiseHandle GetAbortableHandle() const
-	{
-		TAbortablePromise* This = const_cast<TAbortablePromise*>(this);
-		return TFunction<void()>
-		{
-			[This, bThisAlive = TWeakPtr<bool>{bAbortRequested}]()
-			{
-				if (bThisAlive.IsValid())
-				{
-					This->Abort();
-				}
-			}
-		};
 	}
 
 private:

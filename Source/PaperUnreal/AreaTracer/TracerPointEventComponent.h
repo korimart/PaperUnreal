@@ -46,10 +46,10 @@ private:
 
 	void InitiateEventListeningSequence(ITracerPointEventListener* Listener)
 	{
-		RunWeakCoroutine(this, [this, Listener](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this, Listener]() -> FWeakCoroutine
 		{
-			Context.AbortIfNotValid(Listener);
-			
+			co_await AddToWeakList(Listener);
+
 			while (true)
 			{
 				auto Stream = EventSource->GetRunningPathTail().CreateStrictAddStream();
@@ -59,10 +59,10 @@ private:
 				{
 					continue;
 				}
-				
+
 				Listener->OnTracerBegin();
 				Listener->AddPoint(FirstPoint.GetResult());
-				
+
 				bool bLastPointIsHead = false;
 
 				// 여기의 &캡쳐는 Handle이 코루틴 프레임과 수명을 같이하고 &가 코루틴 프레임에 대한 캡쳐기 때문에 안전함

@@ -94,7 +94,7 @@ private:
 		AreaMeshGenerator->SetMeshDestination(ClientAreaMesh);
 		AreaMeshGenerator->RegisterComponent();
 
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
 			auto ColorStream = AreaBaseColor.CreateStream();
 			auto FirstColor = co_await ColorStream;
@@ -108,7 +108,7 @@ private:
 			}
 		});
 	    
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
 			co_await LifeComponent->GetbAlive().If(false);
 

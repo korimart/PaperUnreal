@@ -45,7 +45,7 @@ void APVPBattleGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
-	RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+	RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 	{
 		{
 			auto FreeRule = NewObject<UFreeRuleComponent>(this);

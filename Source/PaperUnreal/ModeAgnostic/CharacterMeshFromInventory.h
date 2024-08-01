@@ -23,7 +23,7 @@ private:
 	{
 		Super::BeginPlay();
 
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
 			auto PlayerState = co_await GetOuterACharacter2()->WaitForPlayerState();
 			auto Inventory = co_await WaitForComponent<UInventoryComponent>(PlayerState);

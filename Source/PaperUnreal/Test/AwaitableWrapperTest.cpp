@@ -14,7 +14,7 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 		Array.Add(MakePromise<void>());
 
 		int32 CompletedIndex = -1;
-		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
 			CompletedIndex = co_await AnyOf(Array[0].Get<1>(), Array[1].Get<1>());
 		});
@@ -30,7 +30,7 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 		Array.Add(MakePromise<void>());
 
 		int32 CompletedIndex = -1;
-		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
 			CompletedIndex = co_await AnyOf(Array[0].Get<1>(), Array[1].Get<1>());
 		});
@@ -47,7 +47,7 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 		Array[1].Get<0>().SetValue();
 
 		int32 CompletedIndex = -1;
-		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
 			CompletedIndex = co_await AnyOf(Array[0].Get<1>(), Array[1].Get<1>());
 		});
@@ -62,7 +62,7 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 
 		bool bAborted = true;
 		int32 CompletedIndex = -1;
-		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
 			CompletedIndex = co_await AnyOf(Array[0].Get<1>(), Array[1].Get<1>());
 			bAborted = false;
@@ -80,7 +80,7 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 		auto Receiver = Stream.GetReceiver();
 
 		int32 Received = 0;
-		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
 			auto Result = co_await Filter(Stream, [](int32 Value) { return Value > 3; });
 			Received = Result;
@@ -100,7 +100,7 @@ bool FAwaitableWrapperTest::RunTest(const FString& Parameters)
 		auto [Promise, Future] = MakePromise<void>();
 
 		int32 Received = 0;
-		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
 			int32 Result = co_await Transform(Future, [](const TFailableResult<std::monostate>&)
 			{

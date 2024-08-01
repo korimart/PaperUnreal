@@ -29,7 +29,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		auto bLifeDestroyed = Life->bDestroyed;
 
 		TArray<int32> Received;
-		RunWeakCoroutine([&Array, &Received, Life = MoveTemp(Life)](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		RunWeakCoroutine([&Array, &Received, Life = MoveTemp(Life)]() -> FWeakCoroutine
 		{
 			co_await Array[0].Get<1>();
 			Received.Add(0);
@@ -74,7 +74,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		auto bLifeDestroyed = Life->bDestroyed;
 
 		TArray<int32> Received;
-		RunWeakCoroutine([&Array, &Received, Life = MoveTemp(Life)](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		RunWeakCoroutine([&Array, &Received, Life = MoveTemp(Life)]() -> FWeakCoroutine
 		{
 			Received.Add(co_await Array[0].Get<1>());
 			Received.Add(co_await Array[1].Get<1>());
@@ -115,9 +115,9 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		auto AbortIfNotValid = NewObject<UDummy>();
 
 		TArray<int32> Received;
-		RunWeakCoroutine([&Array, &AbortIfNotValid, &Received, Life = MoveTemp(Life)](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		RunWeakCoroutine([&Array, &AbortIfNotValid, &Received, Life = MoveTemp(Life)]() -> FWeakCoroutine
 		{
-			Context.AbortIfNotValid(AbortIfNotValid);
+			co_await AddToWeakList(AbortIfNotValid);
 
 			Received.Add(co_await Array[0].Get<1>());
 			Received.Add(co_await Array[1].Get<1>());
@@ -155,7 +155,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		auto bLifeDestroyed = Life->bDestroyed;
 
 		TArray<int32> Received;
-		RunWeakCoroutine([&Array, &Received, Life = MoveTemp(Life)](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		RunWeakCoroutine([&Array, &Received, Life = MoveTemp(Life)]() -> FWeakCoroutine
 		{
 			Received.Add(co_await MoveTemp(Array[0].Get<1>()));
 		});
@@ -176,7 +176,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		Array.Add(MakePromise<int32>());
 
 		TArray<TArray<UFailableResultError*>> Received;
-		RunWeakCoroutine([&](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
 			Received.Add((co_await WithError(MoveTemp(Array[4].Get<1>()))).GetErrors());
 			Received.Add((co_await WithError<UDummyError, UCancellableFutureError>(MoveTemp(Array[3].Get<1>()))).GetErrors());
@@ -204,12 +204,12 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		Array.Add(MakePromise<UDummy*>());
 
 		TArray<TArray<UFailableResultError*>> Received;
-		RunWeakCoroutine([&](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
 			TFailableResult<TAbortPtr<UDummy>> ReceivedDummy = co_await WithError(MoveTemp(Array[0].Get<1>()));
 			Received.Add((co_await WithError(MoveTemp(Array[1].Get<1>()))).GetErrors());
 		});
-		
+
 		TestEqual(TEXT("WithError 함수가 UWeakCoroutineError만큼은 절대로 통과 안 시키는지 체크"), Received.Num(), 0);
 		UDummy* Dummy = NewObject<UDummy>();
 		Array[0].Get<0>().SetValue(Dummy);
@@ -221,9 +221,9 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 
 	{
 		int32 Received = 0;
-		RunWeakCoroutine([&](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
-			Received = co_await RunWeakCoroutine([](TWeakCoroutineContext<int32>&) -> TWeakCoroutine<int32>
+			Received = co_await RunWeakCoroutine([]() -> TWeakCoroutine<int32>
 			{
 				co_return 42;
 			});
@@ -241,21 +241,21 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		Array.Add(MakePromise<int32>());
 
 		int32 Received = 0;
-		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
-			auto Int0 = RunWeakCoroutine([&](TWeakCoroutineContext<int32>&) -> TWeakCoroutine<int32>
+			auto Int0 = RunWeakCoroutine([&]() -> TWeakCoroutine<int32>
 			{
 				co_return co_await Array[0].Get<1>();
 			});
 
-			auto Int1 = RunWeakCoroutine([&](TWeakCoroutineContext<int32>&) -> TWeakCoroutine<int32>
+			auto Int1 = RunWeakCoroutine([&]() -> TWeakCoroutine<int32>
 			{
 				int32 Sum = 0;
 				Sum += co_await Array[1].Get<1>();
 				co_return Sum + co_await Array[2].Get<1>();
 			});
 
-			auto Int2 = RunWeakCoroutine([&](TWeakCoroutineContext<int32>&) -> TWeakCoroutine<int32>
+			auto Int2 = RunWeakCoroutine([&]() -> TWeakCoroutine<int32>
 			{
 				int32 Sum = 0;
 				Sum += co_await Array[4].Get<1>();
@@ -293,7 +293,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		Dummy->MarkAsGarbage();
 
 		bool bAborted = true;
-		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
 			co_await Ret;
 			bAborted = false;
@@ -308,7 +308,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		Promise.SetValue(Null);
 
 		bool bReceived = false;
-		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
 			auto Dummy = co_await Future;
 			bReceived = Dummy == nullptr;
@@ -321,7 +321,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		auto [Promise, Future] = MakePromise<UDummy*>();
 		UDummy* Dummy = NewObject<UDummy>();
 
-		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
 			TAbortPtr<UDummy> Result = co_await Future;
 
@@ -333,12 +333,12 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 
 		Promise.SetValue(Dummy);
 	}
-	
+
 	{
 		auto [Promise, Future] = MakePromise<TWeakObjectPtr<UDummy>>();
 		UDummy* Dummy = NewObject<UDummy>();
 
-		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
 			TWeakObjectPtr<UDummy> Result = co_await Future;
 			TestTrue(TEXT("Safe UObject Wrapper 타입은 TAbortPtr로 Transform 안 되어야 되는 것 테스트"), Result == Dummy);
@@ -351,7 +351,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		auto [Promise, Future] = MakePromise<UDummy*>();
 		UDummy* Dummy = NewObject<UDummy>();
 
-		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
 			TFailableResult<TAbortPtr<UDummy>> Result = co_await WithError(Future);
 			TestTrue(TEXT("WithError를 씌워도 TAbortPtr로 잘 Transform 되는지 테스트"), Result.GetResult() == Dummy);
@@ -378,7 +378,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		};
 
 		TArray<UDummy*> Received;
-		RunWeakCoroutine([&](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
 			{
 				auto Result = co_await Array[0].Get<1>();

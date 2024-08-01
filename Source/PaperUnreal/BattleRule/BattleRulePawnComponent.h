@@ -133,7 +133,7 @@ private:
 		Life = NewChildComponent<ULifeComponent>(GetOwner());
 		Life.Get()->RegisterComponent();
 
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
 			co_await Life.Get()->GetbAlive().If(false);
 
@@ -152,7 +152,7 @@ private:
 	{
 		NewChildComponent<UCharacterMeshFromInventory>(GetOwner())->RegisterComponent();
 
-		RunWeakCoroutine(this, [this](FWeakCoroutineContext&) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
 			co_await Life;
 			co_await Life.Get()->GetbAlive().If(false);

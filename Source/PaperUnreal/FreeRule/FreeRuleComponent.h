@@ -52,9 +52,9 @@ private:
 
 	void InitiatePawnSpawnSequence(APlayerState* Player)
 	{
-		RunWeakCoroutine(this, [this, Player](FWeakCoroutineContext& Context) -> FWeakCoroutine
+		RunWeakCoroutine(this, [this, Player]() -> FWeakCoroutine
 		{
-			Context.AbortIfNotValid(Player);
+			co_await AddToWeakList(Player);
 
 			Player->FindComponentByClass<UInventoryComponent>()->SetTracerBaseColor(NonEyeSoaringRandomColor());
 
