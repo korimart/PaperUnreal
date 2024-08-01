@@ -37,7 +37,7 @@ template <typename AwaitableType, typename InAllowedErrorTypeList>
 struct TCatchAwaitable
 {
 	using AllowedErrorTypeList = InAllowedErrorTypeList;
-	
+
 	AwaitableType Awaitable;
 };
 
@@ -60,10 +60,6 @@ public:
 	void Init(TUniquePtr<TUniqueFunction<TWeakCoroutine()>> Captures)
 	{
 		Handle.promise().Captures = MoveTemp(Captures);
-	}
-
-	void Resume()
-	{
 		Handle.resume();
 	}
 
@@ -92,7 +88,7 @@ public:
 	{
 		return operator co_await(WeakCoroutine.ReturnValue());
 	}
-	
+
 	friend auto operator co_await(TWeakCoroutine&& WeakCoroutine)
 	{
 		return operator co_await(WeakCoroutine.ReturnValue());
@@ -114,9 +110,7 @@ class TWeakCoroutinePromiseType : public FLoggingPromise
 public:
 	TSharedRef<std::monostate> Life = MakeShared<std::monostate>();
 
-	using ReturnObjectType = TWeakCoroutine<T>;
-
-	ReturnObjectType get_return_object()
+	TWeakCoroutine<T> get_return_object()
 	{
 		return std::coroutine_handle<TWeakCoroutinePromiseType>::from_promise(*this);
 	}
@@ -166,19 +160,17 @@ public:
 			| Awaitables::CaptureSourceLocation();
 	}
 
-protected:
-	friend class TWeakCoroutine<T>;
-	TUniquePtr<TUniqueFunction<ReturnObjectType()>> Captures;
-
 private:
+	friend class TWeakCoroutine<T>;
 	friend struct TAbortablePromise<TWeakCoroutinePromiseType>;
+	friend struct TWeakPromise<TWeakCoroutinePromiseType>;
+
+	TUniquePtr<TUniqueFunction<TWeakCoroutine<T>()>> Captures;
 
 	void OnAbortRequested()
 	{
 		AddError(UWeakCoroutineError::ExplicitAbort());
 	}
-
-	friend struct TWeakPromise<TWeakCoroutinePromiseType>;
 
 	void OnAbortByInvalidity()
 	{
@@ -197,7 +189,6 @@ auto RunWeakCoroutine(FuncType&& Func)
 
 	CoroutineType WeakCoroutine = (*LambdaCaptures)();
 	WeakCoroutine.Init(MoveTemp(LambdaCaptures));
-	WeakCoroutine.Resume();
 	return WeakCoroutine;
 }
 
@@ -211,21 +202,8 @@ auto RunWeakCoroutine(const UObject* Lifetime, FuncType&& Func)
 	auto LambdaCaptures = MakeUnique<TUniqueFunction<CoroutineType()>>(Forward<FuncType>(Func));
 
 	CoroutineType WeakCoroutine = (*LambdaCaptures)();
-	WeakCoroutine.Init(MoveTemp(LambdaCaptures));
 	WeakCoroutine.AddToWeakList(Lifetime);
-	WeakCoroutine.Resume();
-	return WeakCoroutine;
-}
-
-
-template <typename FuncType, typename... ArgTypes>
-auto RunWeakCoroutineNoCaptures(const FuncType& Func, ArgTypes&&... Args)
-{
-	using CoroutineType = typename TGetReturnType<FuncType>::Type;
-
-	CoroutineType WeakCoroutine = Func(Forward<ArgTypes>(Args)...);
-	WeakCoroutine.Init(nullptr);
-	WeakCoroutine.Resume();
+	WeakCoroutine.Init(MoveTemp(LambdaCaptures));
 	return WeakCoroutine;
 }
 
