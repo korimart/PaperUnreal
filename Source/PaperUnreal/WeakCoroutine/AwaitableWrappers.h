@@ -55,8 +55,7 @@ public:
 	{
 		if (InnerAwaitable.await_ready())
 		{
-			const bool bResume = ShouldResume(Handle);
-			if (!bResume)
+			if (!ShouldResume(Handle))
 			{
 				Handle.destroy();
 				return true;
@@ -90,8 +89,7 @@ public:
 			return true;
 		}
 
-		const bool bResume = ShouldResume(Handle);
-		if (!bResume)
+		if (!ShouldResume(Handle))
 		{
 			Handle.destroy();
 			return true;
@@ -128,7 +126,8 @@ private:
 
 
 template <CErrorReportingAwaitable InnerAwaitableType>
-class TErrorRemovingAwaitable : public TConditionalResumeAwaitable<TErrorRemovingAwaitable<InnerAwaitableType>, InnerAwaitableType>
+class TErrorRemovingAwaitable
+	: public TConditionalResumeAwaitable<TErrorRemovingAwaitable<InnerAwaitableType>, InnerAwaitableType>
 {
 public:
 	using Super = TConditionalResumeAwaitable<TErrorRemovingAwaitable, InnerAwaitableType>;
@@ -307,6 +306,12 @@ struct TEnsureErrorReporting<AwaitableType>
 };
 
 
+// TODO 이거 여러번 호출 가능한 stream으로 변경
+// TODO TAllOfAwaitable 구현
+// TODO 위 둘 구현을 위해서는 외부에서의 코루틴 종료를 위해 inner가 핸들에 destroy 호출 시 코루틴이 살아있을 때만
+// destroy를 하도록 하는 wrapper awaitable을 작성해야 함 -> 이러면 promise_type도 이 기능을 지원해야 함으로 다중 상속 이용
+// -> awaitable에서 promise_type에 직접 액세스 하는 경우는 전부 다중 상속으로 만들 수 있을 것 같다
+// Future 반환하는 코루틴도 다중 상속으로 해결 가능할 듯;;
 template <typename... InnerAwaitableTypes>
 class TAnyOfAwaitable
 {
@@ -379,6 +384,7 @@ class TFilteringAwaitable
 public:
 	using ResultType = typename std::decay_t<ValueStreamType>::ResultType;
 
+	// TODO stream일 필요가 없음 여러번 await 가능한 awaitable이면 됨
 	template <typename Stream, typename Pred>
 	TFilteringAwaitable(Stream&& ValueStream, Pred&& Predicate)
 		: ValueStream(Forward<Stream>(ValueStream)), Predicate(Forward<Pred>(Predicate))
@@ -422,6 +428,7 @@ private:
 
 template <typename Stream, typename Pred>
 TFilteringAwaitable(Stream&& ValueStream, Pred&& Predicate)
+	// TODO 단순화 가능
 	-> TFilteringAwaitable<std::conditional_t<std::is_lvalue_reference_v<Stream>, Stream, std::decay_t<Stream>>, std::decay_t<Pred>>;
 
 
@@ -467,41 +474,6 @@ private:
 template <typename Await, typename Trans>
 TTransformingAwaitable(Await&& Awaitable, Trans&& TransformFunc)
 	-> TTransformingAwaitable<std::decay_t<Await>, std::decay_t<Trans>>;
-
-
-template <typename InnerAwaitableType>
-class TSourceLocationAwaitable
-{
-public:
-	template <typename AwaitableType>
-	TSourceLocationAwaitable(AwaitableType&& Awaitable)
-		: InnerAwaitable(Forward<AwaitableType>(Awaitable))
-	{
-	}
-	
-	bool await_ready() const
-	{
-		return InnerAwaitable.await_ready();
-	}
-
-	template <typename HandleType>
-	auto await_suspend(HandleType&& Handle, std::source_location SL = std::source_location::current())
-	{
-		Handle.promise().SetSourceLocation(SL);
-		return InnerAwaitable.await_suspend(Forward<HandleType>(Handle));
-	}
-
-	auto await_resume()
-	{
-		return InnerAwaitable.await_resume();
-	}
-	
-private:
-	InnerAwaitableType InnerAwaitable;
-};
-
-template <typename AwaitableType>
-TSourceLocationAwaitable(AwaitableType&&) -> TSourceLocationAwaitable<AwaitableType>;
 
 
 template <typename... MaybeAwaitableTypes>

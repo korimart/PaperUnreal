@@ -5,8 +5,10 @@
 #include <coroutine>
 
 #include "CoreMinimal.h"
+#include "AbortablePromise.h"
 #include "AwaitableWrappers.h"
 #include "CancellableFuture.h"
+#include "LoggingPromise.h"
 #include "MinimalCoroutine.h"
 #include "TypeTraits.h"
 #include "Algo/AllOf.h"
@@ -90,7 +92,7 @@ namespace WeakCoroutine_Private
 		std::coroutine_handle<PromiseType> Handle;
 		AwaitableType InnerAwaitable;
 	};
-	
+
 	template <typename PromiseType, typename AwaitableType>
 	TWeakAwaitable(std::coroutine_handle<PromiseType> InHandle, AwaitableType&& Awaitable)
 		-> TWeakAwaitable<AwaitableType, PromiseType>;
@@ -133,8 +135,8 @@ public:
 	using promise_type = TWeakCoroutinePromiseType<T>;
 	using ContextType = TWeakCoroutineContext<T>;
 
-	TWeakCoroutine(std::coroutine_handle<promise_type> InHandle, const TSharedRef<bool>& bFinished)
-		: Handle(InHandle), bCoroutineFinished(bFinished)
+	TWeakCoroutine(std::coroutine_handle<promise_type> InHandle)
+		: Handle(InHandle), AbortablePromiseHandle(Handle.promise().GetAbortableHandle())
 	{
 	}
 
@@ -158,10 +160,7 @@ public:
 
 	void Abort()
 	{
-		if (!*bCoroutineFinished)
-		{
-			Handle.promise().Abort();
-		}
+		AbortablePromiseHandle.Abort();
 	}
 
 	TCancellableFuture<T> ReturnValue()
@@ -180,43 +179,21 @@ public:
 
 private:
 	std::coroutine_handle<promise_type> Handle;
-	TSharedRef<bool> bCoroutineFinished;
+	FAbortablePromiseHandle AbortablePromiseHandle;
 	TOptional<TCancellableFuture<T>> CoroutineRet;
 };
 
 
 template <typename Derived, typename T>
-class TWeakCoroutinePromiseTypeBase
+class TWeakCoroutinePromiseTypeBase : public FLoggingPromise
+                                      , public TAbortablePromise<TWeakCoroutinePromiseTypeBase<Derived, T>>
 {
 public:
 	using ReturnObjectType = TWeakCoroutine<T>;
 
-	~TWeakCoroutinePromiseTypeBase()
-	{
-		if (LastCoAwaitSourceLocation)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("Weak Coroutine Abort 발생."));
-			UE_LOG(LogTemp, Warning, TEXT("파일: %hs"), LastCoAwaitSourceLocation->file_name());
-			UE_LOG(LogTemp, Warning, TEXT("함수: %hs"), LastCoAwaitSourceLocation->function_name());
-			UE_LOG(LogTemp, Warning, TEXT("라인: %d"), LastCoAwaitSourceLocation->line());
-			UE_LOG(LogTemp, Warning, TEXT("사유는 다음과 같습니다."));
-
-			int32 Index = 0;
-			for (UFailableResultError* Each : Errors)
-			{
-				UE_LOG(LogTemp, Warning, TEXT("[%d] %s: %s"), Index, *Each->GetClass()->GetName(), *Each->What);
-				Index++;
-			}
-		}
-	}
-
 	ReturnObjectType get_return_object()
 	{
-		return
-		{
-			std::coroutine_handle<Derived>::from_promise(*static_cast<Derived*>(this)),
-			bCoroutineFinished,
-		};
+		return std::coroutine_handle<Derived>::from_promise(*static_cast<Derived*>(this));
 	}
 
 	std::suspend_always initial_suspend() const
@@ -226,8 +203,7 @@ public:
 
 	std::suspend_never final_suspend() noexcept
 	{
-		LastCoAwaitSourceLocation.Reset();
-		*bCoroutineFinished = true;
+		ClearErrors();
 		return {};
 	}
 
@@ -267,14 +243,9 @@ public:
 		return TSourceLocationAwaitable{AsAbortPtrReturning(TErrorRemovingAwaitable{TWeakAwaitable{Handle, Forward<AwaitableType>(Awaitable)}})};
 	}
 
-	void Abort()
-	{
-		*bCoroutineFinished = true;
-	}
-
 	bool IsValid() const
 	{
-		return !*bCoroutineFinished && Algo::AllOf(WeakList, [](const auto& Each) { return Each.IsValid(); });
+		return Algo::AllOf(WeakList, [](const auto& Each) { return Each.IsValid(); });
 	}
 
 	template <CUObjectUnsafeWrapper U>
@@ -289,16 +260,6 @@ public:
 		WeakList.Remove(TUObjectUnsafeWrapperTypeTraits<U>::GetUObject(Weak));
 	}
 
-	void SetSourceLocation(std::source_location SL)
-	{
-		LastCoAwaitSourceLocation = SL;
-	}
-
-	void SetErrors(const TArray<UFailableResultError*>& InErrors)
-	{
-		Errors = InErrors;
-	}
-
 protected:
 	friend class TWeakCoroutine<T>;
 
@@ -306,17 +267,20 @@ protected:
 	TUniquePtr<TWeakCoroutineContext<T>> Context;
 	TUniquePtr<TUniqueFunction<ReturnObjectType(TWeakCoroutineContext<T>&)>> Captures;
 	TOptional<TCancellablePromise<T>> Promise;
-	TSharedRef<bool> bCoroutineFinished = MakeShared<bool>(false);
-	TOptional<std::source_location> LastCoAwaitSourceLocation;
-
-	// 설정된 이후 즉시 코루틴이 파괴된다고 가정해 UObject의 생명주기에 관해 신경쓰지 않음
-	TArray<UFailableResultError*> Errors;
-
+	
 	template <CErrorReportingAwaitable AwaitableType>
 	decltype(auto) AsAbortPtrReturning(AwaitableType&& Awaitable);
 
 	template <CNonErrorReportingAwaitable AwaitableType>
 	decltype(auto) AsAbortPtrReturning(AwaitableType&& Awaitable);
+
+private:
+	friend struct TAbortablePromise<TWeakCoroutinePromiseTypeBase>;
+
+	void OnAbortRequested()
+	{
+		AddError(NewError(TEXT("Abort가 호출되었습니다")));
+	}
 };
 
 
