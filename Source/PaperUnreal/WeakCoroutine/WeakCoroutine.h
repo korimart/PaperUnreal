@@ -10,7 +10,6 @@
 #include "AwaitableWrappers.h"
 #include "CancellableFuture.h"
 #include "LoggingPromise.h"
-#include "MinimalCoroutine.h"
 #include "TypeTraits.h"
 #include "WeakPromise.h"
 #include "WeakCoroutine.generated.h"
@@ -35,18 +34,11 @@ public:
 
 
 template <typename AwaitableType, typename InAllowedErrorTypeList>
-class TCatchAwaitable : public TIdentityAwaitable<AwaitableType>
+struct TCatchAwaitable
 {
-public:
 	using AllowedErrorTypeList = InAllowedErrorTypeList;
-	using TIdentityAwaitable<AwaitableType>::TIdentityAwaitable;
-
-	bool await_ready()
-	{
-		// 이 Awaitable은 진짜 awaitable이 아님 사라져야 함
-		check(false);
-		return false;
-	}
+	
+	AwaitableType Awaitable;
 };
 
 
@@ -156,7 +148,7 @@ public:
 	{
 		using AllowedErrorTypeList = typename std::decay_t<WithErrorAwaitableType>::AllowedErrorTypeList;
 
-		return Forward<WithErrorAwaitableType>(Awaitable).Inner()
+		return Forward<WithErrorAwaitableType>(Awaitable).Awaitable
 			| Awaitables::AbortIfInvalidPromise()
 			| Awaitables::AbortIfErrorNotIn<AllowedErrorTypeList>()
 			| Awaitables::ReturnAsAbortPtr(*this)
