@@ -12,7 +12,6 @@
 #include "MinimalCoroutine.h"
 #include "TypeTraits.h"
 #include "WeakPromise.h"
-#include "PaperUnreal/GameFramework2/Utils.h"
 #include "WeakCoroutine.generated.h"
 
 
@@ -34,20 +33,21 @@ public:
 };
 
 
-namespace WeakCoroutine_Private
+template <typename AwaitableType, typename InAllowedErrorTypeList>
+class TCatchAwaitable : public TIdentityAwaitable<AwaitableType>
 {
-	template <typename AwaitableType, typename InAllowedErrorTypeList>
-	class TWithErrorAwaitable : public TIdentityAwaitable<AwaitableType>
+public:
+	using AllowedErrorTypeList = InAllowedErrorTypeList;
+	using TIdentityAwaitable<AwaitableType>::TIdentityAwaitable;
+
+	bool await_ready()
 	{
-	public:
-		using AllowedErrorTypeList = InAllowedErrorTypeList;
-		using TIdentityAwaitable<AwaitableType>::TIdentityAwaitable;
-	};
-}
+		// 이 Awaitable은 진짜 awaitable이 아님 사라져야 함
+		check(false);
+		return false;
+	}
+};
 
-
-template <typename>
-class TWeakCoroutine;
 
 template <typename>
 class TWeakCoroutinePromiseType;
@@ -151,12 +151,13 @@ public:
 		return await_transform(operator co_await(Forward<AnyType>(Any)));
 	}
 
-	template <typename... _>
-	auto await_transform(WeakCoroutine_Private::TWithErrorAwaitable<_...>&& Awaitable)
+	template <typename WithErrorAwaitableType>
+		requires TIsInstantiationOf_V<WithErrorAwaitableType, TCatchAwaitable>
+	auto await_transform(WithErrorAwaitableType&& Awaitable)
 	{
-		using AllowedErrorTypeList = typename std::decay_t<decltype(Awaitable)>::AllowedErrorTypeList;
+		using AllowedErrorTypeList = typename std::decay_t<WithErrorAwaitableType>::AllowedErrorTypeList;
 
-		return MoveTemp(Awaitable.Inner())
+		return Forward<WithErrorAwaitableType>(Awaitable).Inner()
 			| Awaitables::AbortIfInvalidPromise()
 			| Awaitables::AbortIfErrorNotIn<AllowedErrorTypeList>()
 			| Awaitables::ReturnAsAbortPtr(*this)
@@ -164,6 +165,7 @@ public:
 	}
 
 	template <CAwaitable AwaitableType>
+		requires !TIsInstantiationOf_V<AwaitableType, TCatchAwaitable>
 	auto await_transform(AwaitableType&& Awaitable)
 	{
 		return Forward<AwaitableType>(Awaitable)
@@ -264,20 +266,39 @@ auto RunWeakCoroutineNoCaptures(const FuncType& Func, ArgTypes&&... Args)
 }
 
 
-template <typename... AllowedErrorTypes, typename MaybeAwaitableType>
-auto WithError(MaybeAwaitableType&& MaybeAwaitable)
+struct FCatchAllAdaptor : TAwaitableAdaptorBase<FCatchAllAdaptor>
 {
-	using namespace WeakCoroutine_Private;
+	template <CAwaitable AwaitableType>
+	friend auto operator|(AwaitableType&& Awaitable, FCatchAllAdaptor)
+	{
+		return TCatchAwaitable<AwaitableType, void>{Forward<AwaitableType>(Awaitable)};
+	}
+};
 
-	using AllowedErrorTypeList = std::conditional_t
-	<
-		sizeof...(AllowedErrorTypes) == 0,
-		void,
-		TTypeList<AllowedErrorTypes...>
-	>;
 
-	auto Awaitable = AwaitableOrIdentity(Forward<MaybeAwaitableType>(MaybeAwaitable));
-	return TWithErrorAwaitable<decltype(Awaitable), AllowedErrorTypeList>{MoveTemp(Awaitable)};
+template <typename AllowedErrorTypeList>
+struct TCatchAdaptor : TAwaitableAdaptorBase<TCatchAdaptor<AllowedErrorTypeList>>
+{
+	template <CAwaitable AwaitableType>
+	friend auto operator|(AwaitableType&& Awaitable, TCatchAdaptor)
+	{
+		return TCatchAwaitable<AwaitableType, AllowedErrorTypeList>{Forward<AwaitableType>(Awaitable)};
+	}
+};
+
+
+namespace Awaitables
+{
+	inline FCatchAllAdaptor CatchAll()
+	{
+		return {};
+	}
+
+	template <typename... ErrorTypesToCatch>
+	TCatchAdaptor<TTypeList<ErrorTypesToCatch...>> Catch()
+	{
+		return {};
+	}
 }
 
 

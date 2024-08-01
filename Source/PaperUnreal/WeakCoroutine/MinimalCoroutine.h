@@ -67,9 +67,14 @@ public:
 		return Awaitable.await_resume();
 	}
 
-	AwaitableType& Inner()
+	AwaitableType& Inner() &
 	{
 		return Awaitable;
+	}
+	
+	AwaitableType&& Inner() &&
+	{
+		return MoveTemp(Awaitable);
 	}
 
 private:

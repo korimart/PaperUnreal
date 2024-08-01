@@ -52,9 +52,9 @@ private:
 
 			while (true)
 			{
-				auto Stream = EventSource->GetRunningPathTail().CreateStrictAddStream();
+				auto Stream = EventSource->GetRunningPathTail().CreateStrictAddStream() | Awaitables::Catch<UEndOfStreamError>();
 
-				const TFailableResult<FVector2D> FirstPoint = co_await WithError<UEndOfStreamError>(Stream);
+				const TFailableResult<FVector2D> FirstPoint = co_await Stream;
 				if (!FirstPoint)
 				{
 					continue;
@@ -72,7 +72,7 @@ private:
 					bLastPointIsHead = true;
 				});
 
-				while (TFailableResult<FVector2D> Point = co_await WithError<UEndOfStreamError>(Stream))
+				while (TFailableResult<FVector2D> Point = co_await Stream)
 				{
 					bLastPointIsHead ? Listener->SetPoint(-1, Point.GetResult()) : Listener->AddPoint(Point.GetResult());
 					bLastPointIsHead = false;

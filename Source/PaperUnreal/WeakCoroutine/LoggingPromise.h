@@ -93,7 +93,7 @@ template <typename AwaitableType>
 TCaptureSourceLocationAwaitable(AwaitableType&&) -> TCaptureSourceLocationAwaitable<AwaitableType>;
 
 
-struct FCaptureSourceLocationAdaptor
+struct FCaptureSourceLocationAdaptor : TAwaitableAdaptorBase<FCaptureSourceLocationAdaptor>
 {
 	template <typename AwaitableType>
 	friend auto operator|(AwaitableType&& Awaitable, FCaptureSourceLocationAdaptor)

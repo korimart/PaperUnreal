@@ -104,7 +104,7 @@ public:
 		return Receiver;
 	}
 
-	friend auto operator co_await(TValueStream& Stream)
+	friend auto operator co_await(const TValueStream& Stream)
 	{
 		return operator co_await(Stream.Receiver->NextValue());
 	}

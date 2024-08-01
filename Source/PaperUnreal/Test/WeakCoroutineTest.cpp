@@ -178,11 +178,11 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		TArray<TArray<UFailableResultError*>> Received;
 		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
-			Received.Add((co_await WithError(MoveTemp(Array[4].Get<1>()))).GetErrors());
-			Received.Add((co_await WithError<UDummyError, UCancellableFutureError>(MoveTemp(Array[3].Get<1>()))).GetErrors());
-			Received.Add((co_await WithError<UDummyError, UCancellableFutureError, UDummyError2>(MoveTemp(Array[2].Get<1>()))).GetErrors());
-			Received.Add((co_await WithError<UDummyError2>(MoveTemp(Array[1].Get<1>()))).GetErrors());
-			Received.Add((co_await WithError(MoveTemp(Array[0].Get<1>()))).GetErrors());
+			Received.Add((co_await (MoveTemp(Array[4].Get<1>()) | Awaitables::CatchAll())).GetErrors());
+			Received.Add((co_await (MoveTemp(Array[3].Get<1>()) | Awaitables::Catch<UDummyError, UCancellableFutureError>())).GetErrors());
+			Received.Add((co_await (MoveTemp(Array[2].Get<1>()) | Awaitables::Catch<UDummyError, UCancellableFutureError, UDummyError2>())).GetErrors());
+			Received.Add((co_await (MoveTemp(Array[1].Get<1>()) | Awaitables::Catch<UDummyError2>())).GetErrors());
+			Received.Add((co_await (MoveTemp(Array[0].Get<1>()) | Awaitables::CatchAll())).GetErrors());
 		});
 
 		TestEqual(TEXT("WithError 함수로 Error를 받을 수 있는지 테스트"), Received.Num(), 0);
@@ -206,8 +206,8 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		TArray<TArray<UFailableResultError*>> Received;
 		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
-			TFailableResult<TAbortPtr<UDummy>> ReceivedDummy = co_await WithError(MoveTemp(Array[0].Get<1>()));
-			Received.Add((co_await WithError(MoveTemp(Array[1].Get<1>()))).GetErrors());
+			TFailableResult<TAbortPtr<UDummy>> ReceivedDummy = co_await (MoveTemp(Array[0].Get<1>()) | Awaitables::CatchAll());
+			Received.Add((co_await (MoveTemp(Array[1].Get<1>()) | Awaitables::CatchAll())).GetErrors());
 		});
 
 		TestEqual(TEXT("WithError 함수가 UWeakCoroutineError만큼은 절대로 통과 안 시키는지 체크"), Received.Num(), 0);
@@ -353,7 +353,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 
 		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
-			TFailableResult<TAbortPtr<UDummy>> Result = co_await WithError(Future);
+			TFailableResult<TAbortPtr<UDummy>> Result = co_await (Future | Awaitables::CatchAll());
 			TestTrue(TEXT("WithError를 씌워도 TAbortPtr로 잘 Transform 되는지 테스트"), Result.GetResult() == Dummy);
 		});
 

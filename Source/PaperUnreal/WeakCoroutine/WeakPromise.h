@@ -71,7 +71,7 @@ template <typename AwaitableType>
 TWeakAwaitable(AwaitableType&& Awaitable) -> TWeakAwaitable<AwaitableType>;
 
 
-struct FAbortIfInvalidPromiseAdaptor
+struct FAbortIfInvalidPromiseAdaptor : TAwaitableAdaptorBase<FAbortIfInvalidPromiseAdaptor>
 {
 	template <typename AwaitableType>
 	friend auto operator|(AwaitableType&& Awaitable, FAbortIfInvalidPromiseAdaptor)
@@ -194,9 +194,14 @@ private:
 
 
 template <typename WeakPromiseType>
-struct TReturnAsAbortPtrAdaptor
+struct TReturnAsAbortPtrAdaptor : TAwaitableAdaptorBase<TReturnAsAbortPtrAdaptor<WeakPromiseType>>
 {
 	std::coroutine_handle<WeakPromiseType> Handle;
+	
+	TReturnAsAbortPtrAdaptor(std::coroutine_handle<WeakPromiseType> InHandle)
+		: Handle(InHandle)
+	{
+	}
 
 	template <CErrorReportingAwaitable AwaitableType>
 	friend decltype(auto) operator|(AwaitableType&& Awaitable, const TReturnAsAbortPtrAdaptor& Adaptor)

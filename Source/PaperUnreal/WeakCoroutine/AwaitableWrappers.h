@@ -8,6 +8,23 @@
 #include "TypeTraits.h"
 
 
+template <typename DerivedType>
+struct TAwaitableAdaptorBase
+{
+	template <typename NotAwaitableType> requires !CAwaitable<NotAwaitableType>
+	friend decltype(auto) operator|(NotAwaitableType&& NotAwaitable, const DerivedType& Derived)
+	{
+		return operator co_await(Forward<NotAwaitableType>(NotAwaitable)) | Derived;
+	}
+	
+	template <typename NotAwaitableType> requires !CAwaitable<NotAwaitableType>
+	friend decltype(auto) operator|(NotAwaitableType&& NotAwaitable, DerivedType&& Derived)
+	{
+		return operator co_await(Forward<NotAwaitableType>(NotAwaitable)) | MoveTemp(Derived);
+	}
+};
+
+
 template <typename Derived, CAwaitable InnerAwaitableType>
 class TConditionalResumeAwaitable
 {
@@ -166,7 +183,7 @@ template <typename AwaitableType>
 TAbortIfErrorAwaitable(AwaitableType&&) -> TAbortIfErrorAwaitable<AwaitableType>;
 
 
-struct FAbortIfErrorAdaptor
+struct FAbortIfErrorAdaptor : TAwaitableAdaptorBase<FAbortIfErrorAdaptor>
 {
 	template <typename AwaitableType>
 	friend decltype(auto) operator|(AwaitableType&& Awaitable, FAbortIfErrorAdaptor)
@@ -225,7 +242,7 @@ public:
 
 
 template <typename AllowedErrorTypeList>
-struct TAbortIfErrorNotInAdaptor
+struct TAbortIfErrorNotInAdaptor : TAwaitableAdaptorBase<TAbortIfErrorNotInAdaptor<AllowedErrorTypeList>>
 {
 	template <typename AwaitableType>
 	friend decltype(auto) operator|(AwaitableType&& Awaitable, TAbortIfErrorNotInAdaptor)

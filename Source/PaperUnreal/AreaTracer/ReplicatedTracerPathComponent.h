@@ -180,11 +180,15 @@ private:
 		{
 			while (true)
 			{
-				auto Stream = ServerTracerPath->GetRunningPathTail().CreateStrictAddStream();
-				while (auto NextPoint = co_await WithError<UEndOfStreamError>(Stream))
+				auto Stream
+					= ServerTracerPath->GetRunningPathTail().CreateStrictAddStream()
+					| Awaitables::Catch<UEndOfStreamError>();
+
+				while (auto NextPoint = co_await Stream)
 				{
 					RepPathTail.PathTail.Add(NextPoint.GetResult());
 				}
+
 				RepPathTail.Number++;
 				RepPathTail.PathTail.Empty();
 			}
