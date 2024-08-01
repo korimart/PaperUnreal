@@ -2,35 +2,10 @@
 
 #pragma once
 
-#include <source_location>
-
 #include "CoreMinimal.h"
 #include "ErrorReporting.h"
 #include "MinimalCoroutine.h"
 #include "TypeTraits.h"
-
-
-template <typename AwaitableType>
-concept CErrorReportingAwaitable = requires(AwaitableType Awaitable)
-{
-	requires CAwaitable<AwaitableType>;
-	{ Awaitable.await_resume() } -> CInstantiationOf<TFailableResult>;
-};
-
-
-template <typename AwaitableType>
-concept CNonErrorReportingAwaitable = requires(AwaitableType Awaitable)
-{
-	requires CAwaitable<AwaitableType>;
-	requires !CErrorReportingAwaitable<AwaitableType>;
-};
-
-
-template <CErrorReportingAwaitable AwaitableType>
-struct TErrorReportResultType
-{
-	using Type = typename decltype(std::declval<AwaitableType>().await_resume())::ResultType;
-};
 
 
 template <typename Derived, CAwaitable InnerAwaitableType>
@@ -60,6 +35,7 @@ public:
 				Handle.destroy();
 				return true;
 			}
+			
 			return false;
 		}
 
@@ -68,16 +44,13 @@ public:
 			TConditionalResumeAwaitable* This;
 			HandleType Handle;
 
-			void resume() const
-			{
-				const bool bResume = This->ShouldResume(Handle);
-				bResume ? Handle.resume() : Handle.destroy();
-			}
-
+			void resume() const { This->ShouldResume(Handle) ? Handle.resume() : Handle.destroy(); }
 			void destroy() const { Handle.destroy(); }
+			auto& promise() const { return Handle.promise(); }
 		};
 
-		using SuspendType = decltype(std::declval<InnerAwaitableType>().await_suspend(std::declval<FConditionalResumeHandle>()));
+		using SuspendType = decltype(std::declval<InnerAwaitableType>()
+			.await_suspend(std::declval<FConditionalResumeHandle>()));
 
 		if constexpr (std::is_void_v<SuspendType>)
 		{
@@ -94,11 +67,18 @@ public:
 			Handle.destroy();
 			return true;
 		}
+		
 		return false;
+	}
+
+	ReturnType await_resume()
+	{
+		return MoveTemp(*Return);
 	}
 
 private:
 	InnerAwaitableType InnerAwaitable;
+	TOptional<ReturnType> Return;
 
 	template <typename HandleType>
 	bool ShouldResume(const HandleType& Handle)
@@ -119,9 +99,34 @@ private:
 			HandleType Handle;
 		};
 
-		Derived* AsDerived = static_cast<Derived*>(this);
-		return AsDerived->ShouldResume(FReadOnlyHandle{Handle}, InnerAwaitable.await_resume());
+		Return = InnerAwaitable.await_resume();
+
+		return static_cast<Derived*>(this)->ShouldResume(
+			FReadOnlyHandle{Handle}, static_cast<const ReturnType&>(*Return));
 	}
+};
+
+
+template <typename AwaitableType>
+concept CErrorReportingAwaitable = requires(AwaitableType Awaitable)
+{
+	requires CAwaitable<AwaitableType>;
+	{ Awaitable.await_resume() } -> CInstantiationOf<TFailableResult>;
+};
+
+
+template <typename AwaitableType>
+concept CNonErrorReportingAwaitable = requires(AwaitableType Awaitable)
+{
+	requires CAwaitable<AwaitableType>;
+	requires !CErrorReportingAwaitable<AwaitableType>;
+};
+
+
+template <CErrorReportingAwaitable AwaitableType>
+struct TErrorReportResultType
+{
+	using Type = typename decltype(std::declval<AwaitableType>().await_resume())::ResultType;
 };
 
 
@@ -140,26 +145,21 @@ public:
 		static_assert(CNonErrorReportingAwaitable<TErrorRemovingAwaitable>);
 	}
 
-	bool ShouldResume(const auto& Handle, TFailableResult<ResultType>&& InnerResult)
+	bool ShouldResume(const auto& Handle, const TFailableResult<ResultType>& Result) const
 	{
-		Result = MoveTemp(InnerResult);
-
-		if (Result->Failed())
+		if (Result.Failed())
 		{
-			Handle.promise().SetErrors(Result->GetErrors());
+			Handle.promise().SetErrors(Result.GetErrors());
 			return false;
 		}
 
 		return true;
 	}
-
+	
 	ResultType await_resume()
 	{
-		return MoveTempIfPossible(Result->GetResult());
+		return Super::await_resume().GetResult();
 	}
-
-private:
-	TOptional<TFailableResult<ResultType>> Result;
 };
 
 template <typename AwaitableType>
@@ -171,13 +171,9 @@ struct FAllowAll
 };
 
 
-template <CErrorReportingAwaitable InnerAwaitableType, typename AllowedErrorTypeList, typename NeverAllowedTypeList>
+template <CErrorReportingAwaitable InnerAwaitableType, typename AllowedErrorTypeList>
 class TErrorFilteringAwaitable
-	: public TConditionalResumeAwaitable
-	<
-		TErrorFilteringAwaitable<InnerAwaitableType, AllowedErrorTypeList, NeverAllowedTypeList>,
-		InnerAwaitableType
-	>
+	: public TConditionalResumeAwaitable<TErrorFilteringAwaitable<InnerAwaitableType, AllowedErrorTypeList>, InnerAwaitableType>
 {
 public:
 	using Super = TConditionalResumeAwaitable<TErrorFilteringAwaitable, InnerAwaitableType>;
@@ -192,11 +188,9 @@ public:
 		static_assert(CErrorReportingAwaitable<TErrorFilteringAwaitable>);
 	}
 
-	bool ShouldResume(const auto& Handle, TFailableResult<ResultType>&& InnerResult)
+	bool ShouldResume(const auto& Handle, const TFailableResult<ResultType>& Result) const
 	{
-		Result = MoveTemp(InnerResult);
-
-		if (Result->Succeeded())
+		if (Result.Succeeded())
 		{
 			return true;
 		}
@@ -205,33 +199,16 @@ public:
 		{
 			if ([&]<typename... AllowedErrorTypes>(TTypeList<AllowedErrorTypes...>)
 			{
-				return !Result->template OnlyContains<AllowedErrorTypes...>();
+				return !Result.template OnlyContains<AllowedErrorTypes...>();
 			}(AllowedErrorTypeList{}))
 			{
-				Handle.promise().SetErrors(Result->GetErrors());
+				Handle.promise().SetErrors(Result.GetErrors());
 				return false;
 			}
 		}
 
-		if ([&]<typename... NeverAllowedErrorTypes>(TTypeList<NeverAllowedErrorTypes...>)
-		{
-			return Result->template ContainsAnyOf<NeverAllowedErrorTypes...>();
-		}(NeverAllowedTypeList{}))
-		{
-			Handle.promise().SetErrors(Result->GetErrors());
-			return false;
-		}
-
 		return true;
 	}
-
-	TFailableResult<ResultType> await_resume()
-	{
-		return MoveTemp(*Result);
-	}
-
-private:
-	TOptional<TFailableResult<ResultType>> Result;
 };
 
 
@@ -428,7 +405,7 @@ private:
 
 template <typename Stream, typename Pred>
 TFilteringAwaitable(Stream&& ValueStream, Pred&& Predicate)
-	// TODO 단순화 가능
+// TODO 단순화 가능
 	-> TFilteringAwaitable<std::conditional_t<std::is_lvalue_reference_v<Stream>, Stream, std::decay_t<Stream>>, std::decay_t<Pred>>;
 
 

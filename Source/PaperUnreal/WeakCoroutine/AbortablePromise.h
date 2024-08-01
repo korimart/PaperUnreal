@@ -13,12 +13,12 @@ struct FAbortablePromiseHandle
 		: Aborter(MoveTemp(InAborter))
 	{
 	}
-	
+
 	void Abort()
 	{
 		Aborter();
 	}
-	
+
 private:
 	TFunction<void()> Aborter;
 };
@@ -40,17 +40,20 @@ struct TAbortablePromise
 	{
 		return *bAbortRequested;
 	}
-	
+
 	FAbortablePromiseHandle GetAbortableHandle() const
 	{
 		TAbortablePromise* This = const_cast<TAbortablePromise*>(this);
-		return TFunction<void()>{[This, bThisAlive = TWeakPtr<bool>{bAbortRequested}]()
+		return TFunction<void()>
 		{
-			if (bThisAlive.IsValid())
+			[This, bThisAlive = TWeakPtr<bool>{bAbortRequested}]()
 			{
-				This->Abort();
+				if (bThisAlive.IsValid())
+				{
+					This->Abort();
+				}
 			}
-		}};
+		};
 	}
 
 private:
@@ -60,75 +63,26 @@ private:
 
 template <typename AbortablePromiseType, typename InnerAwaitableType>
 class TAbortablePromiseAwaitable
+	: public TConditionalResumeAwaitable<TAbortablePromiseAwaitable<AbortablePromiseType, InnerAwaitableType>, InnerAwaitableType>
 {
 public:
+	using Super = TConditionalResumeAwaitable<TAbortablePromiseAwaitable, InnerAwaitableType>;
+	using ReturnType = typename Super::ReturnType;
+
 	template <typename AwaitableType>
 	TAbortablePromiseAwaitable(AbortablePromiseType& AbortablePromise, AwaitableType&& Awaitable)
-		: AbortablePromiseHandle(std::coroutine_handle<AbortablePromiseType>::from_promise(AbortablePromise))
-		  , InnerAwaitable(Forward<AwaitableType>(Awaitable))
+		: Super(Forward<AwaitableType>(Awaitable))
+		  , AbortablePromiseHandle(std::coroutine_handle<AbortablePromiseType>::from_promise(AbortablePromise))
 	{
 	}
 
-	bool await_ready() const
+	bool ShouldResume(const auto&...) const
 	{
-		return false;
-	}
-
-	template <typename HandleType>
-	bool await_suspend(HandleType&& Handle)
-	{
-		if (AbortablePromiseHandle.promise().IsAbortRequested())
-		{
-			AbortablePromiseHandle.destroy();
-			return true;
-		}
-
-		if (InnerAwaitable.await_ready())
-		{
-			return false;
-		}
-
-		struct FHandle
-		{
-			std::decay_t<HandleType> Handle;
-			TAbortablePromiseAwaitable* This;
-
-			void resume() const
-			{
-				This->AbortablePromiseHandle.promise().IsAbortRequested()
-					? AbortablePromiseHandle.destroy()
-					: Handle.resume();
-			}
-
-			void destroy() const
-			{
-				This->AbortablePromiseHandle.promise().IsAbortRequested()
-					? AbortablePromiseHandle.destroy()
-					: Handle.destroy();
-			}
-		};
-
-		using SuspendType = decltype(InnerAwaitable.await_suspend(std::declval<FHandle>()));
-
-		if constexpr (std::is_void_v<SuspendType>)
-		{
-			InnerAwaitable.await_suspend(FHandle{Forward<HandleType>(Handle), this});
-			return true;
-		}
-		else
-		{
-			return InnerAwaitable.await_suspend(FHandle{Forward<HandleType>(Handle), this});
-		}
-	}
-
-	auto await_resume()
-	{
-		return InnerAwaitable.await_resume();
+		return !AbortablePromiseHandle.promise().IsAbortRequested();
 	}
 
 private:
 	std::coroutine_handle<AbortablePromiseType> AbortablePromiseHandle;
-	InnerAwaitableType InnerAwaitable;
 };
 
 template <typename AbortablePromiseType, typename AwaitableType>

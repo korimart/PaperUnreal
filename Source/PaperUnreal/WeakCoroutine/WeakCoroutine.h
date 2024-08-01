@@ -11,7 +11,7 @@
 #include "LoggingPromise.h"
 #include "MinimalCoroutine.h"
 #include "TypeTraits.h"
-#include "Algo/AllOf.h"
+#include "WeakPromise.h"
 #include "PaperUnreal/GameFramework2/Utils.h"
 #include "WeakCoroutine.generated.h"
 
@@ -26,6 +26,11 @@ public:
 	{
 		return NewError<UWeakCoroutineError>(TEXT("AbortIfInvalid로 등록된 오브젝트가 Valid 하지 않음"));
 	}
+	
+	static UWeakCoroutineError* ExplicitAbort()
+	{
+		return NewError<UWeakCoroutineError>(TEXT("누군가가 코루틴에 대해 Abort를 호출했습니다"));
+	}
 };
 
 
@@ -38,64 +43,6 @@ namespace WeakCoroutine_Private
 		using AllowedErrorTypeList = InAllowedErrorTypeList;
 		using TIdentityAwaitable<AwaitableType>::TIdentityAwaitable;
 	};
-
-
-	template <typename InnerAwaitableType, typename PromiseType>
-	class TWeakAwaitable
-	{
-	public:
-		using AwaitableType = typename TEnsureErrorReporting<InnerAwaitableType>::Type;
-		using ResultType = typename TErrorReportResultType<AwaitableType>::Type;
-
-		/**
-		 * constructor에서 Handle을 받는 것이 안전한 이유는 이 클래스의 사용을 await_transform 내부로만 제한하기 때문임
-		 * await_transform이 호출되었다는 것은 co_await 되었다는 뜻이고 그건 이 인스턴스가 Handle이 가리키는 coroutine frame 안에 존재한다는 것을 의미함
-		 * 즉 await_transform에서 생성하는 이상 이 awaitable의 생명주기는 handle이 가리키는 promise_type을 벗어나지 않음
-		 * 주의 : Handle을 사용해서 resume이나 destroy를 해서는 안 됨 다른 awaitable이 resume/destroy에 대한 권리를 가지고 있을 수 있음
-		 * 만약 그런 처리가 필요한 경우 나에게 resume/destroy 권한이 있을 때(await_suspend로 핸들이 들어와 await_resume이 호출되기 전까지)만 가능
-		 * 그 이외에는 반드시 read-only로만 사용해야 됨
-		 * 
-		 * @param InHandle 위에서 설명한 핸들
-		 * @param InAwaitable Inner Awaitable
-		 */
-		template <typename AwaitableType>
-		TWeakAwaitable(std::coroutine_handle<PromiseType> InHandle, AwaitableType&& Awaitable)
-			: Handle(InHandle), InnerAwaitable(Forward<AwaitableType>(Awaitable))
-		{
-			static_assert(CErrorReportingAwaitable<TWeakAwaitable>);
-		}
-
-		bool await_ready() const
-		{
-			return InnerAwaitable.await_ready();
-		}
-
-		template <typename HandleType>
-		auto await_suspend(HandleType&& Handle)
-		{
-			return InnerAwaitable.await_suspend(Forward<HandleType>(Handle));
-		}
-
-		TFailableResult<ResultType> await_resume()
-		{
-			TFailableResult<ResultType> Ret = InnerAwaitable.await_resume();
-
-			if (!Handle.promise().IsValid())
-			{
-				Ret.AddError(UWeakCoroutineError::InvalidCoroutine());
-			}
-
-			return Ret;
-		}
-
-	private:
-		std::coroutine_handle<PromiseType> Handle;
-		AwaitableType InnerAwaitable;
-	};
-
-	template <typename PromiseType, typename AwaitableType>
-	TWeakAwaitable(std::coroutine_handle<PromiseType> InHandle, AwaitableType&& Awaitable)
-		-> TWeakAwaitable<AwaitableType, PromiseType>;
 }
 
 
@@ -187,6 +134,7 @@ private:
 template <typename Derived, typename T>
 class TWeakCoroutinePromiseTypeBase : public FLoggingPromise
                                       , public TAbortablePromise<TWeakCoroutinePromiseTypeBase<Derived, T>>
+                                      , public TWeakPromise<TWeakCoroutinePromiseTypeBase<Derived, T>>
 {
 public:
 	using ReturnObjectType = TWeakCoroutine<T>;
@@ -220,66 +168,75 @@ public:
 	template <typename... _>
 	auto await_transform(WeakCoroutine_Private::TWithErrorAwaitable<_...>&& Awaitable)
 	{
-		using namespace WeakCoroutine_Private;
+		using AllowedErrorTypeList = typename std::decay_t<decltype(Awaitable)>::AllowedErrorTypeList;
 
-		auto Handle = std::coroutine_handle<Derived>::from_promise(*static_cast<Derived*>(this));
-		auto WeakAwaitable = TWeakAwaitable{Handle, MoveTemp(Awaitable.Inner())};
-
-		using ErrorFilteringAwaitableType = TErrorFilteringAwaitable
-		<
-			decltype(WeakAwaitable),
-			typename std::decay_t<decltype(Awaitable)>::AllowedErrorTypeList,
-			TTypeList<UWeakCoroutineError>
-		>;
-
-		return TSourceLocationAwaitable{AsAbortPtrReturning(ErrorFilteringAwaitableType{MoveTemp(WeakAwaitable)})};
+		return TSourceLocationAwaitable{
+			AsAbortPtrReturning(
+				FilterErrors<AllowedErrorTypeList>(
+					TWeakAwaitable{*this, MoveTemp(Awaitable.Inner())}))
+		};
 	}
 
 	template <CAwaitable AwaitableType>
 	auto await_transform(AwaitableType&& Awaitable)
 	{
-		using namespace WeakCoroutine_Private;
-		auto Handle = std::coroutine_handle<Derived>::from_promise(*static_cast<Derived*>(this));
-		return TSourceLocationAwaitable{AsAbortPtrReturning(TErrorRemovingAwaitable{TWeakAwaitable{Handle, Forward<AwaitableType>(Awaitable)}})};
-	}
-
-	bool IsValid() const
-	{
-		return Algo::AllOf(WeakList, [](const auto& Each) { return Each.IsValid(); });
-	}
-
-	template <CUObjectUnsafeWrapper U>
-	void AddToWeakList(const U& Weak)
-	{
-		WeakList.Emplace(TUObjectUnsafeWrapperTypeTraits<U>::GetUObject(Weak));
-	}
-
-	template <typename U>
-	void RemoveFromWeakList(const U& Weak)
-	{
-		WeakList.Remove(TUObjectUnsafeWrapperTypeTraits<U>::GetUObject(Weak));
+		return TSourceLocationAwaitable{
+			AsAbortPtrReturning(
+				RemoveErrors(
+					TWeakAwaitable{*this, Forward<AwaitableType>(Awaitable)}))
+		};
 	}
 
 protected:
 	friend class TWeakCoroutine<T>;
 
-	TArray<TWeakObjectPtr<const UObject>> WeakList;
 	TUniquePtr<TWeakCoroutineContext<T>> Context;
 	TUniquePtr<TUniqueFunction<ReturnObjectType(TWeakCoroutineContext<T>&)>> Captures;
 	TOptional<TCancellablePromise<T>> Promise;
-	
+
 	template <CErrorReportingAwaitable AwaitableType>
 	decltype(auto) AsAbortPtrReturning(AwaitableType&& Awaitable);
 
 	template <CNonErrorReportingAwaitable AwaitableType>
 	decltype(auto) AsAbortPtrReturning(AwaitableType&& Awaitable);
 
+	template <typename AllowedErrorTypeList, typename AwaitableType>
+	decltype(auto) FilterErrors(AwaitableType&& Awaitable)
+	{
+		if constexpr (!CErrorReportingAwaitable<std::decay_t<AwaitableType>>)
+		{
+			return Forward<AwaitableType>(Awaitable);
+		}
+		else
+		{
+			return TErrorFilteringAwaitable<AwaitableType, AllowedErrorTypeList>{Forward<AwaitableType>(Awaitable)};
+		}
+	}
+
+	template <typename AwaitableType>
+	decltype(auto) RemoveErrors(AwaitableType&& Awaitable)
+	{
+		if constexpr (!CErrorReportingAwaitable<std::decay_t<AwaitableType>>)
+		{
+			return Forward<AwaitableType>(Awaitable);
+		}
+		else
+		{
+			return TErrorRemovingAwaitable{Forward<AwaitableType>(Awaitable)};
+		}
+	}
+
 private:
 	friend struct TAbortablePromise<TWeakCoroutinePromiseTypeBase>;
-
 	void OnAbortRequested()
 	{
-		AddError(NewError(TEXT("Abort가 호출되었습니다")));
+		AddError(UWeakCoroutineError::ExplicitAbort());
+	}
+
+	friend struct TWeakPromise<TWeakCoroutinePromiseTypeBase>;
+	void OnAbortByInvalidity()
+	{
+		AddError(UWeakCoroutineError::InvalidCoroutine());
 	}
 };
 
