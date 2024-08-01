@@ -143,6 +143,7 @@ public:
 		using AllowedErrorTypeList = typename std::decay_t<WithErrorAwaitableType>::AllowedErrorTypeList;
 
 		return Forward<WithErrorAwaitableType>(Awaitable).Awaitable
+			| Awaitables::AbortIfRequested()
 			| Awaitables::AbortIfInvalidPromise()
 			| Awaitables::AbortIfErrorNotIn<AllowedErrorTypeList>()
 			| Awaitables::ReturnAsAbortPtr(*this)
@@ -154,6 +155,7 @@ public:
 	auto await_transform(AwaitableType&& Awaitable)
 	{
 		return Forward<AwaitableType>(Awaitable)
+			| Awaitables::AbortIfRequested()
 			| Awaitables::AbortIfInvalidPromise()
 			| Awaitables::AbortIfError()
 			| Awaitables::ReturnAsAbortPtr(*this)

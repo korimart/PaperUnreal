@@ -29,29 +29,55 @@ private:
 };
 
 
-template <typename AbortablePromiseType, typename InnerAwaitableType>
-class TAbortablePromiseAwaitable
-	: public TConditionalResumeAwaitable<TAbortablePromiseAwaitable<AbortablePromiseType, InnerAwaitableType>, InnerAwaitableType>
+template <typename InnerAwaitableType>
+class TAbortIfRequestedAwaitable
+	: public TConditionalResumeAwaitable<TAbortIfRequestedAwaitable<InnerAwaitableType>, InnerAwaitableType>
 {
 public:
-	using Super = TConditionalResumeAwaitable<TAbortablePromiseAwaitable, InnerAwaitableType>;
+	using Super = TConditionalResumeAwaitable<TAbortIfRequestedAwaitable, InnerAwaitableType>;
 	using ReturnType = typename Super::ReturnType;
 
 	template <typename AwaitableType>
-	TAbortablePromiseAwaitable(AbortablePromiseType& AbortablePromise, AwaitableType&& Awaitable)
+	TAbortIfRequestedAwaitable(AwaitableType&& Awaitable)
 		: Super(Forward<AwaitableType>(Awaitable))
-		  , AbortablePromiseHandle(std::coroutine_handle<AbortablePromiseType>::from_promise(AbortablePromise))
 	{
 	}
+	
+	bool await_suspend(const auto& AbortablePromiseHandle)
+	{
+		if (AbortablePromiseHandle.promise().IsAbortRequested())
+		{
+			AbortablePromiseHandle.destroy();
+			return true;
+		}
+		
+		return Super::await_suspend(AbortablePromiseHandle);
+	}
 
-	bool ShouldResume(const auto&...) const
+	bool ShouldResume(const auto& AbortablePromiseHandle, const auto&) const
 	{
 		return !AbortablePromiseHandle.promise().IsAbortRequested();
 	}
-
-private:
-	std::coroutine_handle<AbortablePromiseType> AbortablePromiseHandle;
 };
 
-template <typename AbortablePromiseType, typename AwaitableType>
-TAbortablePromiseAwaitable(AbortablePromiseType&, AwaitableType&&) -> TAbortablePromiseAwaitable<AbortablePromiseType, AwaitableType>;
+template <typename AwaitableType>
+TAbortIfRequestedAwaitable(AwaitableType&&) -> TAbortIfRequestedAwaitable<AwaitableType>;
+
+
+struct FAbortIfRequestedAdaptor : TAwaitableAdaptorBase<FAbortIfRequestedAdaptor>
+{
+	template <typename AwaitableType>
+	friend decltype(auto) operator|(AwaitableType&& Awaitable, FAbortIfRequestedAdaptor)
+	{
+		return TAbortIfRequestedAwaitable{Forward<AwaitableType>(Awaitable)};
+	}
+};
+
+
+namespace Awaitables
+{
+	inline FAbortIfRequestedAdaptor AbortIfRequested()
+	{
+		return {};
+	}
+}

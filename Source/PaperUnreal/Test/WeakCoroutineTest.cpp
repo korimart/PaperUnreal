@@ -420,5 +420,35 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("TAbortPtr가 Abort 상태를 잘 관리하는지 테스트"), Received[3], Dummies[3]);
 	}
 
+	{
+		TOptional<FWeakCoroutine> Coroutine;
+		auto [Promise, Future] = MakePromise<void>();
+		auto [Promise2, Future2] = MakePromise<void>();
+		
+		auto Life = MakeUnique<FLife>();
+		auto bLifeDestroyed = Life->bDestroyed;
+
+		TArray<int32> Received;
+		Coroutine = RunWeakCoroutine([&, Life = MoveTemp(Life)]() -> FWeakCoroutine
+		{
+			co_await Future;
+
+			Received.Add(0);
+			Coroutine->Abort();
+			Received.Add(0);
+		
+			co_await Future2;
+			
+			Received.Add(0);
+		});
+
+		TestEqual(TEXT("FWeakCoroutine::Abort가 잘 작동하는지 테스트"), Received.Num(), 0);
+		Promise.SetValue();
+		TestEqual(TEXT("FWeakCoroutine::Abort가 잘 작동하는지 테스트"), Received.Num(), 2);
+		TestTrue(TEXT("FWeakCoroutine::Abort가 잘 작동하는지 테스트"), *bLifeDestroyed);
+		Promise2.SetValue();
+		TestEqual(TEXT("FWeakCoroutine::Abort가 잘 작동하는지 테스트"), Received.Num(), 2);
+	}
+
 	return true;
 }
