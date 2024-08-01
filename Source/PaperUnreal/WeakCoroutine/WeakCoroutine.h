@@ -6,6 +6,7 @@
 
 #include "CoreMinimal.h"
 #include "AbortablePromise.h"
+#include "AwaitablePromise.h"
 #include "AwaitableWrappers.h"
 #include "CancellableFuture.h"
 #include "LoggingPromise.h"
@@ -60,17 +61,13 @@ public:
 	using promise_type = TWeakCoroutinePromiseType<T>;
 
 	TWeakCoroutine(std::coroutine_handle<promise_type> InHandle)
-		: Handle(InHandle), PromiseLife(Handle.promise().Life)
+		: Handle(InHandle), PromiseLife(Handle.promise().Life), PromiseReturn(Handle.promise().GetFuture())
 	{
 	}
 
 	void Init(TUniquePtr<TUniqueFunction<TWeakCoroutine()>> Captures)
 	{
 		Handle.promise().Captures = MoveTemp(Captures);
-
-		auto [NewPromise, NewFuture] = MakePromise<T>();
-		Handle.promise().Promise.Emplace(MoveTemp(NewPromise));
-		CoroutineRet.Emplace(MoveTemp(NewFuture));
 	}
 
 	void Resume()
@@ -96,29 +93,31 @@ public:
 
 	TCancellableFuture<T> ReturnValue()
 	{
-		check(CoroutineRet.IsSet());
-		auto Ret = MoveTemp(*CoroutineRet);
-		CoroutineRet.Reset();
-		return Ret;
+		return MoveTemp(PromiseReturn);
 	}
 
-	template <typename U> requires std::is_convertible_v<U, TWeakCoroutine>
-	friend auto operator co_await(U&& Coroutine)
+	friend auto operator co_await(TWeakCoroutine& WeakCoroutine)
 	{
-		return operator co_await(Coroutine.ReturnValue());
+		return operator co_await(WeakCoroutine.ReturnValue());
+	}
+	
+	friend auto operator co_await(TWeakCoroutine&& WeakCoroutine)
+	{
+		return operator co_await(WeakCoroutine.ReturnValue());
 	}
 
 private:
 	std::coroutine_handle<promise_type> Handle;
 	TWeakPtr<std::monostate> PromiseLife;
-	TOptional<TCancellableFuture<T>> CoroutineRet;
+	TCancellableFuture<T> PromiseReturn;
 };
 
 
-template <typename Derived, typename T>
-class TWeakCoroutinePromiseTypeBase : public FLoggingPromise
-                                      , public TAbortablePromise<TWeakCoroutinePromiseTypeBase<Derived, T>>
-                                      , public TWeakPromise<TWeakCoroutinePromiseTypeBase<Derived, T>>
+template <typename T>
+class TWeakCoroutinePromiseType : public FLoggingPromise
+                                  , public TAbortablePromise<TWeakCoroutinePromiseType<T>>
+                                  , public TWeakPromise<TWeakCoroutinePromiseType<T>>
+                                  , public TAwaitablePromise<T>
 {
 public:
 	TSharedRef<std::monostate> Life = MakeShared<std::monostate>();
@@ -127,7 +126,7 @@ public:
 
 	ReturnObjectType get_return_object()
 	{
-		return std::coroutine_handle<Derived>::from_promise(*static_cast<Derived*>(this));
+		return std::coroutine_handle<TWeakCoroutinePromiseType>::from_promise(*this);
 	}
 
 	std::suspend_always initial_suspend() const
@@ -177,48 +176,21 @@ public:
 
 protected:
 	friend class TWeakCoroutine<T>;
-
 	TUniquePtr<TUniqueFunction<ReturnObjectType()>> Captures;
-	TOptional<TCancellablePromise<T>> Promise;
 
 private:
-	friend struct TAbortablePromise<TWeakCoroutinePromiseTypeBase>;
+	friend struct TAbortablePromise<TWeakCoroutinePromiseType>;
 
 	void OnAbortRequested()
 	{
 		AddError(UWeakCoroutineError::ExplicitAbort());
 	}
 
-	friend struct TWeakPromise<TWeakCoroutinePromiseTypeBase>;
+	friend struct TWeakPromise<TWeakCoroutinePromiseType>;
 
 	void OnAbortByInvalidity()
 	{
 		AddError(UWeakCoroutineError::InvalidCoroutine());
-	}
-};
-
-
-template <typename T>
-class TWeakCoroutinePromiseType
-	: public TWeakCoroutinePromiseTypeBase<TWeakCoroutinePromiseType<T>, T>
-{
-public:
-	template <typename U>
-	void return_value(U&& Value)
-	{
-		this->Promise->SetValue(Forward<U>(Value));
-	}
-};
-
-
-template <>
-class TWeakCoroutinePromiseType<void>
-	: public TWeakCoroutinePromiseTypeBase<TWeakCoroutinePromiseType<void>, void>
-{
-public:
-	void return_void()
-	{
-		this->Promise->SetValue();
 	}
 };
 
