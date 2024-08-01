@@ -29,7 +29,7 @@ struct TWeakPromise
 	}
 
 private:
-	template <typename, typename>
+	template <typename>
 	friend class TWeakAwaitable;
 
 	TArray<TWeakObjectPtr<const UObject>> WeakList;
@@ -41,22 +41,21 @@ private:
 };
 
 
-template <typename WeakPromiseHandleType, typename InnerAwaitableType>
+template <typename InnerAwaitableType>
 class TWeakAwaitable
-	: public TConditionalResumeAwaitable<TWeakAwaitable<WeakPromiseHandleType, InnerAwaitableType>, InnerAwaitableType>
+	: public TConditionalResumeAwaitable<TWeakAwaitable<InnerAwaitableType>, InnerAwaitableType>
 {
 public:
 	using Super = TConditionalResumeAwaitable<TWeakAwaitable, InnerAwaitableType>;
 	using ReturnType = typename Super::ReturnType;
 
 	template <typename AwaitableType>
-	TWeakAwaitable(const WeakPromiseHandleType& Handle, AwaitableType&& Awaitable)
+	TWeakAwaitable(AwaitableType&& Awaitable)
 		: Super(Forward<AwaitableType>(Awaitable))
-		  , WeakPromiseHandle(Handle)
 	{
 	}
 
-	bool ShouldResume(const auto&...) const
+	bool ShouldResume(const auto& WeakPromiseHandle, const auto&) const
 	{
 		if (!WeakPromiseHandle.promise().IsValid())
 		{
@@ -66,24 +65,18 @@ public:
 
 		return true;
 	}
-
-private:
-	WeakPromiseHandleType WeakPromiseHandle;
 };
 
-template <typename WeakPromiseHandleType, typename AwaitableType>
-TWeakAwaitable(const WeakPromiseHandleType& InHandle, AwaitableType&& Awaitable) -> TWeakAwaitable<WeakPromiseHandleType, AwaitableType>;
+template <typename AwaitableType>
+TWeakAwaitable(AwaitableType&& Awaitable) -> TWeakAwaitable<AwaitableType>;
 
 
-template <typename WeakPromiseType>
-struct TAbortIfInvalidPromiseAdaptor
+struct FAbortIfInvalidPromiseAdaptor
 {
-	std::coroutine_handle<WeakPromiseType> Handle;
-
 	template <typename AwaitableType>
-	friend auto operator|(AwaitableType&& Awaitable, const TAbortIfInvalidPromiseAdaptor& Adaptor)
+	friend auto operator|(AwaitableType&& Awaitable, FAbortIfInvalidPromiseAdaptor)
 	{
-		return TWeakAwaitable{Adaptor.Handle, Forward<AwaitableType>(Awaitable)};
+		return TWeakAwaitable{Forward<AwaitableType>(Awaitable)};
 	}
 };
 
@@ -266,17 +259,19 @@ struct TReturnAsAbortPtrAdaptor
 };
 
 
-template <typename WeakPromiseType>
-TAbortIfInvalidPromiseAdaptor<WeakPromiseType> AbortIfInvalidPromise(WeakPromiseType& Promise)
+namespace Awaitables
 {
-	return {std::coroutine_handle<WeakPromiseType>::from_promise(Promise)};
-}
+	inline FAbortIfInvalidPromiseAdaptor AbortIfInvalidPromise()
+	{
+		return {};
+	}
 
 
-template <typename WeakPromiseType>
-TReturnAsAbortPtrAdaptor<WeakPromiseType> ReturnAsAbortPtr(WeakPromiseType& Promise)
-{
-	return {std::coroutine_handle<WeakPromiseType>::from_promise(Promise)};
+	template <typename WeakPromiseType>
+	TReturnAsAbortPtrAdaptor<WeakPromiseType> ReturnAsAbortPtr(WeakPromiseType& Promise)
+	{
+		return {std::coroutine_handle<WeakPromiseType>::from_promise(Promise)};
+	}
 }
 
 

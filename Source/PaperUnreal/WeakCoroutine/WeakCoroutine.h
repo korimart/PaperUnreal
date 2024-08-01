@@ -155,19 +155,22 @@ public:
 	auto await_transform(WeakCoroutine_Private::TWithErrorAwaitable<_...>&& Awaitable)
 	{
 		using AllowedErrorTypeList = typename std::decay_t<decltype(Awaitable)>::AllowedErrorTypeList;
-		auto Temp0 = MoveTemp(Awaitable.Inner()) | AbortIfInvalidPromise(*this);
-		auto Temp = FilterErrors<AllowedErrorTypeList>(MoveTemp(Temp0));
-		auto Temp2 = MoveTemp(Temp) | ReturnAsAbortPtr(*this);
-		return TSourceLocationAwaitable{MoveTemp(Temp2)};
+
+		return MoveTemp(Awaitable.Inner())
+			| Awaitables::AbortIfInvalidPromise()
+			| Awaitables::AbortIfErrorNotIn<AllowedErrorTypeList>()
+			| Awaitables::ReturnAsAbortPtr(*this)
+			| Awaitables::CaptureSourceLocation();
 	}
 
 	template <CAwaitable AwaitableType>
 	auto await_transform(AwaitableType&& Awaitable)
 	{
-		auto Temp0 = Forward<AwaitableType>(Awaitable) | AbortIfInvalidPromise(*this);
-		auto Temp = RemoveErrors(MoveTemp(Temp0));
-		auto Temp2 = MoveTemp(Temp) | ReturnAsAbortPtr(*this);
-		return TSourceLocationAwaitable{MoveTemp(Temp2)};
+		return Forward<AwaitableType>(Awaitable)
+			| Awaitables::AbortIfInvalidPromise()
+			| Awaitables::AbortIfError()
+			| Awaitables::ReturnAsAbortPtr(*this)
+			| Awaitables::CaptureSourceLocation();
 	}
 
 protected:
@@ -175,32 +178,6 @@ protected:
 
 	TUniquePtr<TUniqueFunction<ReturnObjectType()>> Captures;
 	TOptional<TCancellablePromise<T>> Promise;
-
-	template <typename AllowedErrorTypeList, typename AwaitableType>
-	decltype(auto) FilterErrors(AwaitableType&& Awaitable)
-	{
-		if constexpr (!CErrorReportingAwaitable<std::decay_t<AwaitableType>>)
-		{
-			return Forward<AwaitableType>(Awaitable);
-		}
-		else
-		{
-			return TErrorFilteringAwaitable<AwaitableType, AllowedErrorTypeList>{Forward<AwaitableType>(Awaitable)};
-		}
-	}
-
-	template <typename AwaitableType>
-	decltype(auto) RemoveErrors(AwaitableType&& Awaitable)
-	{
-		if constexpr (!CErrorReportingAwaitable<std::decay_t<AwaitableType>>)
-		{
-			return Forward<AwaitableType>(Awaitable);
-		}
-		else
-		{
-			return TErrorRemovingAwaitable{Forward<AwaitableType>(Awaitable)};
-		}
-	}
 
 private:
 	friend struct TAbortablePromise<TWeakCoroutinePromiseTypeBase>;
@@ -295,7 +272,7 @@ auto WithError(MaybeAwaitableType&& MaybeAwaitable)
 	using AllowedErrorTypeList = std::conditional_t
 	<
 		sizeof...(AllowedErrorTypes) == 0,
-		FAllowAll,
+		void,
 		TTypeList<AllowedErrorTypes...>
 	>;
 

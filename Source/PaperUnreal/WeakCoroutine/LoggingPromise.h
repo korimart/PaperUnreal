@@ -59,11 +59,11 @@ private:
 
 
 template <typename InnerAwaitableType>
-class TSourceLocationAwaitable
+class TCaptureSourceLocationAwaitable
 {
 public:
 	template <typename AwaitableType>
-	TSourceLocationAwaitable(AwaitableType&& Awaitable)
+	TCaptureSourceLocationAwaitable(AwaitableType&& Awaitable)
 		: InnerAwaitable(Forward<AwaitableType>(Awaitable))
 	{
 	}
@@ -90,4 +90,23 @@ private:
 };
 
 template <typename AwaitableType>
-TSourceLocationAwaitable(AwaitableType&&) -> TSourceLocationAwaitable<AwaitableType>;
+TCaptureSourceLocationAwaitable(AwaitableType&&) -> TCaptureSourceLocationAwaitable<AwaitableType>;
+
+
+struct FCaptureSourceLocationAdaptor
+{
+	template <typename AwaitableType>
+	friend auto operator|(AwaitableType&& Awaitable, FCaptureSourceLocationAdaptor)
+	{
+		return TCaptureSourceLocationAwaitable{Forward<AwaitableType>(Awaitable)};
+	}
+};
+
+
+namespace Awaitables
+{
+	inline FCaptureSourceLocationAdaptor CaptureSourceLocation()
+	{
+		return {};
+	}
+}
