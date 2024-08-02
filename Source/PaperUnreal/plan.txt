@@ -172,3 +172,4 @@ ReplicatedAreaExpander
 9. shareable live data? -> replace state tracker?
 10. game rule이 pawn의 uclass를 받는 대신 팩토리를 받도록 수정
 11. refactor enhanced input handling in player controller
+12. co_await UObject* -> TAbortPtr<UObject> 신택스 구현

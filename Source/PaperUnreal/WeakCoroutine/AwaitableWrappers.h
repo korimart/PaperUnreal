@@ -16,7 +16,7 @@ struct TAwaitableAdaptorBase
 	{
 		return operator co_await(Forward<NotAwaitableType>(NotAwaitable)) | Derived;
 	}
-	
+
 	template <typename NotAwaitableType> requires !CAwaitable<NotAwaitableType>
 	friend decltype(auto) operator|(NotAwaitableType&& NotAwaitable, DerivedType&& Derived)
 	{
@@ -37,6 +37,8 @@ public:
 	{
 	}
 
+	TConditionalResumeAwaitable(TConditionalResumeAwaitable&&) = default;
+	
 	bool await_ready() const
 	{
 		return false;
@@ -93,8 +95,10 @@ public:
 		return MoveTemp(*Return);
 	}
 
-private:
+protected:
 	InnerAwaitableType InnerAwaitable;
+
+private:
 	TOptional<ReturnType> Return;
 
 	template <typename HandleType>
@@ -393,6 +397,11 @@ public:
 		return NewError(TEXT("TAnyOfAwaitable 아무도 에러 없이 완료하지 않았음"));
 	}
 
+	void await_abort()
+	{
+		// TODO await cancel all child coroutines
+	}
+
 private:
 	InnerAwaitableTuple InnerAwaitables;
 	TSharedRef<int32> ResultIndex = MakeShared<int32>(-1);
@@ -444,6 +453,11 @@ public:
 		return MoveTemp(Ret.GetValue());
 	}
 
+	void await_abort()
+	{
+		// TODO await cancel all child coroutines
+	}
+
 private:
 	ValueStreamType ValueStream;
 	PredicateType Predicate;
@@ -490,6 +504,11 @@ public:
 		}
 	}
 
+	void await_abort()
+	{
+		Awaitable.await_abort();
+	}
+
 private:
 	AwaitableType Awaitable;
 	TransformFuncType TransformFunc;
@@ -506,7 +525,7 @@ namespace Awaitables
 	{
 		return {};
 	}
-	
+
 	template <typename AllowedErrorTypeList>
 	TAbortIfErrorNotInAdaptor<AllowedErrorTypeList> AbortIfErrorNotIn()
 	{

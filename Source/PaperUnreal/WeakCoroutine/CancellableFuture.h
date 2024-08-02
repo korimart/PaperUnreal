@@ -48,7 +48,7 @@ public:
 	{
 		return NewError<UCancellableFutureError>(TEXT("PromiseNotFulfilled"));
 	}
-	
+
 	static UCancellableFutureError* Cancelled()
 	{
 		return NewError<UCancellableFutureError>(TEXT("Cancelled"));
@@ -77,7 +77,7 @@ public:
 	void SetValue(U&& Value)
 	{
 		Ret.Emplace(TFailableResult<ResultType>{Forward<U>(Value)});
-		
+
 		if (Callback)
 		{
 			Callback(PeekValue());
@@ -94,7 +94,7 @@ public:
 		check(!bResultConsumed);
 		return *Ret;
 	}
-	
+
 	TFailableResult<ResultType> ConsumeValue() &&
 	{
 		check(!bResultConsumed);
@@ -180,7 +180,7 @@ public:
 		State = nullptr;
 		return Ret;
 	}
-	
+
 	const TFailableResult<ResultType>& PeekValue() const
 	{
 		check(IsReady());
@@ -339,9 +339,12 @@ public:
 	template <typename HandleType>
 	void await_suspend(HandleType&& Handle)
 	{
-		Future.Then([this, Handle = Forward<HandleType>(Handle)](auto&)
+		Future.Then([Handle = Forward<HandleType>(Handle), bAborted = bAborted](auto&)
 		{
-			Handle.resume();
+			if (!*bAborted)
+			{
+				Handle.resume();
+			}
 		});
 	}
 
@@ -350,7 +353,13 @@ public:
 		return MoveTemp(Future).ConsumeValue();
 	}
 
+	void await_abort()
+	{
+		*bAborted = true;
+	}
+
 private:
+	TSharedRef<bool> bAborted = MakeShared<bool>(false);
 	FutureType Future;
 };
 
@@ -499,17 +508,17 @@ auto RequestAsyncLoadImpl(const auto& SoftPointer)
 {
 	using OutputType = decltype(SoftPointer.Get());
 	using RetType = TCancellableFuture<OutputType>;
-	
+
 	if (SoftPointer.IsNull())
 	{
 		return RetType{nullptr};
 	}
-	
+
 	if (SoftPointer.IsValid())
 	{
 		return RetType{SoftPointer.Get()};
 	}
-	
+
 	FStreamableDelegate Delegate;
 	auto Ret = MakeFutureFromDelegate<OutputType>(
 		Delegate,

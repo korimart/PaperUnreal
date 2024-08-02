@@ -53,7 +53,7 @@ public:
 	using promise_type = TWeakCoroutinePromiseType<T>;
 
 	TWeakCoroutine(std::coroutine_handle<promise_type> InHandle)
-		: Handle(InHandle), PromiseLife(Handle.promise().Life), PromiseReturn(Handle.promise().GetFuture())
+		: Handle(InHandle), PromiseLife(Handle.promise().PromiseLife), PromiseReturn(Handle.promise().GetFuture())
 	{
 	}
 
@@ -108,8 +108,6 @@ class TWeakCoroutinePromiseType : public FLoggingPromise
                                   , public TAwaitablePromise<T>
 {
 public:
-	TSharedRef<std::monostate> Life = MakeShared<std::monostate>();
-
 	TWeakCoroutine<T> get_return_object()
 	{
 		return std::coroutine_handle<TWeakCoroutinePromiseType>::from_promise(*this);
@@ -168,6 +166,7 @@ private:
 	friend struct TWeakPromise<TWeakCoroutinePromiseType>;
 
 	TUniquePtr<TUniqueFunction<TWeakCoroutine<T>()>> Captures;
+	TSharedRef<std::monostate> PromiseLife = MakeShared<std::monostate>();
 
 	void OnAbortRequested()
 	{

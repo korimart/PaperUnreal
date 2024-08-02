@@ -2,8 +2,6 @@
 
 #pragma once
 
-#include <coroutine>
-
 #include "CoreMinimal.h"
 
 
@@ -12,20 +10,29 @@ struct TAbortablePromise
 {
 	void Abort()
 	{
-		if (!*bAbortRequested)
+		if (!bAbortRequested)
 		{
-			*bAbortRequested = true;
+			bAbortRequested = true;
 			static_cast<Derived*>(this)->OnAbortRequested();
+		}
+
+		if (bSuspendedOnAbortIfRequestedAwaitable)
+		{
+			std::coroutine_handle<Derived>::from_promise(*static_cast<Derived*>(this)).destroy();
 		}
 	}
 
-	bool IsAbortRequested() const
-	{
-		return *bAbortRequested;
-	}
-
 private:
-	TSharedRef<bool> bAbortRequested = MakeShared<bool>();
+	template <typename>
+	friend class TAbortIfRequestedAwaitable;
+
+	bool bAbortRequested = false;
+	bool bSuspendedOnAbortIfRequestedAwaitable = false;
+
+	TWeakPtr<std::monostate> GetPromiseLifeFromDerived() const
+	{
+		return static_cast<const Derived*>(this)->PromiseLife;
+	}
 };
 
 
@@ -42,22 +49,42 @@ public:
 		: Super(Forward<AwaitableType>(Awaitable))
 	{
 	}
-	
-	bool await_suspend(const auto& AbortablePromiseHandle)
+
+	TAbortIfRequestedAwaitable(TAbortIfRequestedAwaitable&&) = default;
+
+	~TAbortIfRequestedAwaitable()
 	{
-		if (AbortablePromiseHandle.promise().IsAbortRequested())
+		if (bSuspended)
+		{
+			Super::InnerAwaitable.await_abort();
+		}
+	}
+
+	template <typename HandleType>
+	bool await_suspend(HandleType&& AbortablePromiseHandle)
+	{
+		if (AbortablePromiseHandle.promise().bAbortRequested)
 		{
 			AbortablePromiseHandle.destroy();
 			return true;
 		}
-		
-		return Super::await_suspend(AbortablePromiseHandle);
+
+		bSuspended = true;
+		AbortablePromiseHandle.promise().bSuspendedOnAbortIfRequestedAwaitable = true;
+
+		return Super::await_suspend(Forward<HandleType>(AbortablePromiseHandle));
 	}
 
-	bool ShouldResume(const auto& AbortablePromiseHandle, const auto&) const
+	bool ShouldResume(const auto& AbortablePromiseHandle, const auto&)
 	{
-		return !AbortablePromiseHandle.promise().IsAbortRequested();
+		bSuspended = false;
+		AbortablePromiseHandle.promise().bSuspendedOnAbortIfRequestedAwaitable = false;
+
+		return !AbortablePromiseHandle.promise().bAbortRequested;
 	}
+
+private:
+	bool bSuspended = false;
 };
 
 template <typename AwaitableType>
@@ -66,7 +93,7 @@ TAbortIfRequestedAwaitable(AwaitableType&&) -> TAbortIfRequestedAwaitable<Awaita
 
 struct FAbortIfRequestedAdaptor : TAwaitableAdaptorBase<FAbortIfRequestedAdaptor>
 {
-	template <typename AwaitableType>
+	template <CAwaitable AwaitableType>
 	friend decltype(auto) operator|(AwaitableType&& Awaitable, FAbortIfRequestedAdaptor)
 	{
 		return TAbortIfRequestedAwaitable{Forward<AwaitableType>(Awaitable)};

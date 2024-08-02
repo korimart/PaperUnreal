@@ -55,6 +55,8 @@ public:
 	{
 	}
 
+	TWeakAwaitable(TWeakAwaitable&&) = default;
+
 	bool ShouldResume(const auto& WeakPromiseHandle, const auto&) const
 	{
 		if (!WeakPromiseHandle.promise().IsValid())
@@ -125,6 +127,11 @@ struct FAddToWeakListAwaitable
 	std::monostate await_resume()
 	{
 		return {};
+	}
+
+	void await_abort()
+	{
+		// 이 Awaitable은 Suspend 하지 않으므로 이 메세지를 받을 일이 없음
 	}
 
 private:

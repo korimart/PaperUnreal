@@ -424,7 +424,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		TOptional<FWeakCoroutine> Coroutine;
 		auto [Promise, Future] = MakePromise<void>();
 		auto [Promise2, Future2] = MakePromise<void>();
-		
+
 		auto Life = MakeUnique<FLife>();
 		auto bLifeDestroyed = Life->bDestroyed;
 
@@ -436,9 +436,9 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 			Received.Add(0);
 			Coroutine->Abort();
 			Received.Add(0);
-		
+
 			co_await Future2;
-			
+
 			Received.Add(0);
 		});
 
@@ -448,6 +448,23 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("FWeakCoroutine::Abort가 잘 작동하는지 테스트"), *bLifeDestroyed);
 		Promise2.SetValue();
 		TestEqual(TEXT("FWeakCoroutine::Abort가 잘 작동하는지 테스트"), Received.Num(), 2);
+	}
+
+	{
+		TOptional<FWeakCoroutine> Coroutine;
+		auto [Promise, Future] = MakePromise<void>();
+
+		auto Life = MakeUnique<FLife>();
+		auto bLifeDestroyed = Life->bDestroyed;
+
+		Coroutine = RunWeakCoroutine([&, Life = MoveTemp(Life)]() -> FWeakCoroutine
+		{
+			co_await Future;
+		});
+
+		TestFalse(TEXT("co_await이 발생한 이후 Abort를 호출해도 잘 작동하는지 테스트"), *bLifeDestroyed);
+		Coroutine->Abort();
+		TestTrue(TEXT("co_await이 발생한 이후 Abort를 호출해도 잘 작동하는지 테스트"), *bLifeDestroyed);
 	}
 
 	return true;
