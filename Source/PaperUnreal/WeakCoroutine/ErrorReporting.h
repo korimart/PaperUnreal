@@ -3,6 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AwaitableAdaptor.h"
+#include "ConditionalResumeAwaitable.h"
 #include "TypeTraits.h"
 #include "Algo/AllOf.h"
 #include "Algo/AnyOf.h"
@@ -40,12 +42,6 @@ public:
 			"(애초에 쓰레기로 초기화 되었을 수도 있고 도중에 쓰레기가 되었을 수도 있음. "
 			"하지만 TFailable이 Strong Object Pointer를 유지하기 때문에 레퍼런스 소실에 의한 것이 아니라 "
 			"누군가가 명시적으로 쓰레기로 만든 것임)"));
-	}
-
-	static UErrorReportingError* InnerAwaitableAborted()
-	{
-		return NewError<UErrorReportingError>(TEXT(
-			"TAlwaysResumingAwaitable: inner awaitable이 코루틴을 파괴했으므로 에러로 바꿔서 resume 합니다"));
 	}
 };
 
@@ -236,3 +232,153 @@ private:
 	TOptional<TFailableResultStorage<ResultType>> Result;
 	TArray<TStrongObjectPtr<UFailableResultError>> Errors;
 };
+
+
+template <typename AwaitableType>
+concept CErrorReportingAwaitable = requires(AwaitableType Awaitable)
+{
+	requires CAwaitable<AwaitableType>;
+	{ Awaitable.await_resume() } -> CInstantiationOf<TFailableResult>;
+};
+
+
+template <typename AwaitableType>
+concept CNonErrorReportingAwaitable = requires(AwaitableType Awaitable)
+{
+	requires CAwaitable<AwaitableType>;
+	requires !CErrorReportingAwaitable<AwaitableType>;
+};
+
+
+template <CErrorReportingAwaitable AwaitableType>
+struct TErrorReportResultType
+{
+	using Type = typename decltype(std::declval<AwaitableType>().await_resume())::ResultType;
+};
+
+
+template <CErrorReportingAwaitable InnerAwaitableType>
+class TAbortIfErrorAwaitable
+	: public TConditionalResumeAwaitable<TAbortIfErrorAwaitable<InnerAwaitableType>, InnerAwaitableType>
+{
+public:
+	using Super = TConditionalResumeAwaitable<TAbortIfErrorAwaitable, InnerAwaitableType>;
+	using ResultType = typename TErrorReportResultType<InnerAwaitableType>::Type;
+
+	template <typename AwaitableType>
+	TAbortIfErrorAwaitable(AwaitableType&& Awaitable)
+		: Super(Forward<AwaitableType>(Awaitable))
+	{
+		static_assert(CNonErrorReportingAwaitable<TAbortIfErrorAwaitable>);
+	}
+
+	bool ShouldResume(const auto& Handle, const TFailableResult<ResultType>& Result) const
+	{
+		if (Result.Failed())
+		{
+			Handle.promise().SetErrors(Result.GetErrors());
+			return false;
+		}
+
+		return true;
+	}
+
+	ResultType await_resume()
+	{
+		return Super::await_resume().GetResult();
+	}
+};
+
+template <typename AwaitableType>
+TAbortIfErrorAwaitable(AwaitableType&&) -> TAbortIfErrorAwaitable<AwaitableType>;
+
+
+struct FAbortIfErrorAdaptor : TAwaitableAdaptorBase<FAbortIfErrorAdaptor>
+{
+	template <typename AwaitableType>
+	friend decltype(auto) operator|(AwaitableType&& Awaitable, FAbortIfErrorAdaptor)
+	{
+		if constexpr (!CErrorReportingAwaitable<std::decay_t<AwaitableType>>)
+		{
+			return Forward<AwaitableType>(Awaitable);
+		}
+		else
+		{
+			return TAbortIfErrorAwaitable{Forward<AwaitableType>(Awaitable)};
+		}
+	}
+};
+
+
+template <CErrorReportingAwaitable InnerAwaitableType, typename AllowedErrorTypeList>
+class TAbortIfErrorNotInAwaitable
+	: public TConditionalResumeAwaitable<TAbortIfErrorNotInAwaitable<InnerAwaitableType, AllowedErrorTypeList>, InnerAwaitableType>
+{
+public:
+	using Super = TConditionalResumeAwaitable<TAbortIfErrorNotInAwaitable, InnerAwaitableType>;
+	using ResultType = typename TErrorReportResultType<InnerAwaitableType>::Type;
+
+	static constexpr bool bAllowAll = std::is_same_v<void, AllowedErrorTypeList>;
+
+	template <typename AwaitableType>
+	TAbortIfErrorNotInAwaitable(AwaitableType&& Awaitable)
+		: Super(Forward<AwaitableType>(Awaitable))
+	{
+		static_assert(CErrorReportingAwaitable<TAbortIfErrorNotInAwaitable>);
+	}
+
+	bool ShouldResume(const auto& Handle, const TFailableResult<ResultType>& Result) const
+	{
+		if (Result.Succeeded())
+		{
+			return true;
+		}
+
+		if constexpr (!bAllowAll)
+		{
+			if ([&]<typename... AllowedErrorTypes>(TTypeList<AllowedErrorTypes...>)
+			{
+				return !Result.template OnlyContains<AllowedErrorTypes...>();
+			}(AllowedErrorTypeList{}))
+			{
+				Handle.promise().SetErrors(Result.GetErrors());
+				return false;
+			}
+		}
+
+		return true;
+	}
+};
+
+
+template <typename AllowedErrorTypeList>
+struct TAbortIfErrorNotInAdaptor : TAwaitableAdaptorBase<TAbortIfErrorNotInAdaptor<AllowedErrorTypeList>>
+{
+	template <typename AwaitableType>
+	friend decltype(auto) operator|(AwaitableType&& Awaitable, TAbortIfErrorNotInAdaptor)
+	{
+		if constexpr (!CErrorReportingAwaitable<std::decay_t<AwaitableType>>)
+		{
+			return Forward<AwaitableType>(Awaitable);
+		}
+		else
+		{
+			return TAbortIfErrorNotInAwaitable<AwaitableType, AllowedErrorTypeList>{Forward<AwaitableType>(Awaitable)};
+		}
+	}
+};
+
+
+namespace Awaitables
+{
+	inline FAbortIfErrorAdaptor AbortIfError()
+	{
+		return {};
+	}
+
+	template <typename AllowedErrorTypeList>
+	TAbortIfErrorNotInAdaptor<AllowedErrorTypeList> AbortIfErrorNotIn()
+	{
+		return {};
+	}
+}

@@ -15,7 +15,7 @@
 #include "PaperUnreal/ModeAgnostic/ReadyStateComponent.h"
 #include "PaperUnreal/ModeAgnostic/TeamComponent.h"
 #include "PaperUnreal/ModeAgnostic/WorldTimerComponent.h"
-#include "PaperUnreal/WeakCoroutine/AwaitableWrappers.h"
+#include "PaperUnreal/WeakCoroutine/AnyOfAwaitable.h"
 #include "PaperUnreal/WeakCoroutine/CancellableFuture.h"
 #include "BattleRuleComponent.generated.h"
 
@@ -212,7 +212,7 @@ private:
 				AreaStateTracker->DestroyComponent();
 			});
 
-			const int32 CompletedAwaitableIndex = co_await AnyOf(
+			const int32 CompletedAwaitableIndex = co_await Awaitables::AnyOf(
 				Timeout, LastManStanding, UInGameCheats::OnEndGameByCheat);
 
 			if (CompletedAwaitableIndex != 2 && UInGameCheats::bDoNotEndGameUntilCheat)

@@ -57,7 +57,7 @@ void APVPBattleGameMode::BeginPlay()
 
 			auto AtLeast2Ready = GetGameState<APVPBattleGameState>()->ReadyStateTrackerComponent->ReadyCountIsAtLeast(2);
 			auto ReadyByCheat = MakeFutureFromDelegate(UInGameCheats::OnStartGameByCheat);
-			co_await AnyOf(AtLeast2Ready, ReadyByCheat);
+			co_await Awaitables::AnyOf(AtLeast2Ready, ReadyByCheat);
 		}
 
 		const FBattleRuleResult GameResult = co_await [&]()

@@ -3,6 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AwaitableAdaptor.h"
+#include "ConditionalResumeAwaitable.h"
 
 
 template <typename Derived>
