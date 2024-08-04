@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "FilterAwaitable.h"
+#include "TransformAwaitable.h"
 #include "CancellableFuture.h"
 #include "PaperUnreal/GameFramework2/Utils.h"
 #include "ValueStream.generated.h"
@@ -111,18 +112,16 @@ public:
 
 	auto EndOfStream()
 	{
-		return Transform
-		(
-			*this | Awaitables::Filter([](const TFailableResult<ResultType>& Result)
+		return *this
+			| Awaitables::Filter([](const TFailableResult<ResultType>& Result)
 			{
 				return Result.template ContainsAnyOf<UEndOfStreamError>();
-			}),
-			[](const TFailableResult<ResultType>&)
+			})
+			| Awaitables::Transform([](const TFailableResult<ResultType>&)
 			{
 				// TODO TFailalbeResult<void>가 가능해지면 return;으로 수정
 				return std::monostate{};
-			}
-		);
+			});
 	}
 
 private:

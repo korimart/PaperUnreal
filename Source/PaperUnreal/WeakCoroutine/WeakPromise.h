@@ -2,8 +2,12 @@
 
 #pragma once
 
+#include <coroutine>
+
 #include "CoreMinimal.h"
-#include "AwaitableWrappers.h"
+#include "ConditionalResumeAwaitable.h"
+#include "ErrorReporting.h"
+#include "TransformAwaitable.h"
 #include "TypeTraits.h"
 #include "Algo/AllOf.h"
 
@@ -204,7 +208,7 @@ template <typename WeakPromiseType>
 struct TReturnAsAbortPtrAdaptor : TAwaitableAdaptorBase<TReturnAsAbortPtrAdaptor<WeakPromiseType>>
 {
 	std::coroutine_handle<WeakPromiseType> Handle;
-	
+
 	TReturnAsAbortPtrAdaptor(std::coroutine_handle<WeakPromiseType> InHandle)
 		: Handle(InHandle)
 	{
@@ -225,11 +229,8 @@ struct TReturnAsAbortPtrAdaptor : TAwaitableAdaptorBase<TReturnAsAbortPtrAdaptor
 			using AbortPtrType = TAbortPtr<std::remove_pointer_t<ResultAsRawPtrType>>;
 
 			// 아래 Handle 복사에 대한 이유는 TAbortPtr의 주석 참고
-
-			return TTransformingAwaitable
-			{
-				Forward<AwaitableType>(Awaitable),
-				[Handle = Adaptor.Handle](TFailableResult<ResultType>&& Result) -> TFailableResult<AbortPtrType>
+			return Forward<AwaitableType>(Awaitable) | Awaitables::Transform(
+				[Handle = Adaptor.Handle](TFailableResult<ResultType>&& Result)-> TFailableResult<AbortPtrType>
 				{
 					if (Result.Succeeded())
 					{
@@ -237,8 +238,7 @@ struct TReturnAsAbortPtrAdaptor : TAwaitableAdaptorBase<TReturnAsAbortPtrAdaptor
 					}
 
 					return Result.GetErrors();
-				},
-			};
+				});
 		}
 	}
 
@@ -257,15 +257,11 @@ struct TReturnAsAbortPtrAdaptor : TAwaitableAdaptorBase<TReturnAsAbortPtrAdaptor
 			using AbortPtrType = TAbortPtr<std::remove_pointer_t<ResultAsRawPtrType>>;
 
 			// 아래 Handle 복사에 대한 이유는 TAbortPtr의 주석 참고
-
-			return TTransformingAwaitable
-			{
-				Forward<AwaitableType>(Awaitable),
+			return Forward<AwaitableType>(Awaitable) | Awaitables::Transform(
 				[Handle = Adaptor.Handle](ResultType&& Result) -> AbortPtrType
 				{
 					return {Handle, TUObjectUnsafeWrapperTypeTraits<ResultType>::GetRaw(MoveTemp(Result))};
-				},
-			};
+				});
 		}
 	}
 };

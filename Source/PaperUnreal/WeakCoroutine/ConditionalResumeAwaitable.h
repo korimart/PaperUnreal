@@ -76,6 +76,11 @@ public:
 		return MoveTemp(*Return);
 	}
 
+	void await_abort()
+	{
+		InnerAwaitable.await_abort();
+	}
+
 protected:
 	InnerAwaitableType InnerAwaitable;
 

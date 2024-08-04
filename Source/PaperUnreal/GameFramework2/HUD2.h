@@ -6,6 +6,7 @@
 #include "PlayerController2.h"
 #include "GameFramework/HUD.h"
 #include "GameFramework/PlayerState.h"
+#include "PaperUnreal/WeakCoroutine/TransformAwaitable.h"
 #include "HUD2.generated.h"
 
 /**
@@ -20,9 +21,8 @@ public:
 	template <typename T>
 	auto GetOwningPlayerState() const
 	{
-		return Transform(
-			CastChecked<APlayerController2>(GetOwningPlayerController())->GetPlayerState(),
-			[](const TFailableResult<APlayerState*>& PlayerState)
+		return CastChecked<APlayerController2>(GetOwningPlayerController())->GetPlayerState()
+			| Awaitables::Transform([](const TFailableResult<APlayerState*>& PlayerState)
 			{
 				return PlayerState
 					? TFailableResult<T*>{CastChecked<T>(PlayerState.GetResult())}

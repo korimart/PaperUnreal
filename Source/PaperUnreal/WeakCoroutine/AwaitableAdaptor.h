@@ -53,7 +53,10 @@ public:
 
 	void await_abort()
 	{
-		Awaitable->await_abort();
+		if (Awaitable)
+		{
+			Awaitable->await_abort();
+		}
 	}
 
 private:

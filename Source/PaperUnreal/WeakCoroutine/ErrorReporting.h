@@ -295,7 +295,7 @@ TAbortIfErrorAwaitable(AwaitableType&&) -> TAbortIfErrorAwaitable<AwaitableType>
 
 struct FAbortIfErrorAdaptor : TAwaitableAdaptorBase<FAbortIfErrorAdaptor>
 {
-	template <typename AwaitableType>
+	template <CAwaitable AwaitableType>
 	friend decltype(auto) operator|(AwaitableType&& Awaitable, FAbortIfErrorAdaptor)
 	{
 		if constexpr (!CErrorReportingAwaitable<std::decay_t<AwaitableType>>)
