@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AwaitableWrappers.h"
+#include "FilterAwaitable.h"
 #include "CancellableFuture.h"
 #include "PaperUnreal/GameFramework2/Utils.h"
 #include "ValueStream.generated.h"
@@ -113,11 +113,11 @@ public:
 	{
 		return Transform
 		(
-			Filter(*this, [](const TFailableResult<ResultType>& Result)
+			*this | Awaitables::Filter([](const TFailableResult<ResultType>& Result)
 			{
 				return Result.template ContainsAnyOf<UEndOfStreamError>();
 			}),
-			[](const TFailableResult<ResultType>& Result)
+			[](const TFailableResult<ResultType>&)
 			{
 				// TODO TFailalbeResult<void>가 가능해지면 return;으로 수정
 				return std::monostate{};

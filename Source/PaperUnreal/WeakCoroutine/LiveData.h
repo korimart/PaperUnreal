@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "TypeTraits.h"
-#include "AwaitableWrappers.h"
+#include "FilterAwaitable.h"
 #include "ValueStream.h"
 
 
@@ -624,16 +624,10 @@ public:
 	// Live Data View Convenience Functions
 	//
 
-	template <CEqualityComparable<ValueType> ArgType>
+	template <typename ArgType>
 	auto If(ArgType&& OfThis)
 	{
-		return Filter(CreateStream(), [OfThis = Forward<ArgType>(OfThis)](const auto& Value) { return Value == OfThis; });
-	}
-
-	template <CPredicate<ValueType> PredicateType>
-	auto If(PredicateType&& Predicate)
-	{
-		return Filter(CreateStream(), [Predicate = Forward<PredicateType>(Predicate)](const auto& Value) { return Predicate(Value); });
+		return CreateStream() | Awaitables::If(Forward<ArgType>(OfThis));
 	}
 
 	//

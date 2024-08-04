@@ -27,8 +27,9 @@ private:
 		{
 			auto PlayerState = co_await GetOuterACharacter2()->WaitForPlayerState();
 			auto Inventory = co_await WaitForComponent<UInventoryComponent>(PlayerState);
-			auto Stream = Inventory->GetCharacterMesh().CreateStream();
-			auto NonNullStream = Filter(Stream, [](const auto& SoftMesh) { return !SoftMesh.IsNull(); });
+			
+			auto NonNullStream = Inventory->GetCharacterMesh().CreateStream()
+				| Awaitables::Filter([](const auto& SoftMesh) { return !SoftMesh.IsNull(); });
 
 			while (true)
 			{

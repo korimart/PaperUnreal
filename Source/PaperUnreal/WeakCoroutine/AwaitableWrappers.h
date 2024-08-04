@@ -3,68 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "ErrorReporting.h"
-#include "MinimalCoroutine.h"
 #include "TypeTraits.h"
-
-
-template <typename ValueStreamType, typename PredicateType>
-class TFilteringAwaitable
-{
-public:
-	using ResultType = typename std::decay_t<ValueStreamType>::ResultType;
-
-	// TODO stream일 필요가 없음 여러번 await 가능한 awaitable이면 됨
-	template <typename Stream, typename Pred>
-	TFilteringAwaitable(Stream&& ValueStream, Pred&& Predicate)
-		: ValueStream(Forward<Stream>(ValueStream)), Predicate(Forward<Pred>(Predicate))
-	{
-		static_assert(CErrorReportingAwaitable<TFilteringAwaitable>);
-	}
-
-	bool await_ready() const
-	{
-		return false;
-	}
-
-	void await_suspend(auto Handle)
-	{
-		[](TFilteringAwaitable& This, auto Handle) -> FMinimalCoroutine
-		{
-			while (true)
-			{
-				auto Result = co_await This.ValueStream;
-				if (Result.Failed() || This.Predicate(Result.GetResult()))
-				{
-					This.Ret = MoveTemp(Result);
-					break;
-				}
-			}
-
-			Handle.resume();
-		}(*this, Handle);
-	}
-
-	TFailableResult<ResultType> await_resume()
-	{
-		return MoveTemp(Ret.GetValue());
-	}
-
-	void await_abort()
-	{
-		// TODO await cancel all child coroutines
-	}
-
-private:
-	ValueStreamType ValueStream;
-	PredicateType Predicate;
-	TOptional<TFailableResult<ResultType>> Ret;
-};
-
-template <typename Stream, typename Pred>
-TFilteringAwaitable(Stream&& ValueStream, Pred&& Predicate)
-// TODO 단순화 가능
-	-> TFilteringAwaitable<std::conditional_t<std::is_lvalue_reference_v<Stream>, Stream, std::decay_t<Stream>>, std::decay_t<Pred>>;
 
 
 template <typename AwaitableType, typename TransformFuncType>
@@ -114,13 +53,6 @@ private:
 template <typename Await, typename Trans>
 TTransformingAwaitable(Await&& Awaitable, Trans&& TransformFunc)
 	-> TTransformingAwaitable<std::decay_t<Await>, std::decay_t<Trans>>;
-
-
-template <typename ValueStreamType, typename PredicateType>
-auto Filter(ValueStreamType&& Stream, PredicateType&& Predicate)
-{
-	return TFilteringAwaitable{Forward<ValueStreamType>(Stream), Forward<PredicateType>(Predicate)};
-}
 
 
 template <typename MaybeAwaitableType, typename TransformFuncType>

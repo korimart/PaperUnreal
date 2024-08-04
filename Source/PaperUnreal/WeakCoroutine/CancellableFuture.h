@@ -74,7 +74,7 @@ public:
 	}
 
 	template <typename U>
-	void SetValue(U&& Value)
+	void SetValue(U&& Value) requires std::is_constructible_v<TFailableResult<ResultType>, U&&>
 	{
 		Ret.Emplace(TFailableResult<ResultType>{Forward<U>(Value)});
 
@@ -123,7 +123,7 @@ public:
 	using StateType = TCancellableFutureState<T>;
 	using ResultType = typename StateType::ResultType;
 
-	TCancellableFuture() requires std::is_same_v<T, void>
+	TCancellableFuture() requires std::is_void_v<T>
 		: State(MakeShared<StateType>())
 	{
 		State->SetValue();
@@ -135,7 +135,8 @@ public:
 	}
 
 	template <typename U>
-	TCancellableFuture(U&& ReadyValue) requires !std::is_convertible_v<U, const TSharedRef<StateType>&>
+	TCancellableFuture(U&& ReadyValue)
+		requires requires (StateType State) { State.SetValue(Forward<U>(ReadyValue)); }
 		: State(MakeShared<StateType>())
 	{
 		State->SetValue(Forward<U>(ReadyValue));
@@ -322,12 +323,21 @@ class TCancellableFutureAwaitable
 public:
 	using ResultType = typename std::decay_t<FutureType>::ResultType;
 
-	template <typename T>
-	TCancellableFutureAwaitable(T&& InFuture)
-		: Future(Forward<T>(InFuture))
+	TCancellableFutureAwaitable(FutureType InFuture)
+		requires std::is_lvalue_reference_v<FutureType>
+		: Future(InFuture)
 	{
 		static_assert(CErrorReportingAwaitable<TCancellableFutureAwaitable>);
 	}
+	
+	TCancellableFutureAwaitable(FutureType&& InFuture)
+		requires !std::is_reference_v<FutureType>
+		: Future(MoveTemp(InFuture))
+	{
+		static_assert(CErrorReportingAwaitable<TCancellableFutureAwaitable>);
+	}
+
+	TCancellableFutureAwaitable(TCancellableFutureAwaitable&&) = default;
 
 	bool await_ready() const
 	{
