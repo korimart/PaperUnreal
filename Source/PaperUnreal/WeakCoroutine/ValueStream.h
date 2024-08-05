@@ -6,6 +6,7 @@
 #include "FilterAwaitable.h"
 #include "TransformAwaitable.h"
 #include "CancellableFuture.h"
+#include "MinimalCoroutine.h"
 #include "PaperUnreal/GameFramework2/Utils.h"
 #include "ValueStream.generated.h"
 
@@ -27,6 +28,8 @@ template <typename T>
 class TValueStreamValueReceiver
 {
 public:
+	using ValueType = T;
+	
 	TValueStreamValueReceiver() = default;
 
 	TValueStreamValueReceiver(const TValueStreamValueReceiver&) = delete;
@@ -76,6 +79,11 @@ public:
 		}
 	}
 
+	bool IsClosed() const
+	{
+		return bClosed;
+	}
+
 private:
 	bool bClosed = false;
 	TArray<TCancellableFuture<T>> UnclaimedFutures;
@@ -88,7 +96,7 @@ class TValueStream
 {
 public:
 	using ReceiverType = TValueStreamValueReceiver<T>;
-	using ResultType = T;
+	using ValueType = T;
 
 	TValueStream() = default;
 
@@ -113,11 +121,11 @@ public:
 	auto EndOfStream()
 	{
 		return *this
-			| Awaitables::Filter([](const TFailableResult<ResultType>& Result)
+			| Awaitables::Filter([](const TFailableResult<ValueType>& Result)
 			{
 				return Result.template ContainsAnyOf<UEndOfStreamError>();
 			})
-			| Awaitables::Transform([](const TFailableResult<ResultType>&)
+			| Awaitables::Transform([](const TFailableResult<ValueType>&)
 			{
 				// TODO TFailalbeResult<void>가 가능해지면 return;으로 수정
 				return std::monostate{};
@@ -129,81 +137,152 @@ private:
 };
 
 
-template <typename T, typename DelegateType>
-TTuple<TValueStream<T>, FDelegateHandle> CreateMulticastValueStream(
-	const TArray<T>& ReadyValues,
-	DelegateType& MulticastDelegate)
+namespace Stream
 {
-	return CreateMulticastValueStream(ReadyValues, MulticastDelegate,
-		[](auto...) { return true; },
-		[]<typename ArgType>(ArgType&& Arg) -> decltype(auto) { return Forward<ArgType>(Arg); });
-}
-
-
-template <typename T, typename DelegateType, typename PredicateType, typename TransformFuncType>
-TTuple<TValueStream<T>, FDelegateHandle> CreateMulticastValueStream(
-	const TArray<T>& ReadyValues,
-	DelegateType& MulticastDelegate,
-	PredicateType&& Predicate,
-	TransformFuncType&& TransformFunc)
-{
-	TValueStream<T> Ret;
-
-	auto Receiver = Ret.GetReceiver();
-	for (const T& Each : ReadyValues)
+	// TODO cancellablefuture.h에 있는 delegate 파라미터 가져오는 로직 분리해서 여기도 T 넘길 필요 없도록 사용법 개선
+	template <typename T>
+	TTuple<TValueStream<T>, FDelegateHandle> MakeFromMulticastDelegate(
+		auto& MulticastDelegate, const TArray<T>& ReadyValues = {})
 	{
-		Receiver.Pin()->ReceiveValue(Each);
+		return MakeFromMulticastDelegate(MulticastDelegate, ReadyValues,
+			[](auto...) { return true; },
+			[]<typename ArgType>(ArgType&& Arg) -> decltype(auto) { return Forward<ArgType>(Arg); });
 	}
 
-	struct FCopyChecker
+
+	template <typename T, typename DelegateType, typename PredicateType, typename TransformFuncType>
+	TTuple<TValueStream<T>, FDelegateHandle> MakeFromMulticastDelegate(
+		DelegateType& MulticastDelegate,
+		const TArray<T>& ReadyValues,
+		PredicateType&& Predicate,
+		TransformFuncType&& TransformFunc)
 	{
-		TWeakPtr<TValueStreamValueReceiver<T>> Receiver;
+		TValueStream<T> Ret;
 
-		FCopyChecker(TWeakPtr<TValueStreamValueReceiver<T>> InReceiver)
-			: Receiver(InReceiver)
+		auto Receiver = Ret.GetReceiver();
+		for (const T& Each : ReadyValues)
 		{
+			Receiver.Pin()->ReceiveValue(Each);
 		}
 
-		FCopyChecker(const FCopyChecker&)
+		struct FCopyChecker
 		{
-			AssertNoCopy();
-		}
+			TWeakPtr<TValueStreamValueReceiver<T>> Receiver;
 
-		FCopyChecker& operator=(const FCopyChecker&)
-		{
-			AssertNoCopy();
-			return *this;
-		}
-
-		FCopyChecker(FCopyChecker&&) = default;
-		FCopyChecker& operator=(FCopyChecker&&) = default;
-
-		~FCopyChecker()
-		{
-			if (auto Pinned = Receiver.Pin())
+			FCopyChecker(TWeakPtr<TValueStreamValueReceiver<T>> InReceiver)
+				: Receiver(InReceiver)
 			{
-				Pinned->Close();
 			}
-		}
 
-		// MulticastDelegate를 복사하는 경우 여러 곳에서 Receiver에 값을 넣을 수 있게 됨
-		// 이것에 대한 처리를 구현하지 않았으므로 실수로 델리게이트를 복사하지 않도록 막아둠
-		void AssertNoCopy() { check(false); }
-	};
-
-	FDelegateHandle Handle = MulticastDelegate.Add(DelegateType::FDelegate::CreateSPLambda(Receiver.Pin().ToSharedRef(),
-		[
-			Receiver,
-			Predicate = Forward<PredicateType>(Predicate),
-			TransformFunc = Forward<TransformFuncType>(TransformFunc),
-			CopyChecker = FCopyChecker{Receiver}
-		]<typename... ArgTypes>(ArgTypes&&... NewValues)
-		{
-			if (Predicate(Forward<ArgTypes>(NewValues)...))
+			FCopyChecker(const FCopyChecker&)
 			{
-				Receiver.Pin()->ReceiveValue(TransformFunc(Forward<ArgTypes>(NewValues)...));
+				AssertNoCopy();
 			}
-		}));
 
-	return MakeTuple(MoveTemp(Ret), Handle);
+			FCopyChecker& operator=(const FCopyChecker&)
+			{
+				AssertNoCopy();
+				return *this;
+			}
+
+			FCopyChecker(FCopyChecker&&) = default;
+			FCopyChecker& operator=(FCopyChecker&&) = default;
+
+			~FCopyChecker()
+			{
+				if (auto Pinned = Receiver.Pin())
+				{
+					Pinned->Close();
+				}
+			}
+
+			// MulticastDelegate를 복사하는 경우 여러 곳에서 Receiver에 값을 넣을 수 있게 됨
+			// 이것에 대한 처리를 구현하지 않았으므로 실수로 델리게이트를 복사하지 않도록 막아둠
+			void AssertNoCopy() { check(false); }
+		};
+
+		FDelegateHandle Handle = MulticastDelegate.Add(DelegateType::FDelegate::CreateSPLambda(Receiver.Pin().ToSharedRef(),
+			[
+				Receiver,
+				Predicate = Forward<PredicateType>(Predicate),
+				TransformFunc = Forward<TransformFuncType>(TransformFunc),
+				CopyChecker = FCopyChecker{Receiver}
+			]<typename... ArgTypes>(ArgTypes&&... NewValues)
+			{
+				if (Predicate(Forward<ArgTypes>(NewValues)...))
+				{
+					Receiver.Pin()->ReceiveValue(TransformFunc(Forward<ArgTypes>(NewValues)...));
+				}
+			}));
+
+		return MakeTuple(MoveTemp(Ret), Handle);
+	}
+
+	
+	template <int32 Index>
+	FMinimalCoroutine CombineImpl(auto ValueStream, auto WeakReceiver, auto SharedTuple)
+	{
+		using ReceiverValueType = typename std::decay_t<decltype(*WeakReceiver.Pin())>::ValueType;
+		
+		while (true)
+		{
+			auto FailableResult = co_await ValueStream;
+			
+			if (!WeakReceiver.IsValid() || WeakReceiver.Pin()->IsClosed())
+			{
+				break;
+			}
+			
+			if (FailableResult.template ContainsAnyOf<UEndOfStreamError>())
+			{
+				WeakReceiver.Pin()->Close();
+				break;
+			}
+
+			SharedTuple->template Get<Index>().Emplace(MoveTemp(FailableResult));
+
+			const bool bContainsUnset = SharedTuple->ApplyAfter([&](const auto&... OptionalFailableResults)
+			{
+				return (!OptionalFailableResults.IsSet() || ...);
+			});
+
+			if (bContainsUnset)
+			{
+				continue;
+			}
+
+			TArray<UFailableResultError*> Errors;
+			SharedTuple->ApplyAfter([&](const auto&... OptionalFailableResults)
+			{
+				(Errors.Append(OptionalFailableResults->GetErrors()), ...);
+			});
+
+			if (Errors.Num() > 0)
+			{
+				WeakReceiver.Pin()->ReceiveValue(TFailableResult<ReceiverValueType>{MoveTemp(Errors)});
+				continue;
+			}
+
+			auto CombinedValue = SharedTuple->ApplyAfter([&](const auto&... OptionalFailableResults)
+			{
+				return ReceiverValueType{OptionalFailableResults->GetResult()...};
+			});
+
+			WeakReceiver.Pin()->ReceiveValue(TFailableResult<ReceiverValueType>{MoveTemp(CombinedValue)});
+		}
+	}
+
+	template <typename... ValueTypes>
+	TValueStream<TTuple<ValueTypes...>> Combine(TValueStream<ValueTypes>&&... ValueStreams)
+	{
+		TValueStream<TTuple<ValueTypes...>> Ret;
+		
+		auto SharedTuple = MakeShared<TTuple<TOptional<TFailableResult<ValueTypes>>...>>();
+		[&]<std::size_t... Indices>(std::index_sequence<Indices...>)
+		{
+			(CombineImpl<Indices>(MoveTemp(ValueStreams), Ret.GetReceiver(), SharedTuple), ...);
+		}(std::index_sequence_for<ValueTypes...>{});
+		
+		return Ret;
+	}
 }

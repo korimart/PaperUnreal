@@ -35,6 +35,13 @@ public:
 			InnerAwaitable.await_resume();
 			return TransformFunc();
 		}
+		else if constexpr (TIsInstantiationOf_V<decltype(InnerAwaitable.await_resume()), TTuple>)
+		{
+			return InnerAwaitable.await_resume().ApplyAfter([&]<typename... ArgTypes>(ArgTypes&&... Args)
+			{
+				return TransformFunc(Forward<ArgTypes>(Args)...);
+			});
+		}
 		else
 		{
 			return TransformFunc(InnerAwaitable.await_resume());
@@ -55,21 +62,21 @@ template <typename AwaitableType, typename Trans>
 TTransformAwaitable(AwaitableType&& Awaitable, Trans&& TransformFunc) -> TTransformAwaitable<AwaitableType, std::decay_t<Trans>>;
 
 
-template <typename PredicateType>
-struct TTransformAdaptor : TAwaitableAdaptorBase<TTransformAdaptor<PredicateType>>
+template <typename TransformFuncType>
+struct TTransformAdaptor : TAwaitableAdaptorBase<TTransformAdaptor<TransformFuncType>>
 {
-	std::decay_t<PredicateType> Predicate;
+	std::decay_t<TransformFuncType> Predicate;
 
-	TTransformAdaptor(const std::decay_t<PredicateType>& Pred)
+	TTransformAdaptor(const std::decay_t<TransformFuncType>& Pred)
 		: Predicate(Pred)
 	{
 	}
-	
-	TTransformAdaptor(std::decay_t<PredicateType>&& Pred)
+
+	TTransformAdaptor(std::decay_t<TransformFuncType>&& Pred)
 		: Predicate(MoveTemp(Pred))
 	{
 	}
-	
+
 	template <CAwaitable AwaitableType>
 	friend auto operator|(AwaitableType&& Awaitable, TTransformAdaptor Adaptor)
 	{
@@ -80,9 +87,9 @@ struct TTransformAdaptor : TAwaitableAdaptorBase<TTransformAdaptor<PredicateType
 
 namespace Awaitables
 {
-	template <typename PredicateType>
-	auto Transform(PredicateType&& Predicate)
+	template <typename TransformFuncType>
+	auto Transform(TransformFuncType&& Predicate)
 	{
-		return TTransformAdaptor<PredicateType>{Forward<PredicateType>(Predicate)};
+		return TTransformAdaptor<TransformFuncType>{Forward<TransformFuncType>(Predicate)};
 	}
 }

@@ -113,6 +113,12 @@ class TFailableResult
 public:
 	using ResultType = InResultType;
 
+	/**
+	 * 이 클래스는 현재 결과 or 에러 중 하나가 반드시 설정되어 있음을 가정하고 있음
+	 * 둘 다 없이 초기화에 성공하면 멤버 함수들 고장남
+	 */
+	TFailableResult() = delete;
+
 	TFailableResult(UFailableResultError* Error)
 	{
 		AddError(Error);

@@ -220,7 +220,7 @@ public:
 	void Modify(const auto& Func)
 	{
 		FScopedCallbackGuard S{this};
-		
+
 		// TODO static assert Func takes a non-const lvalue reference
 		if (Func(Value))
 		{
@@ -331,7 +331,8 @@ public:
 
 	TValueStream<DecayedValueType> CreateStream()
 	{
-		return CreateMulticastValueStream(TArray<DecayedValueType>{Value}, OnChanged).template Get<0>();
+		return Stream::MakeFromMulticastDelegate(
+			OnChanged, TArray<DecayedValueType>{Value}).template Get<0>();
 	}
 
 private:
@@ -406,7 +407,7 @@ public:
 	void Empty()
 	{
 		FScopedCallbackGuard S{this};
-		
+
 		// OnElementRemoved의 콜백에서 Array가 비었음을 즉시 볼 수 있도록 미리 비움
 		auto Removed = MoveTemp(Array);
 		for (const ElementType& Each : Removed)
@@ -528,12 +529,12 @@ public:
 
 	TValueStream<ElementType> CreateAddStream()
 	{
-		return CreateMulticastValueStream(Array, OnElementAdded).template Get<0>();
+		return Stream::MakeFromMulticastDelegate(OnElementAdded, Array).template Get<0>();
 	}
 
 	TValueStream<ElementType> CreateStrictAddStream()
 	{
-		auto [ValueStream, Handle] = CreateMulticastValueStream(Array, OnElementAdded);
+		auto [ValueStream, Handle] = Stream::MakeFromMulticastDelegate(OnElementAdded, Array);
 		StrictAddStreamHandles.Add(Handle);
 		return MoveTemp(ValueStream);
 	}

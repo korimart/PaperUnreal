@@ -174,3 +174,5 @@ ReplicatedAreaExpander
 11. refactor enhanced input handling in player controller
 12. co_await UObject* -> TAbortPtr<UObject> 신택스 구현
 13. weak coroutine을 awaitable로 만들어서 future를 통하지 않고 값을 반환할 수 있음
+14. AllOf 개념 이상하니까 삭제하고 Awaitables::Join 구현
+15. LiveData lock을 새로운 클래스로 분리

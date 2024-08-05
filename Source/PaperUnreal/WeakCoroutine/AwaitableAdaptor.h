@@ -10,6 +10,7 @@ template <typename AwaitableProducerType>
 class TAwaitableGetterAwaitable
 {
 public:
+	// TODO 여기에 operator co_await 존재 여부에 대한 static assert 추가
 	using AwaitableType = decltype(operator co_await(std::declval<AwaitableProducerType&>()));
 
 	TAwaitableGetterAwaitable(AwaitableProducerType Producer)
