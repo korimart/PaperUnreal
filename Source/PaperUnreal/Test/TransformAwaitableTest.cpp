@@ -29,8 +29,7 @@ bool FTransformAwaitableTest::RunTest(const FString& Parameters)
 		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
 			auto TimesTwoStream = LiveData.CreateStream()
-				| Awaitables::AbortIfError()
-				| Awaitables::Transform([](int32 Value) { return Value * 2; });
+				| Awaitables::TransformIfNotError([](int32 Value) { return Value * 2; });
 
 			while (true)
 			{

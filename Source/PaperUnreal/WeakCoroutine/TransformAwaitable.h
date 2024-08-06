@@ -85,11 +85,67 @@ struct TTransformAdaptor : TAwaitableAdaptorBase<TTransformAdaptor<TransformFunc
 };
 
 
+namespace Awaitables_Private
+{
+	auto TransformIfNotErrorVoidCase(const auto& FailableResult, const auto& TransformFunc)
+	{
+		using TransformedType = decltype(TransformFunc());
+		using ReturnType = TFailableResult<TransformedType>;
+		return FailableResult ? ReturnType{TransformFunc()} : ReturnType{FailableResult.GetErrors()};
+	}
+}
+
+
 namespace Awaitables
 {
 	template <typename TransformFuncType>
-	auto Transform(TransformFuncType&& Predicate)
+	auto Transform(TransformFuncType&& TransformFunc)
 	{
-		return TTransformAdaptor<TransformFuncType>{Forward<TransformFuncType>(Predicate)};
+		return TTransformAdaptor<TransformFuncType>{Forward<TransformFuncType>(TransformFunc)};
+	}
+
+	template <typename TransformFuncType>
+	auto TransformIfNotError(TransformFuncType&& TransformFunc)
+	{
+		auto Relay = [TransformFunc = Forward<TransformFuncType>(TransformFunc)]
+			<typename FailableResultType>(const FailableResultType& FailableResult)
+		{
+			// Transform을 사용할 자리에 TransformIfNotError를 사용하면 여기 걸림
+			static_assert(TIsInstantiationOf_V<FailableResultType, TFailableResult>);
+
+			using ResultType = typename FailableResultType::ResultType;
+
+			if constexpr (std::is_void_v<ResultType>)
+			{
+				// SEARCH: 이거 인라인으로 쓰면 컴파일이 안 되는데 이유를 잘 모르겠다
+				return Awaitables_Private::TransformIfNotErrorVoidCase(FailableResult, TransformFunc);
+			}
+			else if constexpr (TIsInstantiationOf_V<ResultType, TTuple>)
+			{
+				return [&]<typename... TupleElementTypes>(TTypeList<TupleElementTypes...>)
+				{
+					using TransformedType = decltype(TransformFunc(std::declval<TupleElementTypes>()...));
+					using ReturnType = TFailableResult<TransformedType>;
+
+					if (!FailableResult)
+					{
+						return ReturnType{FailableResult.GetErrors()};
+					}
+
+					return FailableResult.GetResult().ApplyAfter([&]<typename... ArgTypes>(ArgTypes&&... Args)
+					{
+						return ReturnType{TransformFunc(Forward<ArgTypes>(Args)...)};
+					});
+				}(typename TSwapTypeList<ResultType, TTypeList>::Type{});
+			}
+			else
+			{
+				using TransformedType = decltype(TransformFunc(FailableResult.GetResult()));
+				using ReturnType = TFailableResult<TransformedType>;
+				return FailableResult ? ReturnType{TransformFunc(FailableResult.GetResult())} : ReturnType{FailableResult.GetErrors()};
+			}
+		};
+
+		return TTransformAdaptor<decltype(Relay)>{MoveTemp(Relay)};
 	}
 }

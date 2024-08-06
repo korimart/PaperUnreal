@@ -50,8 +50,7 @@ private:
 				// 지금은 바인딩을 추가하고 버튼을 누른 다음에 자격이 있는지 검사하기 때문에 불가능 함
 				auto GoodTimeForEditingConfig
 					= StageComponent->GetCurrentStage().CreateStream()
-					| Awaitables::AbortIfError()
-					| Awaitables::Transform([](FName Stage) { return Stage == PVPBattleStage::WaitingForConfig; });
+					| Awaitables::TransformIfNotError([](FName Stage) { return Stage == PVPBattleStage::WaitingForConfig; });
 
 				while (true)
 				{

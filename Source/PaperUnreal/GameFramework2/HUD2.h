@@ -22,14 +22,11 @@ public:
 	template <typename T>
 	auto GetOwningPlayerState() const
 	{
-		return CastChecked<APlayerController2>(GetOwningPlayerController())->GetPlayerState()
-			// TODO TransformIfNotError 추가
-			| Awaitables::Transform([](const TFailableResult<APlayerState*>& PlayerState)
-			{
-				return PlayerState
-					? TFailableResult<T*>{CastChecked<T>(PlayerState.GetResult())}
-					: TFailableResult<T*>{PlayerState.GetErrors()};
-			});
+		auto PC = CastChecked<APlayerController2>(GetOwningPlayerController());
+		return PC->GetPlayerState() | Awaitables::TransformIfNotError([](APlayerState* PlayerState)
+		{
+			return CastChecked<T>(PlayerState);
+		});
 	}
 
 	UEnhancedInputComponent* GetEnhancedInputComponent() const
