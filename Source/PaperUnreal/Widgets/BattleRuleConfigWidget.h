@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "PaperUnreal/BattleRule/BattleRuleConfigComponent.h"
 #include "BattleRuleConfigWidget.generated.h"
 
 /**
@@ -15,12 +16,34 @@ class UBattleRuleConfigWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	DECLARE_DELEGATE_RetVal_TwoParams(bool, FConfigConfirmHandler, int32, int32);
-	FConfigConfirmHandler ConfirmHandler;
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnSubmit, bool);
+	FOnSubmit OnSubmit;
+	
+	const FBattleRuleConfig& GetLastSubmittedConfig() const
+	{
+		check(LastSubmittedConfig.IsSet());
+		return *LastSubmittedConfig;
+	}
+	
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnInitialConfig(const FBattleRuleConfig& Config);
+	
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnSubmitFailed();
+	
+private:
+	TOptional<FBattleRuleConfig> LastSubmittedConfig;
 	
 	UFUNCTION(BlueprintCallable)
-	bool OnConfigConfirmed(int32 MaxTeamCount, int32 MaxMemberCount)
+	void Submit(const FBattleRuleConfig& Config)
 	{
-		return ConfirmHandler.Execute(MaxTeamCount, MaxMemberCount);
+		LastSubmittedConfig = Config;
+		OnSubmit.Broadcast(true);
+	}
+	
+	UFUNCTION(BlueprintCallable)
+	void Cancel()
+	{
+		OnSubmit.Broadcast(false);
 	}
 };

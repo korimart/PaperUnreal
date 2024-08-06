@@ -7,6 +7,7 @@
 #include "PVPBattlePlayerState.h"
 #include "PaperUnreal/Development/InGameCheats.h"
 #include "PaperUnreal/BattleRule/BattleRuleComponent.h"
+#include "PaperUnreal/BattleRule/BattleRuleConfigComponent.h"
 #include "PaperUnreal/FreeRule/FreeRuleComponent.h"
 #include "PaperUnreal/ModeAgnostic/FixedCameraPawn.h"
 #include "PaperUnreal/ModeAgnostic/ThirdPersonTemplatePlayerController.h"
@@ -34,7 +35,7 @@ APVPBattleGameMode::APVPBattleGameMode()
 	{
 		PlayerControllerClass = PlayerControllerBPClass.Class;
 	}
-	
+
 	static ConstructorHelpers::FClassFinder<APVPBattleHUD> HUDBPClass(TEXT("/Game/TopDown/Blueprints/BP_PVPBattleHUD"));
 	if (HUDBPClass.Class != nullptr)
 	{
@@ -48,19 +49,26 @@ void APVPBattleGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
+	GetGameState<APVPBattleGameState>()->GetPlayerStateArray().ObserveAddIfValid(this, [this](APlayerState* PlayerState)
+	{
+		CastChecked<APVPBattlePlayerState>(PlayerState)
+			->PrivilegeComponent
+			->AddHostComponentClass(UBattleRuleConfigComponent::StaticClass());
+
+		CastChecked<APVPBattlePlayerState>(PlayerState)
+			->PrivilegeComponent
+			->SetbHost(true);
+	});
+
 	RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 	{
 		GetGameState<APVPBattleGameState>()->StageComponent->SetCurrentStage(PVPBattleStage::WaitingForConfig);
-		GetGameState<APVPBattleGameState>()->GetPlayerStateArray().ObserveAddIfValid(this, [this](APlayerState* PlayerState)
-		{
-			CastChecked<APVPBattlePlayerState>(PlayerState)->PrivilegeComponent->SetbHost(true);
-		});
-		
+
 		{
 			auto FreeRule = NewObject<UFreeRuleComponent>(this);
 			FreeRule->RegisterComponent();
 			FreeRule->Start(DefaultPawnClass);
-			auto F = FinallyIfValid(FreeRule, [FreeRule](){ FreeRule->DestroyComponent(); });
+			auto F = FinallyIfValid(FreeRule, [FreeRule]() { FreeRule->DestroyComponent(); });
 
 			// TODO 방설정 완료될 때까지 대기
 

@@ -24,6 +24,11 @@ struct TAbortablePromise
 		}
 	}
 
+	bool IsAbortRequested() const
+	{
+		return bAbortRequested;
+	}
+
 private:
 	template <typename>
 	friend class TAbortIfRequestedAwaitable;
@@ -35,6 +40,41 @@ private:
 	{
 		return static_cast<const Derived*>(this)->PromiseLife;
 	}
+};
+
+
+template <typename AbortableCoroutineType>
+class TAbortableCoroutineHandle
+{
+public:
+	~TAbortableCoroutineHandle()
+	{
+		Reset();
+	}
+	
+	TAbortableCoroutineHandle& operator=(AbortableCoroutineType&& InCoroutine)
+	{
+		Reset();
+		Coroutine.Emplace(MoveTemp(InCoroutine));
+		return *this;
+	}
+	
+	operator bool() const
+	{
+		return Coroutine && !Coroutine->IsDeadMan();
+	}
+
+	void Reset()
+	{
+		if (Coroutine)
+		{
+			Coroutine->Abort();
+			Coroutine.Reset();
+		}
+	}
+
+private:
+	TOptional<AbortableCoroutineType> Coroutine;
 };
 
 

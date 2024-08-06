@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Blueprint/UserWidget.h"
 #include "PaperUnreal/WeakCoroutine/TypeTraits.h"
 #include "Utils.generated.h"
 
@@ -10,7 +11,7 @@
 namespace Utils_Private
 {
 	template <typename FuncType>
-	class TFinally
+	class TFinally UE_NODISCARD
 	{
 	public:
 		TFinally(FuncType InFunc) : Func(InFunc)
@@ -43,6 +44,28 @@ namespace Utils_Private
 
 	private:
 		TOptional<FuncType> Func;
+	};
+
+	struct FScopedAddToViewport UE_NODISCARD
+	{
+		TWeakObjectPtr<UUserWidget> Widget;
+
+		FScopedAddToViewport(UUserWidget* InWidget)
+			: Widget(InWidget)
+		{
+			Widget->AddToViewport();
+		}
+
+		~FScopedAddToViewport()
+		{
+			if (Widget.IsValid() && Widget->IsInViewport())
+			{
+				Widget->RemoveFromParent();
+			}
+		}
+
+		FScopedAddToViewport(const FScopedAddToViewport&) = delete;
+		FScopedAddToViewport& operator=(const FScopedAddToViewport&) = delete;
 	};
 }
 
@@ -174,6 +197,12 @@ UE_NODISCARD auto FinallyIfValid(UObject* Object, FuncType&& Func)
 			Func();
 		}
 	});
+}
+
+
+inline UE_NODISCARD auto ScopedAddToViewport(UUserWidget* Widget)
+{
+	return Utils_Private::FScopedAddToViewport{Widget};
 }
 
 

@@ -7,9 +7,9 @@
 #include "CoreMinimal.h"
 #include "AbortablePromise.h"
 #include "AwaitablePromise.h"
-#include "TransformAwaitable.h"
 #include "CancellableFuture.h"
 #include "LoggingPromise.h"
+#include "MiscAwaitables.h"
 #include "TypeTraits.h"
 #include "WeakPromise.h"
 #include "WeakCoroutine.generated.h"
@@ -42,14 +42,6 @@ struct TCatchAwaitable
 };
 
 
-struct FSuspendConditional {
-	bool bSuspend = false;
-    constexpr bool await_ready() const noexcept { return !bSuspend; }
-    constexpr void await_suspend(std::coroutine_handle<>) const noexcept {}
-    constexpr void await_resume() const noexcept {}
-};
-
-
 template <typename>
 class TWeakCoroutinePromiseType;
 
@@ -77,6 +69,21 @@ public:
 		{
 			Handle.promise().Abort();
 		}
+	}
+
+	bool IsDeadMan() const
+	{
+		if (!PromiseLife.IsValid())
+		{
+			return true;
+		}
+		
+		if (Handle.promise().IsAbortRequested())
+		{
+			return true;
+		}
+		
+		return false;
 	}
 
 	void AddToWeakList(const UObject* Object)
@@ -150,10 +157,16 @@ public:
 	{
 	}
 
-	template <typename AnyType>
+	template <CAwaitableConvertible AnyType>
 	auto await_transform(AnyType&& Any)
 	{
 		return await_transform(operator co_await(Forward<AnyType>(Any)));
+	}
+	
+	template <CUObjectUnsafeWrapper UnsafeWrapperType>
+	auto await_transform(const UnsafeWrapperType& Wrapper)
+	{
+		return Awaitables::AsAwaitable(Wrapper) | Awaitables::ReturnAsAbortPtr(*this);
 	}
 
 	template <typename WithErrorAwaitableType>

@@ -21,7 +21,7 @@ struct TWeakPromise
 	{
 		AddToWeakList(&Object);
 	}
-	
+
 	bool IsValid() const
 	{
 		return Algo::AllOf(WeakList, [](const auto& Each) { return Each.IsValid(); });
