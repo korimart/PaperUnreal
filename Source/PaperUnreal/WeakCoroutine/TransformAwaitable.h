@@ -7,7 +7,7 @@
 #include "TypeTraits.h"
 
 
-template <bool bIfNotError, typename InnerAwaitableType, typename TransformFuncType>
+template <typename InnerAwaitableType, typename TransformFuncType>
 class TTransformAwaitable
 {
 public:
@@ -28,44 +28,7 @@ public:
 		return InnerAwaitable.await_suspend(Forward<HandleType>(Handle));
 	}
 
-	auto await_resume() requires bIfNotError
-	{
-		auto FailableResult = InnerAwaitable.await_resume();
-		using ResultType = typename decltype(FailableResult)::ResultType;
-
-		if constexpr (std::is_void_v<ResultType>)
-		{
-			using TransformedType = decltype(TransformFunc());
-			using ReturnType = TFailableResult<TransformedType>;
-			return FailableResult ? ReturnType{TransformFunc()} : ReturnType{FailableResult.GetErrors()};
-		}
-		else if constexpr (TIsInstantiationOf_V<ResultType, TTuple>)
-		{
-			return [&]<typename... TupleElementTypes>(TTypeList<TupleElementTypes...>)
-			{
-				using TransformedType = decltype(TransformFunc(std::declval<TupleElementTypes>()...));
-				using ReturnType = TFailableResult<TransformedType>;
-
-				if (!FailableResult)
-				{
-					return ReturnType{FailableResult.GetErrors()};
-				}
-
-				return FailableResult.GetResult().ApplyAfter([&]<typename... ArgTypes>(ArgTypes&&... Args)
-				{
-					return ReturnType{TransformFunc(Forward<ArgTypes>(Args)...)};
-				});
-			}(TSwapTypeList<ResultType, TTypeList>{});
-		}
-		else
-		{
-			using TransformedType = decltype(TransformFunc(FailableResult.GetResult()));
-			using ReturnType = TFailableResult<TransformedType>;
-			return FailableResult ? ReturnType{TransformFunc(FailableResult.GetResult())} : ReturnType{FailableResult.GetErrors()};
-		}
-	}
-
-	auto await_resume() requires !bIfNotError
+	auto await_resume()
 	{
 		if constexpr (std::is_void_v<decltype(InnerAwaitable.await_resume())>)
 		{
@@ -95,9 +58,12 @@ private:
 	TransformFuncType TransformFunc;
 };
 
+template <typename AwaitableType, typename Trans>
+TTransformAwaitable(AwaitableType&& Awaitable, Trans&& TransformFunc) -> TTransformAwaitable<AwaitableType, std::decay_t<Trans>>;
 
-template <bool bIfNotError, typename TransformFuncType>
-struct TTransformAdaptor : TAwaitableAdaptorBase<TTransformAdaptor<bIfNotError, TransformFuncType>>
+
+template <typename TransformFuncType>
+struct TTransformAdaptor : TAwaitableAdaptorBase<TTransformAdaptor<TransformFuncType>>
 {
 	std::decay_t<TransformFuncType> Predicate;
 
@@ -111,22 +77,10 @@ struct TTransformAdaptor : TAwaitableAdaptorBase<TTransformAdaptor<bIfNotError, 
 	{
 	}
 
-	template <CErrorReportingAwaitable AwaitableType>
-	friend auto operator|(AwaitableType&& Awaitable, TTransformAdaptor Adaptor) requires bIfNotError
-	{
-		return TTransformAwaitable<true, AwaitableType, decltype(Predicate)>
-		{
-			Forward<AwaitableType>(Awaitable), MoveTemp(Adaptor.Predicate)
-		};
-	}
-
 	template <CAwaitable AwaitableType>
-	friend auto operator|(AwaitableType&& Awaitable, TTransformAdaptor Adaptor) requires !bIfNotError
+	friend auto operator|(AwaitableType&& Awaitable, TTransformAdaptor Adaptor)
 	{
-		return TTransformAwaitable<false, AwaitableType, decltype(Predicate)>
-		{
-			Forward<AwaitableType>(Awaitable), MoveTemp(Adaptor.Predicate)
-		};
+		return TTransformAwaitable{Forward<AwaitableType>(Awaitable), MoveTemp(Adaptor.Predicate)};
 	}
 };
 
@@ -136,12 +90,6 @@ namespace Awaitables
 	template <typename TransformFuncType>
 	auto Transform(TransformFuncType&& Predicate)
 	{
-		return TTransformAdaptor<false, TransformFuncType>{Forward<TransformFuncType>(Predicate)};
-	}
-	
-	template <typename TransformFuncType>
-	auto TransformIfNotError(TransformFuncType&& Predicate)
-	{
-		return TTransformAdaptor<true, TransformFuncType>{Forward<TransformFuncType>(Predicate)};
+		return TTransformAdaptor<TransformFuncType>{Forward<TransformFuncType>(Predicate)};
 	}
 }
