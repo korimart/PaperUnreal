@@ -8,7 +8,6 @@
 #include "GameFramework/GameStateBase.h"
 #include "PaperUnreal/GameFramework2/HUD2.h"
 #include "PaperUnreal/ModeAgnostic/PrivilegeComponent.h"
-#include "PaperUnreal/ModeAgnostic/ReadyStateComponent.h"
 #include "PaperUnreal/ModeAgnostic/StageComponent.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 #include "PaperUnreal/WeakCoroutine/WhileTrueAwaitable.h"
@@ -26,9 +25,16 @@ private:
 	UPROPERTY()
 	UStageComponent* StageComponent;
 
+	UPROPERTY(EditAnywhere)
+	UInputAction* EditConfigAction;
+	FSimpleMulticastDelegate OnEditConfigTriggered;
+	void OnEditConfigTriggeredFunc() { OnEditConfigTriggered.Broadcast(); }
+
 	virtual void BeginPlay() override
 	{
 		Super::BeginPlay();
+
+		GetEnhancedInputComponent()->BindAction(EditConfigAction, ETriggerEvent::Triggered, this, &ThisClass::OnEditConfigTriggeredFunc);
 
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
@@ -40,11 +46,11 @@ private:
 				auto PlayerState = co_await GetOwningPlayerState<APVPBattlePlayerState>();
 				auto bHost = PlayerState->PrivilegeComponent->GetbHost();
 				auto CurrentStage = StageComponent->GetCurrentStage();
-				
+
 				co_await (Stream::Combine(bHost.CreateStream(), CurrentStage.CreateStream())
 					| Awaitables::AbortIfError()
 					| Awaitables::Transform([](bool bHost, FName Stage) { return bHost && Stage == PVPBattleStage::WaitingForConfig; })
-					| Awaitables::WhileTrue([this]() { return ListenToEditConfigButton(); }));
+					| Awaitables::WhileTrue([this]() { return ListenToEditConfigAction(); }));
 			});
 
 			// TODO 캐릭터 선택 화면 띄우기
@@ -60,12 +66,13 @@ private:
 		});
 	}
 
-	FWeakCoroutine ListenToEditConfigButton()
+	FWeakCoroutine ListenToEditConfigAction()
 	{
 		// wait for config component on player controller
 		while (true)
 		{
-			co_return;
+			co_await OnEditConfigTriggered;
+			UE_LOG(LogTemp, Warning, TEXT("triggered"));
 			// wait for key press
 			// get current config from server
 			// Open Widget

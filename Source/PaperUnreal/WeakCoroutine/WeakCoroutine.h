@@ -119,7 +119,7 @@ public:
 	TWeakCoroutinePromiseType() = default;
 
 	// TODO static assert functor type
-	TWeakCoroutinePromiseType(const auto& Lambda)
+	TWeakCoroutinePromiseType(const std::invocable auto& Lambda)
 		: bInitRequired(true)
 	{
 	}

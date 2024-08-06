@@ -113,6 +113,7 @@ private:
 		ServerTracerToAreaConverter->SetConversionDestination(ServerHomeArea->ServerAreaBoundary);
 		ServerTracerToAreaConverter->RegisterComponent();
 
+		// TODO ServerTracerToAreaConverter는 죽으면 파괴되므로 없을 수 있음 (죽고 나서 액터가 파괴되기까지 시간이 걸림)
 		ServerGameState->ServerAreaSpawner->GetSpawnedAreas().ObserveAddIfValid(this, [this](AAreaActor* NewArea)
 		{
 			if (NewArea != ServerHomeArea)

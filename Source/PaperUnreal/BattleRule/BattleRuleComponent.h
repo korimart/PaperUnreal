@@ -107,6 +107,7 @@ private:
 	FTeamAllocator TeamAllocator;
 	TMap<int32, FLinearColor> TeamColors;
 
+	// TODO 여기 코루틴들 RunWeakCoroutine 호출 필요 없음
 	void InitiatePawnSpawnSequence(APlayerState* Player)
 	{
 		RunWeakCoroutine(this, [this, Player]() -> FWeakCoroutine
