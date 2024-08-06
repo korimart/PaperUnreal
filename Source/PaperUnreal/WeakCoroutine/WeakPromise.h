@@ -15,6 +15,13 @@
 template <typename Derived>
 struct TWeakPromise
 {
+	TWeakPromise() = default;
+
+	TWeakPromise(const UObject& Object, auto&&...)
+	{
+		AddToWeakList(&Object);
+	}
+	
 	bool IsValid() const
 	{
 		return Algo::AllOf(WeakList, [](const auto& Each) { return Each.IsValid(); });

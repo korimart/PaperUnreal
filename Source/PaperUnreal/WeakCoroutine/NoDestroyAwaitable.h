@@ -4,6 +4,20 @@
 
 #include "CoreMinimal.h"
 #include "ErrorReporting.h"
+#include "NoDestroyAwaitable.generated.h"
+
+
+UCLASS()
+class UNoDestroyError : public UFailableResultError
+{
+	GENERATED_BODY()
+
+public:
+	static UNoDestroyError* DestroyCalled()
+	{
+		return NewError<UNoDestroyError>(TEXT("Inner Awaitable이 destroy를 요청했으므로 Error로 변경해서 resume합니다"));
+	}
+};
 
 
 template <typename InnerAwaitableType>
@@ -44,6 +58,8 @@ public:
 				This->bDestroyed = true;
 				Handle.resume();
 			}
+
+			auto& promise() const { return Handle.promise(); }
 		};
 
 		bDestroyed = false;
@@ -54,7 +70,7 @@ public:
 	{
 		if (bDestroyed)
 		{
-			return NewError(TEXT("NoDestroyAwaitable: Inner Awaitable이 destroy를 요청했으므로 Error로 변경해서 resume합니다"));
+			return UNoDestroyError::DestroyCalled();
 		}
 
 		return Inner.await_resume();

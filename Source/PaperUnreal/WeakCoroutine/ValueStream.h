@@ -272,6 +272,7 @@ namespace Stream
 		}
 	}
 
+	// TODO live data, multicast delegate를 받는 버전 추가
 	template <typename... ValueTypes>
 	TValueStream<TTuple<ValueTypes...>> Combine(TValueStream<ValueTypes>&&... ValueStreams)
 	{

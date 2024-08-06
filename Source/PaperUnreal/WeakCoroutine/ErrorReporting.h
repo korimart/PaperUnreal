@@ -256,7 +256,7 @@ concept CNonErrorReportingAwaitable = requires(AwaitableType Awaitable)
 };
 
 
-template <CErrorReportingAwaitable AwaitableType>
+template <typename AwaitableType>
 struct TErrorReportResultType
 {
 	using Type = typename decltype(std::declval<AwaitableType>().await_resume())::ResultType;

@@ -45,10 +45,26 @@ struct FMinimalAbortableCoroutine
 		void OnAbortRequested()
 		{
 		}
+
+		// TODO 여기다가 쓰는 게 아니라 awaitable 쪽에서 SetErrors가 있는지 검사
+		void SetErrors(const TArray<UFailableResultError*>&)
+		{
+			// 미니멀이기 때문에 AbortIfError 등의 Awaitable을 사용해도
+			// 어떤 에러가 발생했는지 기록하지 않음
+		}
 	};
 
 	TWeakPtr<std::monostate> PromiseLife;
 	std::coroutine_handle<promise_type> CoroutineHandle;
+	bool bAbortOnDestruction = false;
+
+	~FMinimalAbortableCoroutine()
+	{
+		if (bAbortOnDestruction)
+		{
+			Abort();
+		}
+	}
 
 	void Abort()
 	{
@@ -56,5 +72,10 @@ struct FMinimalAbortableCoroutine
 		{
 			CoroutineHandle.promise().Abort();
 		}
+	}
+
+	void AbortOnDestruction()
+	{
+		bAbortOnDestruction = true;
 	}
 };

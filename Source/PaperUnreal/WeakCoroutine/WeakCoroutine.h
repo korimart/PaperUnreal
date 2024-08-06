@@ -42,6 +42,14 @@ struct TCatchAwaitable
 };
 
 
+struct FSuspendConditional {
+	bool bSuspend = false;
+    constexpr bool await_ready() const noexcept { return !bSuspend; }
+    constexpr void await_suspend(std::coroutine_handle<>) const noexcept {}
+    constexpr void await_resume() const noexcept {}
+};
+
+
 template <typename>
 class TWeakCoroutinePromiseType;
 
@@ -108,14 +116,28 @@ class TWeakCoroutinePromiseType : public FLoggingPromise
                                   , public TAwaitablePromise<T>
 {
 public:
+	TWeakCoroutinePromiseType() = default;
+
+	// TODO static assert functor type
+	TWeakCoroutinePromiseType(const auto& Lambda)
+		: bInitRequired(true)
+	{
+	}
+
+	template <typename... ArgTypes>
+	TWeakCoroutinePromiseType(const UObject& Object, ArgTypes&&... Args)
+		: TWeakPromise<TWeakCoroutinePromiseType>(Object, Forward<ArgTypes>(Args)...)
+	{
+	}
+	
 	TWeakCoroutine<T> get_return_object()
 	{
 		return std::coroutine_handle<TWeakCoroutinePromiseType>::from_promise(*this);
 	}
 
-	std::suspend_always initial_suspend() const
+	FSuspendConditional initial_suspend() const
 	{
-		return {};
+		return {bInitRequired};
 	}
 
 	std::suspend_never final_suspend() noexcept
@@ -165,6 +187,7 @@ private:
 	friend struct TAbortablePromise<TWeakCoroutinePromiseType>;
 	friend struct TWeakPromise<TWeakCoroutinePromiseType>;
 
+	bool bInitRequired = false;
 	TUniquePtr<TUniqueFunction<TWeakCoroutine<T>()>> Captures;
 	TSharedRef<std::monostate> PromiseLife = MakeShared<std::monostate>();
 

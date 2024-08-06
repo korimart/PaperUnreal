@@ -31,6 +31,7 @@ public:
 		Coroutine = StartFiltering(Handle);
 	}
 
+	// TODO Inner가 Error reporing이면 에러로 아니면 아닌걸로 변경
 	TFailableResult<ResultType> await_resume()
 	{
 		return MoveTemp(Ret.GetValue());

@@ -11,6 +11,7 @@
 #include "PaperUnreal/ModeAgnostic/ReadyStateComponent.h"
 #include "PaperUnreal/ModeAgnostic/StageComponent.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
+#include "PaperUnreal/WeakCoroutine/WhileTrueAwaitable.h"
 #include "PVPBattleHUD.generated.h"
 
 /**
@@ -34,7 +35,17 @@ private:
 			StageComponent = (co_await WaitForGameState(GetWorld()))->FindComponentByClass<UStageComponent>();
 			check(IsValid(StageComponent));
 
-			InitiateHostSequence();
+			RunWeakCoroutine(this, [this]() -> FWeakCoroutine
+			{
+				auto PlayerState = co_await GetOwningPlayerState<APVPBattlePlayerState>();
+				auto bHost = PlayerState->PrivilegeComponent->GetbHost();
+				auto CurrentStage = StageComponent->GetCurrentStage();
+				
+				co_await (Stream::Combine(bHost.CreateStream(), CurrentStage.CreateStream())
+					| Awaitables::AbortIfError()
+					| Awaitables::Transform([](bool bHost, FName Stage) { return bHost && Stage == PVPBattleStage::WaitingForConfig; })
+					| Awaitables::WhileTrue([this]() { return ListenToEditConfigButton(); }));
+			});
 
 			// TODO 캐릭터 선택 화면 띄우기
 
@@ -49,14 +60,18 @@ private:
 		});
 	}
 
-	void InitiateHostSequence()
+	FWeakCoroutine ListenToEditConfigButton()
 	{
-		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
+		// wait for config component on player controller
+		while (true)
 		{
-			auto PlayerState = co_await GetOwningPlayerState<APVPBattlePlayerState>();
-			co_await PlayerState->PrivilegeComponent->GetbHost().If(true);
-
-			// TODO open widget
-		});
+			co_return;
+			// wait for key press
+			// get current config from server
+			// Open Widget
+			// wait for result
+			// if cancelled continue
+			// send the config to server
+		}
 	}
 };

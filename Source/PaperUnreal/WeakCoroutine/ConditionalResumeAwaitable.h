@@ -10,6 +10,7 @@ template <typename Derived, CAwaitable InnerAwaitableType>
 class TConditionalResumeAwaitable
 {
 public:
+	// TODO allow void return
 	using ReturnType = decltype(std::declval<InnerAwaitableType>().await_resume());
 
 	template <typename AwaitableType>
