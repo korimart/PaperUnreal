@@ -14,6 +14,7 @@
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 #include "PaperUnreal/WeakCoroutine/WhileTrueAwaitable.h"
 #include "PaperUnreal/Widgets/BattleRuleConfigWidget.h"
+#include "PaperUnreal/Widgets/SelectCharacterWidget.h"
 #include "PVPBattleHUD.generated.h"
 
 /**
@@ -30,6 +31,9 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<UBattleRuleConfigWidget> ConfigWidgetClass;
+
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<USelectCharacterWidget> SelectCharacterWidgetClass;
 
 	UPROPERTY(EditAnywhere)
 	UInputAction* EditConfigAction;
@@ -62,6 +66,11 @@ private:
 			});
 
 			// TODO 캐릭터 선택 화면 띄우기
+			{
+				auto SelectCharacterWidget = co_await CreateWidget<USelectCharacterWidget>(GetOwningPlayerController(), SelectCharacterWidgetClass);
+				auto S = ScopedAddToViewport(SelectCharacterWidget);
+				const int32 Selection = co_await Awaitables::AnyOf(SelectCharacterWidget->OnManny, SelectCharacterWidget->OnQuinn);
+			}
 
 			// TODO 플레이를 시작하면 플레이 HUD 띄우기
 
