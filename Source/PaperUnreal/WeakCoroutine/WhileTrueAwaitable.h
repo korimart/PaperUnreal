@@ -6,13 +6,14 @@
 #include "FilterAwaitable.h"
 #include "MinimalAbortableCoroutine.h"
 #include "NoDestroyAwaitable.h"
-#include "PaperUnreal/GameFramework2/Utils.h"
 
 
 template <typename InnerAwaitableType, typename CoroutineGetterType>
 class TWhileTrueAwaitable
 {
 public:
+	using ResultType = decltype(std::declval<InnerAwaitableType>().await_resume());
+	
 	template <typename AwaitableType, typename CoGetter>
 	TWhileTrueAwaitable(AwaitableType&& Awaitable, CoGetter&& Getter)
 		: Inner(Forward<AwaitableType>(Awaitable)), CoroutineGetter(Forward<CoGetter>(Getter))
@@ -21,73 +22,71 @@ public:
 
 	bool await_ready() const
 	{
-		// 이 Awaitable은 한 번만 사용될 것을 염두에 두고 작성되었음
-		check(!Worker.IsSet());
 		return false;
 	}
 
-	template <typename HandleType>
-	auto await_suspend(HandleType&& Handle)
+	auto await_suspend(const auto& Handle)
 	{
-		Worker = Start(Forward<HandleType>(Handle));
+		bAborted = MakeShared<bool>(false);
+		Worker = Start();
+		Worker->ReturnValue().Then([this, Handle, bAborted = bAborted](const auto& FailableResult)
+		{
+			if (!*bAborted)
+			{
+				FailableResult ? Handle.resume() : Handle.destroy();
+			}
+		});
 	}
 
-	// TODO inner가 error reporting이 아니면 non failable 반환하도록 변경
-	TFailableResult<std::monostate> await_resume()
+	ResultType await_resume()
 	{
-		return Errors;
+		Worker.Reset();
+		return MoveTemp(*InnerReturn);
 	}
 	
 	void await_abort()
 	{
-		Worker->Abort();
+		Worker.Reset();
 	}
 
 private:
 	InnerAwaitableType Inner;
 	CoroutineGetterType CoroutineGetter;
-	TOptional<FMinimalAbortableCoroutine> Worker;
-	TArray<UFailableResultError*> Errors;
 
-	FMinimalAbortableCoroutine Start(auto Handle)
+	// TODO 로직이 FilterAwaitable과 매우 유사하므로 리팩토링 가능한지 연구
+	TAbortableCoroutineHandle<FMinimalAbortableCoroutine> Worker;
+	TOptional<ResultType> InnerReturn;
+	TSharedPtr<bool> bAborted;
+
+	FMinimalAbortableCoroutine Start()
 	{
 		while (true)
 		{
-			// TODO 이거랑 같은 패턴이 Filter Awaitable에도 반복되어 있음
-			// Inner Coroutine 만들어서 Error forwarding 기능 구현 필요
-			auto Failable0 = co_await (Inner | Awaitables::If(true) | Awaitables::NoDestroy());
-			if (ForwardErrorsIfError(Handle, Failable0))
+			InnerReturn = co_await (Inner | Awaitables::If(true));
+			if (IsError(*InnerReturn))
 			{
 				break;
 			}
+
+			TAbortableCoroutineHandle Coroutine = CoroutineGetter();
 			
-			auto Coroutine = CoroutineGetter();
-			auto F = Finally([&](){ Coroutine.Abort(); });
-			
-			auto Failable1 = co_await (Inner | Awaitables::If(false) | Awaitables::NoDestroy());
-			if (ForwardErrorsIfError(Handle, Failable1))
+			InnerReturn = co_await (Inner | Awaitables::If(false));
+			if (IsError(*InnerReturn))
 			{
 				break;
 			}
 		}
 	}
 
-	bool ForwardErrorsIfError(const auto& Handle, const auto& Failable)
+	template <typename T>
+	bool IsError(const TFailableResult<T>& FR)
 	{
-		if (Failable)
-		{
-			return false;
-		}
+		return !FR;
+	}
 
-		if (Failable.template ContainsAnyOf<UNoDestroyError>())
-		{
-			Handle.destroy();
-			return true;
-		}
-
-		Errors = Failable.GetErrors();
-		Handle.resume();
-		return true;
+	bool IsError(const auto&)
+	{
+		return false;
 	}
 };
 
