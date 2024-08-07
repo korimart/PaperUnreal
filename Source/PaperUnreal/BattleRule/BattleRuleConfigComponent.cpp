@@ -17,9 +17,16 @@ void UBattleRuleConfigComponent::ClientReceiveConfig_Implementation(const FBattl
 
 void UBattleRuleConfigComponent::ServerReceiveConfig_Implementation(const FBattleRuleConfig& Config)
 {
-	// TODO validate
-	CurrentConfig = Config;
-	ClientReceiveConfirmation(true);
+	if (FMath::IsWithinInclusive(Config.MaxTeamCount, 1, 4)
+		&& FMath::IsWithinInclusive(Config.MaxMemberCount, 1, 4))
+	{
+		CurrentConfig = Config;
+		ClientReceiveConfirmation(true);
+	}
+	else
+	{
+		ClientReceiveConfirmation(false);
+	}
 }
 
 void UBattleRuleConfigComponent::ClientReceiveConfirmation_Implementation(bool bSucceeded)
