@@ -123,12 +123,15 @@ public:
 		return *this
 			| Awaitables::Filter([](const TFailableResult<ValueType>& Result)
 			{
-				return Result.template ContainsAnyOf<UEndOfStreamError>();
+				return !Result;
 			})
-			| Awaitables::Transform([](const TFailableResult<ValueType>&)
+			| Awaitables::Transform([](const TFailableResult<ValueType>& Result)
 			{
-				// TODO TFailalbeResult<void>가 가능해지면 return;으로 수정
-				return std::monostate{};
+				if (Result.template OnlyContains<UEndOfStreamError>())
+				{
+					return TFailableResult{std::monostate{}};
+				}
+				return TFailableResult<std::monostate>{Result.GetErrors()};
 			});
 	}
 
@@ -176,11 +179,25 @@ TTuple<TValueStream<T>, FDelegateHandle> MakeStreamFromDelegate(
 		Receiver.Pin()->ReceiveValue(Each);
 	}
 
+	struct FStreamCloser
+	{
+		TWeakPtr<TValueStreamValueReceiver<T>> Receiver;
+
+		~FStreamCloser()
+		{
+			if (Receiver.IsValid())
+			{
+				Receiver.Pin()->Close();
+			}
+		}
+	};
+
 	FDelegateHandle Handle = MulticastDelegate.Add(DelegateType::FDelegate::CreateSPLambda(Receiver.Pin().ToSharedRef(),
 		[
 			Receiver,
 			Predicate = Forward<PredicateType>(Predicate),
-			TransformFunc = Forward<TransformFuncType>(TransformFunc)
+			TransformFunc = Forward<TransformFuncType>(TransformFunc),
+			StreamCloser = MakeShared<FStreamCloser>(Receiver)
 		]<typename... ArgTypes>(ArgTypes&&... NewValues)
 		{
 			if (Predicate(Forward<ArgTypes>(NewValues)...))

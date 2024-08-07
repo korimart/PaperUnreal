@@ -92,6 +92,14 @@ struct TLiveDataValidator<TSoftObjectPtr<ObjectType>>
 
 class FLiveDataBase
 {
+public:
+	FLiveDataBase() = default;
+	
+	// Value Stream을 Multicast Delegate을 통해서 만들기 때문에 허용하면 여러 곳에서
+	// Value Stream을 Value를 넣을 수 있게 됨
+	FLiveDataBase(const FLiveDataBase&) = delete;
+	FLiveDataBase& operator=(const FLiveDataBase&) = delete;
+	
 protected:
 	bool bExecutingCallbacks = false;
 	TArray<TCancellablePromise<void>> CallbackGuardAwaiters;
