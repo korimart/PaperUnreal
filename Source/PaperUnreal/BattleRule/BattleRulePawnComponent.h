@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "BattleRuleGameStateComponent.h"
+#include "Engine/Texture2DArray.h"
 #include "PaperUnreal/AreaTracer/AreaSlasherComponent.h"
 #include "PaperUnreal/AreaTracer/AreaSpawnerComponent.h"
 #include "PaperUnreal/AreaTracer/ReplicatedTracerPathComponent.h"
@@ -69,6 +70,9 @@ private:
 	UBattleRuleGameStateComponent* ServerGameState;
 
 	UPROPERTY()
+	UTracerComponent* ServerTracer;
+
+	UPROPERTY()
 	UTracerOverlapCheckerComponent* ServerOverlapChecker;
 
 	UPROPERTY()
@@ -89,35 +93,48 @@ private:
 
 	virtual void AttachServerMachineComponents() override
 	{
-		auto Tracer = NewChildComponent<UTracerComponent>(GetOwner());
-		Tracer->RegisterComponent();
-		Tracer->ServerTracerPath->SetNoPathArea(ServerHomeArea->ServerAreaBoundary);
+		ServerTracer = NewChildComponent<UTracerComponent>(GetOwner());
+		ServerTracer->RegisterComponent();
+		ServerTracer->ServerTracerPath->SetNoPathArea(ServerHomeArea->ServerAreaBoundary);
 
 		ServerOverlapChecker = NewChildComponent<UTracerOverlapCheckerComponent>(GetOwner());
-		ServerOverlapChecker->SetTracer(Tracer->ServerTracerPath);
+		ServerOverlapChecker->SetTracer(ServerTracer->ServerTracerPath);
 		ServerOverlapChecker->RegisterComponent();
 
-		ServerGameState->ServerPawnSpawner->GetSpawnedPawns().ObserveAddIfValid(this, [this](APawn* NewPlayer)
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
-			auto NewPlayerHome = NewPlayer->FindComponentByClass<UBattleRulePawnComponent>()->ServerHomeArea;
-			auto NewPlayerTracer = NewPlayer->FindComponentByClass<UTracerPathComponent>();
+			co_await AddToWeakList(ServerOverlapChecker);
+			co_await AddToWeakList(ServerHomeArea);
 
-			if (NewPlayerHome != ServerHomeArea)
+			auto PawnStream
+				= ServerGameState->ServerPawnSpawner->GetSpawnedPawns().CreateAddStream()
+				| Awaitables::TransformToComponent<UBattleRulePawnComponent>()
+				| Awaitables::FilterIfNotError([this](auto Pawn){ return Pawn->ServerHomeArea != ServerHomeArea; });
+
+			while (true)
 			{
-				ServerOverlapChecker->AddOverlapTarget(NewPlayerTracer);
+				auto NewPawn = co_await PawnStream;
+				ServerOverlapChecker->AddOverlapTarget(NewPawn->ServerTracer->ServerTracerPath);
 			}
 		});
 
 		ServerTracerToAreaConverter = NewChildComponent<UTracerToAreaConverterComponent>(GetOwner());
-		ServerTracerToAreaConverter->SetTracer(Tracer->ServerTracerPath);
+		ServerTracerToAreaConverter->SetTracer(ServerTracer->ServerTracerPath);
 		ServerTracerToAreaConverter->SetConversionDestination(ServerHomeArea->ServerAreaBoundary);
 		ServerTracerToAreaConverter->RegisterComponent();
 
-		// TODO ServerTracerToAreaConverter는 죽으면 파괴되므로 없을 수 있음 (죽고 나서 액터가 파괴되기까지 시간이 걸림)
-		ServerGameState->ServerAreaSpawner->GetSpawnedAreas().ObserveAddIfValid(this, [this](AAreaActor* NewArea)
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
-			if (NewArea != ServerHomeArea)
+			co_await AddToWeakList(ServerTracerToAreaConverter);
+			co_await AddToWeakList(ServerHomeArea);
+
+			auto AreaStream
+				= ServerGameState->ServerAreaSpawner->GetSpawnedAreas().CreateAddStream()
+				| Awaitables::IfNot(ServerHomeArea);
+
+			while (true)
 			{
+				auto NewArea = co_await AreaStream;
 				auto AreaSlasher = NewChildComponent<UAreaSlasherComponent>(GetOwner());
 				AreaSlasher->SetSlashTarget(NewArea->ServerAreaBoundary);
 				AreaSlasher->SetTracerToAreaConverter(ServerTracerToAreaConverter);
@@ -126,7 +143,7 @@ private:
 		});
 
 		auto Killer = NewChildComponent<UTracerKillerComponent>(GetOwner());
-		Killer->SetTracer(Tracer->ServerTracerPath);
+		Killer->SetTracer(ServerTracer->ServerTracerPath);
 		Killer->SetArea(ServerHomeArea->ServerAreaBoundary);
 		Killer->SetOverlapChecker(ServerOverlapChecker);
 		Killer->RegisterComponent();

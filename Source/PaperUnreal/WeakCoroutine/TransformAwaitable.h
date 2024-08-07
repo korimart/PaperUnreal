@@ -154,4 +154,10 @@ namespace Awaitables
 	{
 		return Awaitables_Private::TransformIfNotErrorImpl(Forward<TransformFuncType>(TransformFunc));
 	}
+
+	template <typename ComponentType>
+	auto TransformToComponent()
+	{
+		return TransformIfNotError([](auto Actor){ return Actor->template FindComponentByClass<ComponentType>(); });
+	}
 }

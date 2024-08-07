@@ -124,10 +124,22 @@ namespace Awaitables
 
 		return TFilterAdaptor<decltype(Relay)>{MoveTemp(Relay)};
 	}
-
+	
 	template <typename ValueType>
 	auto If(ValueType&& Value)
 	{
 		return FilterIfNotError([Value = Forward<ValueType>(Value)](const auto& Result) { return Result == Value; });
 	}
+	
+	template <typename ValueType>
+	auto IfNot(ValueType&& Value)
+	{
+		return FilterIfNotError([Value = Forward<ValueType>(Value)](const auto& Result) { return Result != Value; });
+	}
+	
+	inline auto IfValid()
+	{
+		return FilterIfNotError([](auto* Result) { return ::IsValid(Result); });
+	}
+
 }
