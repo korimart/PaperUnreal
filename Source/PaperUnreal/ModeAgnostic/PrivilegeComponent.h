@@ -3,7 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/PlayerState.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
 #include "PrivilegeComponent.generated.h"
 
@@ -48,7 +47,7 @@ private:
 };
 
 
-UCLASS(Within=PlayerState)
+UCLASS(Within=PlayerController)
 class UPrivilegeComponent : public UComponentGroupComponent
 {
 	GENERATED_BODY()
@@ -96,7 +95,7 @@ private:
 		}
 
 		FConditionalComponents& Ret = NameToConditionalComponentsMap.Emplace(Privilege);
-		Ret.SetComponentOwnerAndGroup(GetOuterAPlayerState()->GetPlayerController(), this);
+		Ret.SetComponentOwnerAndGroup(GetOuterAPlayerController(), this);
 		return Ret;
 	}
 };

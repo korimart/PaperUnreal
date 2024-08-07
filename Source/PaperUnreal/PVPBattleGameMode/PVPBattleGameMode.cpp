@@ -4,13 +4,13 @@
 
 #include "PVPBattleGameState.h"
 #include "PVPBattleHUD.h"
+#include "PVPBattlePlayerController.h"
 #include "PVPBattlePlayerState.h"
 #include "PaperUnreal/Development/InGameCheats.h"
 #include "PaperUnreal/BattleRule/BattleRuleComponent.h"
 #include "PaperUnreal/BattleRule/BattleRuleConfigComponent.h"
 #include "PaperUnreal/FreeRule/FreeRuleComponent.h"
 #include "PaperUnreal/ModeAgnostic/FixedCameraPawn.h"
-#include "PaperUnreal/ModeAgnostic/ThirdPersonTemplatePlayerController.h"
 #include "UObject/ConstructorHelpers.h"
 
 
@@ -20,7 +20,7 @@ DEFINE_LOG_CATEGORY(LogPVPBattleGameMode);
 APVPBattleGameMode::APVPBattleGameMode()
 {
 	GameStateClass = APVPBattleGameState::StaticClass();
-	PlayerControllerClass = AThirdPersonTemplatePlayerController::StaticClass();
+	PlayerControllerClass = APVPBattlePlayerController::StaticClass();
 	PlayerStateClass = APVPBattlePlayerState::StaticClass();
 	SpectatorClass = AFixedCameraPawn::StaticClass();
 
@@ -51,20 +51,14 @@ void APVPBattleGameMode::BeginPlay()
 
 	RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 	{
-		const auto SetupComponentsForPrivileges = [](UPrivilegeComponent* PrivilegeComponent)
-		{
-			PrivilegeComponent->AddComponentForPrivilege(PVPBattlePrivilege::Host, UBattleRuleConfigComponent::StaticClass());
-			// PrivilegeComponent->AddComponentForPrivilege(PVPBattlePrivilege::Normie, UBattleRuleConfigComponent::StaticClass());
-		};
-		
 		auto PrivilegeStream
 			= GetGameState<APVPBattleGameState>()->GetPlayerStateArray().CreateAddStream()
-			| Awaitables::Cast<APVPBattlePlayerState>()
-			| Awaitables::Transform(&APVPBattlePlayerState::ServerPrivilegeComponent);
+			| Awaitables::Transform(&APVPBattlePlayerState::GetPlayerController)
+			| Awaitables::CastChecked<APVPBattlePlayerController>()
+			| Awaitables::Transform(&APVPBattlePlayerController::ServerPrivilegeComponent);
 
 		{
 			auto FirstPlayerPrivilege = co_await PrivilegeStream;
-			SetupComponentsForPrivileges(FirstPlayerPrivilege);
 			FirstPlayerPrivilege->GivePrivilege(PVPBattlePrivilege::Host);
 			FirstPlayerPrivilege->GivePrivilege(PVPBattlePrivilege::Normie);
 		}
@@ -72,7 +66,6 @@ void APVPBattleGameMode::BeginPlay()
 		while (true)
 		{
 			auto PlayerPrivilege = co_await PrivilegeStream;
-			SetupComponentsForPrivileges(PlayerPrivilege);
 			PlayerPrivilege->GivePrivilege(PVPBattlePrivilege::Normie);
 		}
 	});

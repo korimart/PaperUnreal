@@ -270,6 +270,7 @@ namespace Stream_Private
 namespace Stream
 {
 	// TODO live data, multicast delegate를 받는 버전 추가
+	// TODO lvalue도 받도록 수정할 수 있음
 	template <typename... ValueTypes>
 	TValueStream<TTuple<ValueTypes...>> Combine(TValueStream<ValueTypes>&&... ValueStreams)
 	{

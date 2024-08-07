@@ -160,6 +160,12 @@ namespace Awaitables
 	{
 		return Transform([](auto Object) { return ::Cast<To>(Object); });
 	}
+	
+	template <typename To>
+	auto CastChecked()
+	{
+		return Transform([](auto Object) { return ::CastChecked<To>(Object); });
+	}
 
 	template <typename ComponentType>
 	auto FindComponentByClass()

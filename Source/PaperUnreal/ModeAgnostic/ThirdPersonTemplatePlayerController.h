@@ -49,7 +49,7 @@ protected:
 	virtual void SetupInputComponent() override;
 	
 	// To add mapping context
-	virtual void BeginPlay();
+	virtual void BeginPlay() override;
 
 	/** Input handlers for SetDestination action. */
 	void OnInputStarted();
