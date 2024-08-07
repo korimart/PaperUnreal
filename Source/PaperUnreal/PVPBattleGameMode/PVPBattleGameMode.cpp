@@ -60,7 +60,7 @@ void APVPBattleGameMode::BeginPlay()
 		auto PrivilegeStream
 			= GetGameState<APVPBattleGameState>()->GetPlayerStateArray().CreateAddStream()
 			| Awaitables::Cast<APVPBattlePlayerState>()
-			| Awaitables::TransformIfNotError(&APVPBattlePlayerState::ServerPrivilegeComponent);
+			| Awaitables::Transform(&APVPBattlePlayerState::ServerPrivilegeComponent);
 
 		{
 			auto FirstPlayerPrivilege = co_await PrivilegeStream;

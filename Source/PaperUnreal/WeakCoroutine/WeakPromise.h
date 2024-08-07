@@ -236,7 +236,7 @@ struct TReturnAsAbortPtrAdaptor : TAwaitableAdaptorBase<TReturnAsAbortPtrAdaptor
 			using AbortPtrType = TAbortPtr<std::remove_pointer_t<ResultAsRawPtrType>>;
 
 			// 아래 Handle 복사에 대한 이유는 TAbortPtr의 주석 참고
-			return Forward<AwaitableType>(Awaitable) | Awaitables::Transform(
+			return Forward<AwaitableType>(Awaitable) | Awaitables::TransformWithError(
 				[Handle = Adaptor.Handle](TFailableResult<ResultType>&& Result)-> TFailableResult<AbortPtrType>
 				{
 					if (Result.Succeeded())
@@ -264,7 +264,7 @@ struct TReturnAsAbortPtrAdaptor : TAwaitableAdaptorBase<TReturnAsAbortPtrAdaptor
 			using AbortPtrType = TAbortPtr<std::remove_pointer_t<ResultAsRawPtrType>>;
 
 			// 아래 Handle 복사에 대한 이유는 TAbortPtr의 주석 참고
-			return Forward<AwaitableType>(Awaitable) | Awaitables::Transform(
+			return Forward<AwaitableType>(Awaitable) | Awaitables::TransformWithError(
 				[Handle = Adaptor.Handle](ResultType&& Result) -> AbortPtrType
 				{
 					return {Handle, TUObjectUnsafeWrapperTypeTraits<ResultType>::GetRaw(MoveTemp(Result))};

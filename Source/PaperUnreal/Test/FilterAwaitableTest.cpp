@@ -16,7 +16,7 @@ bool FFilterAwaitableTest::RunTest(const FString& Parameters)
 		{
 			while (true)
 			{
-				auto Result = co_await (Stream | Awaitables::FilterIfNotError([](int32 Value) { return Value > 3; }));
+				auto Result = co_await (Stream | Awaitables::Filter([](int32 Value) { return Value > 3; }));
 				Received = Result;
 			}
 		});
@@ -35,7 +35,7 @@ bool FFilterAwaitableTest::RunTest(const FString& Parameters)
 		int32 Received = 0;
 		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
-			auto FilteredStream = Stream | Awaitables::FilterIfNotError([](int32 Value) { return Value > 3; });
+			auto FilteredStream = Stream | Awaitables::Filter([](int32 Value) { return Value > 3; });
 
 			while (true)
 			{

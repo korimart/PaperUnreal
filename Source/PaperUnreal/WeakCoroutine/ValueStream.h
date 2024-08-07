@@ -121,11 +121,11 @@ public:
 	auto EndOfStream()
 	{
 		return *this
-			| Awaitables::Filter([](const TFailableResult<ValueType>& Result)
+			| Awaitables::FilterWithError([](const TFailableResult<ValueType>& Result)
 			{
 				return !Result;
 			})
-			| Awaitables::Transform([](const TFailableResult<ValueType>& Result)
+			| Awaitables::TransformWithError([](const TFailableResult<ValueType>& Result)
 			{
 				if (Result.template OnlyContains<UEndOfStreamError>())
 				{

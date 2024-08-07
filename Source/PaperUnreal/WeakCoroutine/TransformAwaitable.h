@@ -100,7 +100,7 @@ namespace Awaitables_Private
 		auto Relay = [TransformFunc = Forward<TransformFuncType>(TransformFunc)]
 			<typename FailableResultType>(const FailableResultType& FailableResult)
 		{
-			// Transform을 사용할 자리에 TransformIfNotError를 사용하면 여기 걸림
+			// TransformWithError을 사용할 자리에 Transform을 사용하면 여기 걸림
 			static_assert(TIsInstantiationOf_V<FailableResultType, TFailableResult>);
 
 			using ResultType = typename FailableResultType::ResultType;
@@ -144,13 +144,13 @@ namespace Awaitables_Private
 namespace Awaitables
 {
 	template <typename TransformFuncType>
-	auto Transform(TransformFuncType&& TransformFunc)
+	auto TransformWithError(TransformFuncType&& TransformFunc)
 	{
 		return TTransformAdaptor<TransformFuncType>{Forward<TransformFuncType>(TransformFunc)};
 	}
 
 	template <typename TransformFuncType>
-	auto TransformIfNotError(TransformFuncType&& TransformFunc)
+	auto Transform(TransformFuncType&& TransformFunc)
 	{
 		return Awaitables_Private::TransformIfNotErrorImpl(Forward<TransformFuncType>(TransformFunc));
 	}
@@ -158,12 +158,12 @@ namespace Awaitables
 	template <typename To>
 	auto Cast()
 	{
-		return TransformIfNotError([](auto Object) { return ::Cast<To>(Object); });
+		return Transform([](auto Object) { return ::Cast<To>(Object); });
 	}
 
 	template <typename ComponentType>
 	auto FindComponentByClass()
 	{
-		return TransformIfNotError([](auto Actor){ return Actor->template FindComponentByClass<ComponentType>(); });
+		return Transform([](auto Actor){ return Actor->template FindComponentByClass<ComponentType>(); });
 	}
 }

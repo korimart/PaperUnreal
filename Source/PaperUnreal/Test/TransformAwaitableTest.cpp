@@ -13,7 +13,7 @@ bool FTransformAwaitableTest::RunTest(const FString& Parameters)
 		int32 Received = 0;
 		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
-			int32 Result = co_await (Future | Awaitables::Transform([](const auto&) { return 3; }));
+			int32 Result = co_await (Future | Awaitables::TransformWithError([](const auto&) { return 3; }));
 			Received = Result;
 		});
 
@@ -29,7 +29,7 @@ bool FTransformAwaitableTest::RunTest(const FString& Parameters)
 		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
 			auto TimesTwoStream = LiveData.CreateStream()
-				| Awaitables::TransformIfNotError([](int32 Value) { return Value * 2; });
+				| Awaitables::Transform([](int32 Value) { return Value * 2; });
 
 			while (true)
 			{

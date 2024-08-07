@@ -98,18 +98,18 @@ struct TFilterAdaptor : TAwaitableAdaptorBase<TFilterAdaptor<PredicateType>>
 namespace Awaitables
 {
 	template <typename PredicateType>
-	auto Filter(PredicateType&& Predicate)
+	auto FilterWithError(PredicateType&& Predicate)
 	{
 		return TFilterAdaptor<PredicateType>{Forward<PredicateType>(Predicate)};
 	}
 
 	template <typename PredicateType>
-	auto FilterIfNotError(PredicateType&& Predicate)
+	auto Filter(PredicateType&& Predicate)
 	{
 		auto Relay = [Predicate = Forward<PredicateType>(Predicate)]
 			<typename FailableResultType>(const FailableResultType& FailableResult)
 		{
-			// Filter를 사용할 자리에 FilterIfNotError를 사용하면 여기 걸림
+			// FilterWithError를 사용할 자리에 Filter를 사용하면 여기 걸림
 			static_assert(TIsInstantiationOf_V<FailableResultType, TFailableResult>);
 
 			if (!FailableResult)
@@ -128,18 +128,18 @@ namespace Awaitables
 	template <typename ValueType>
 	auto If(ValueType&& Value)
 	{
-		return FilterIfNotError([Value = Forward<ValueType>(Value)](const auto& Result) { return Result == Value; });
+		return Filter([Value = Forward<ValueType>(Value)](const auto& Result) { return Result == Value; });
 	}
 	
 	template <typename ValueType>
 	auto IfNot(ValueType&& Value)
 	{
-		return FilterIfNotError([Value = Forward<ValueType>(Value)](const auto& Result) { return Result != Value; });
+		return Filter([Value = Forward<ValueType>(Value)](const auto& Result) { return Result != Value; });
 	}
 	
 	inline auto IfValid()
 	{
-		return FilterIfNotError([](auto* Result) { return ::IsValid(Result); });
+		return Filter([](auto* Result) { return ::IsValid(Result); });
 	}
 
 }

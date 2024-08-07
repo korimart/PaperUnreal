@@ -58,10 +58,7 @@ private:
 
 				co_await (
 					Stream::Combine(MoveTemp(ConfigStream), MoveTemp(StageStream))
-					| Awaitables::TransformIfNotError([](UBattleRuleConfigComponent* Config, FName Stage)
-					{
-						return IsValid(Config) && Stage == PVPBattleStage::WaitingForConfig;
-					})
+					| Awaitables::Transform([](UBattleRuleConfigComponent* Config, FName Stage) { return IsValid(Config) && Stage == PVPBattleStage::WaitingForConfig; })
 					| Awaitables::WhileTrue([this]() { return ListenToEditConfigAction(); }));
 			});
 
