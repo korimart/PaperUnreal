@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "FilterAwaitable.h"
 #include "MinimalAbortableCoroutine.h"
+#include "NoDestroyAwaitable.h"
 #include "PaperUnreal/GameFramework2/Utils.h"
 
 
@@ -119,8 +120,8 @@ struct TWhileTrueAdaptor : TAwaitableAdaptorBase<TWhileTrueAdaptor<CoroutineGett
 namespace Awaitables
 {
 	template <typename CoroutineGetterType>
-	auto WhileTrue(CoroutineGetterType&& Predicate)
+	auto WhileTrue(CoroutineGetterType&& CoroutineGetter)
 	{
-		return TWhileTrueAdaptor<CoroutineGetterType>{Forward<CoroutineGetterType>(Predicate)};
+		return TWhileTrueAdaptor<CoroutineGetterType>{Forward<CoroutineGetterType>(CoroutineGetter)};
 	}
 }

@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "PaperUnreal/GameFramework2/ActorComponent2.h"
 #include "PaperUnreal/WeakCoroutine/CancellableFuture.h"
+#include "PaperUnreal/WeakCoroutine/ValueStream.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "ComponentRegistry.generated.h"
 
@@ -29,7 +30,14 @@ public:
 		if (FComponentEvent* Found = MulticastDelegateMap.Find({Component->GetClass(), Component->GetOwner()}))
 		{
 			Found->Broadcast(Component);
-			MulticastDelegateMap.Remove({Component->GetClass(), Component->GetOwner()});
+		}
+	}
+
+	void OnComponentEndPlay(UActorComponent* Component) const
+	{
+		if (FComponentEvent* Found = MulticastDelegateMap.Find({Component->GetClass(), Component->GetOwner()}))
+		{
+			Found->Broadcast(nullptr);
 		}
 	}
 
@@ -56,7 +64,7 @@ private:
 
 
 template <typename ComponentType>
-	// 현재 UActorComponentEx만 Registry를 사용하므로 실수 다른 컴포넌트를 넣지 않도록 체크
+// 현재 UActorComponentEx만 Registry를 사용하므로 실수 다른 컴포넌트를 넣지 않도록 체크
 	requires std::is_base_of_v<UActorComponent2, ComponentType>
 TCancellableFuture<ComponentType*> WaitForComponent(AActor* Owner)
 {
@@ -65,15 +73,42 @@ TCancellableFuture<ComponentType*> WaitForComponent(AActor* Owner)
 		check(false);
 		return nullptr;
 	}
-	
+
 	if (ComponentType* Found = ValidOrNull(Owner->FindComponentByClass<ComponentType>()))
 	{
 		return Found;
 	}
-	
+
 	UComponentRegistry* Registry = Owner->GetWorld()->GetSubsystem<UComponentRegistry>();
 	return MakeFutureFromDelegate<ComponentType*>(
 		Registry->GetComponentMulticastDelegate(ComponentType::StaticClass(), Owner),
-		[](auto){ return true; },
+		[](UActorComponent* Component) { return IsValid(Component); },
 		[](UActorComponent* BeforeCast) { return Cast<ComponentType>(BeforeCast); });
+}
+
+
+template <typename ComponentType>
+// 현재 UActorComponentEx만 Registry를 사용하므로 실수 다른 컴포넌트를 넣지 않도록 체크
+	requires std::is_base_of_v<UActorComponent2, ComponentType>
+TValueStream<ComponentType*> MakeComponentStream(AActor* Owner)
+{
+	if (!IsValid(Owner))
+	{
+		check(false);
+		return {};
+	}
+
+	TArray<ComponentType*> Initial;
+	if (ComponentType* Found = ValidOrNull(Owner->FindComponentByClass<ComponentType>()))
+	{
+		Initial.Add(Found);
+	}
+
+	UComponentRegistry* Registry = Owner->GetWorld()->GetSubsystem<UComponentRegistry>();
+	return MakeStreamFromDelegate<ComponentType*>(
+			Registry->GetComponentMulticastDelegate(ComponentType::StaticClass(), Owner),
+			Initial,
+			[](auto) { return true; },
+			[](UActorComponent* BeforeCast) { return Cast<ComponentType>(BeforeCast); })
+		.template Get<0>();
 }

@@ -331,7 +331,7 @@ public:
 
 	TValueStream<DecayedValueType> CreateStream()
 	{
-		return Stream::MakeFromMulticastDelegate(
+		return MakeStreamFromDelegate(
 			OnChanged, TArray<DecayedValueType>{Value}).template Get<0>();
 	}
 
@@ -529,12 +529,12 @@ public:
 
 	TValueStream<ElementType> CreateAddStream()
 	{
-		return Stream::MakeFromMulticastDelegate(OnElementAdded, Array).template Get<0>();
+		return MakeStreamFromDelegate(OnElementAdded, Array).template Get<0>();
 	}
 
 	TValueStream<ElementType> CreateStrictAddStream()
 	{
-		auto [ValueStream, Handle] = Stream::MakeFromMulticastDelegate(OnElementAdded, Array);
+		auto [ValueStream, Handle] = MakeStreamFromDelegate(OnElementAdded, Array);
 		StrictAddStreamHandles.Add(Handle);
 		return MoveTemp(ValueStream);
 	}

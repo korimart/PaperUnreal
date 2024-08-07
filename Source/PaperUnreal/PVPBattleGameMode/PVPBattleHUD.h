@@ -10,6 +10,7 @@
 #include "PaperUnreal/GameFramework2/HUD2.h"
 #include "PaperUnreal/ModeAgnostic/ComponentRegistry.h"
 #include "PaperUnreal/ModeAgnostic/StageComponent.h"
+#include "PaperUnreal/WeakCoroutine/AnyOfAwaitable.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 #include "PaperUnreal/WeakCoroutine/WhileTrueAwaitable.h"
 #include "PaperUnreal/Widgets/BattleRuleConfigWidget.h"
@@ -28,16 +29,18 @@ private:
 	UStageComponent* StageComponent;
 
 	UPROPERTY(EditAnywhere)
-	UInputAction* EditConfigAction;
-
-	UPROPERTY(EditAnywhere)
 	TSubclassOf<UBattleRuleConfigWidget> ConfigWidgetClass;
 
-	TAbortableCoroutineHandle<FWeakCoroutine> EditConfigCoroutine;
+	UPROPERTY(EditAnywhere)
+	UInputAction* EditConfigAction;
+	FSimpleMulticastDelegate OnEditConfigTriggered;
+	void OnEditConfigTriggeredFunc() { OnEditConfigTriggered.Broadcast(); }
 
 	virtual void BeginPlay() override
 	{
 		Super::BeginPlay();
+
+		GetEnhancedInputComponent()->BindAction(EditConfigAction, ETriggerEvent::Triggered, this, &ThisClass::OnEditConfigTriggeredFunc);
 
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
@@ -46,19 +49,16 @@ private:
 
 			RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 			{
-				// TODO 자격이 있을 때만 도는 coroutine이 있으면 자격이 있을 때 유저에게 알려주는 등의 처리를 해줄 수 있음
-				// 지금은 바인딩을 추가하고 버튼을 누른 다음에 자격이 있는지 검사하기 때문에 불가능 함
-				auto GoodTimeForEditingConfig
-					= StageComponent->GetCurrentStage().CreateStream()
-					| Awaitables::TransformIfNotError([](FName Stage) { return Stage == PVPBattleStage::WaitingForConfig; });
+				auto ConfigStream = MakeComponentStream<UBattleRuleConfigComponent>(GetOwningPlayerController());
+				auto StageStream = StageComponent->GetCurrentStage().CreateStream();
 
-				while (true)
-				{
-					co_await (GoodTimeForEditingConfig | Awaitables::If(true));
-					auto Handle = GetEnhancedInputComponent()->BindAction(EditConfigAction, ETriggerEvent::Triggered, this, &ThisClass::OnEditConfigTriggered).GetHandle();
-					co_await (GoodTimeForEditingConfig | Awaitables::If(false));
-					GetEnhancedInputComponent()->RemoveBindingByHandle(Handle);
-				}
+				co_await (
+					Stream::Combine(MoveTemp(ConfigStream), MoveTemp(StageStream))
+					| Awaitables::TransformIfNotError([](UBattleRuleConfigComponent* Config, FName Stage)
+					{
+						return IsValid(Config) && Stage == PVPBattleStage::WaitingForConfig;
+					})
+					| Awaitables::WhileTrue([this]() { return ListenToEditConfigAction(); }));
 			});
 
 			// TODO 캐릭터 선택 화면 띄우기
@@ -74,21 +74,19 @@ private:
 		});
 	}
 
-	void OnEditConfigTriggered()
+	FWeakCoroutine ListenToEditConfigAction()
 	{
-		if (EditConfigCoroutine)
+		while (true)
 		{
-			EditConfigCoroutine.Reset();
-		}
-		else
-		{
-			EditConfigCoroutine = EditConfig();
+			co_await OnEditConfigTriggered;
+			TAbortableCoroutineHandle EditConfigCoroutine = EditConfig();
+			co_await Awaitables::AnyOf(OnEditConfigTriggered, EditConfigCoroutine->ReturnValue());
 		}
 	}
 
 	FWeakCoroutine EditConfig() const
 	{
-		auto ConfigComponent = co_await WaitForComponent<UBattleRuleConfigComponent>(GetOwningPlayerController());
+		auto ConfigComponent = co_await GetOwningPlayerController()->FindComponentByClass<UBattleRuleConfigComponent>();
 		auto ConfigWidget = co_await CreateWidget<UBattleRuleConfigWidget>(GetOwningPlayerController(), ConfigWidgetClass);
 		auto S = ScopedAddToViewport(ConfigWidget);
 
@@ -100,7 +98,7 @@ private:
 			{
 				break;
 			}
-			
+
 			ConfigWidget->OnSubmitFailed();
 		}
 	}

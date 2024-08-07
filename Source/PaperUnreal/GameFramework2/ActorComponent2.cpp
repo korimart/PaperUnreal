@@ -15,6 +15,7 @@ void UActorComponent2::BeginPlay()
 void UActorComponent2::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
+	GetWorld()->GetSubsystem<UComponentRegistry>()->OnComponentEndPlay(this);
 	OnEndPlay.Broadcast();
 }
 

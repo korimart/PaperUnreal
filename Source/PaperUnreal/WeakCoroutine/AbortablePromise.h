@@ -107,6 +107,11 @@ public:
 	TAbortableCoroutineHandle(TAbortableCoroutineHandle&&) = default;
 	TAbortableCoroutineHandle& operator=(TAbortableCoroutineHandle&&) = default;
 
+	TAbortableCoroutineHandle(AbortableCoroutineType&& InCoroutine)
+		: Coroutine(MoveTemp(InCoroutine))
+	{
+	}
+	
 	TAbortableCoroutineHandle& operator=(AbortableCoroutineType&& InCoroutine)
 	{
 		Reset();
