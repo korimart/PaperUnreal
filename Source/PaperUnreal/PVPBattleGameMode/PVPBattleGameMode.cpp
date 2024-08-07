@@ -49,15 +49,32 @@ void APVPBattleGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
-	GetGameState<APVPBattleGameState>()->GetPlayerStateArray().ObserveAddIfValid(this, [this](APlayerState* PlayerState)
+	RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 	{
-		CastChecked<APVPBattlePlayerState>(PlayerState)
-			->PrivilegeComponent
-			->AddHostComponentClass(UBattleRuleConfigComponent::StaticClass());
+		const auto SetupComponentsForPrivileges = [](UPrivilegeComponent* PrivilegeComponent)
+		{
+			PrivilegeComponent->AddComponentForPrivilege(PVPBattlePrivilege::Host, UBattleRuleConfigComponent::StaticClass());
+			// PrivilegeComponent->AddComponentForPrivilege(PVPBattlePrivilege::Normie, UBattleRuleConfigComponent::StaticClass());
+		};
+		
+		auto PrivilegeStream
+			= GetGameState<APVPBattleGameState>()->GetPlayerStateArray().CreateAddStream()
+			| Awaitables::Cast<APVPBattlePlayerState>()
+			| Awaitables::TransformIfNotError(&APVPBattlePlayerState::ServerPrivilegeComponent);
 
-		CastChecked<APVPBattlePlayerState>(PlayerState)
-			->PrivilegeComponent
-			->SetbHost(true);
+		{
+			auto FirstPlayerPrivilege = co_await PrivilegeStream;
+			SetupComponentsForPrivileges(FirstPlayerPrivilege);
+			FirstPlayerPrivilege->GivePrivilege(PVPBattlePrivilege::Host);
+			FirstPlayerPrivilege->GivePrivilege(PVPBattlePrivilege::Normie);
+		}
+
+		while (true)
+		{
+			auto PlayerPrivilege = co_await PrivilegeStream;
+			SetupComponentsForPrivileges(PlayerPrivilege);
+			PlayerPrivilege->GivePrivilege(PVPBattlePrivilege::Normie);
+		}
 	});
 
 	RunWeakCoroutine(this, [this]() -> FWeakCoroutine

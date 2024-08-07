@@ -65,18 +65,20 @@ private:
 					| Awaitables::WhileTrue([this]() { return ListenToEditConfigAction(); }));
 			});
 
-			// TODO 캐릭터 선택 화면 띄우기
 			{
-				auto SelectCharacterWidget = co_await CreateWidget<USelectCharacterWidget>(GetOwningPlayerController(), SelectCharacterWidgetClass);
-				auto S = ScopedAddToViewport(SelectCharacterWidget);
-				const int32 Selection = co_await Awaitables::AnyOf(SelectCharacterWidget->OnManny, SelectCharacterWidget->OnQuinn);
+				TAbortableCoroutineHandle SelectCharacterAndPlay = RunWeakCoroutine(this, [this]() -> FWeakCoroutine
+				{
+					auto SelectCharacterWidget = co_await CreateWidget<USelectCharacterWidget>(GetOwningPlayerController(), SelectCharacterWidgetClass);
+					auto S = ScopedAddToViewport(SelectCharacterWidget);
+					const int32 Selection = co_await Awaitables::AnyOf(SelectCharacterWidget->OnManny, SelectCharacterWidget->OnQuinn);
+					
+					// TODO 플레이를 시작하면 플레이 HUD 띄우기
+				});
+				
+				co_await StageComponent->GetCurrentStage().If(PVPBattleStage::Result);
 			}
 
-			// TODO 플레이를 시작하면 플레이 HUD 띄우기
-
-			co_await StageComponent->GetCurrentStage().If(PVPBattleStage::Result);
-
-			// TODO 캐릭터 선택 화면이건 플레이 HUD건 띄워져 있는 거 없애고 결과창 띄우기
+			// TODO 결과창 구현
 			UE_LOG(LogTemp, Warning, TEXT("결과창"));
 
 			// TODO 위에서부터 반복

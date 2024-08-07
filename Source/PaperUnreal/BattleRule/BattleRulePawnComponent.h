@@ -108,7 +108,7 @@ private:
 
 			auto PawnStream
 				= ServerGameState->ServerPawnSpawner->GetSpawnedPawns().CreateAddStream()
-				| Awaitables::TransformToComponent<UBattleRulePawnComponent>()
+				| Awaitables::FindComponentByClass<UBattleRulePawnComponent>()
 				| Awaitables::FilterIfNotError([this](auto Pawn){ return Pawn->ServerHomeArea != ServerHomeArea; });
 
 			while (true)

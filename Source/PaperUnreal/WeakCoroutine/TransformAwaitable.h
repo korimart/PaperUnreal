@@ -130,9 +130,9 @@ namespace Awaitables_Private
 			}
 			else
 			{
-				using TransformedType = decltype(TransformFunc(FailableResult.GetResult()));
+				using TransformedType = std::decay_t<decltype(std::invoke(TransformFunc, FailableResult.GetResult()))>;
 				using ReturnType = TFailableResult<TransformedType>;
-				return FailableResult ? ReturnType{TransformFunc(FailableResult.GetResult())} : ReturnType{FailableResult.GetErrors()};
+				return FailableResult ? ReturnType{std::invoke(TransformFunc, FailableResult.GetResult())} : ReturnType{FailableResult.GetErrors()};
 			}
 		};
 
@@ -155,8 +155,14 @@ namespace Awaitables
 		return Awaitables_Private::TransformIfNotErrorImpl(Forward<TransformFuncType>(TransformFunc));
 	}
 
+	template <typename To>
+	auto Cast()
+	{
+		return TransformIfNotError([](auto Object) { return ::Cast<To>(Object); });
+	}
+
 	template <typename ComponentType>
-	auto TransformToComponent()
+	auto FindComponentByClass()
 	{
 		return TransformIfNotError([](auto Actor){ return Actor->template FindComponentByClass<ComponentType>(); });
 	}

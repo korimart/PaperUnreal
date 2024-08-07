@@ -12,6 +12,15 @@ class UComponentGroupComponent : public UActorComponent2
 {
 	GENERATED_BODY()
 
+public:
+	template <typename T, typename... ArgTypes>
+	T* NewChildComponent(AActor* Actor, ArgTypes&&... Args)
+	{
+		T* Component = NewObject<T>(Actor, Forward<ArgTypes>(Args)...);
+		Component->AddLifeDependency(this);
+		return Component;
+	}
+
 protected:
 	UComponentGroupComponent()
 	{
@@ -36,12 +45,4 @@ protected:
 
 	virtual void AttachServerMachineComponents() {}
 	virtual void AttachPlayerMachineComponents() {}
-	
-	template <typename T>
-	T* NewChildComponent(AActor* Actor)
-	{
-		T* Component = NewObject<T>(Actor);
-		Component->AddLifeDependency(this);
-		return Component;
-	}
 };

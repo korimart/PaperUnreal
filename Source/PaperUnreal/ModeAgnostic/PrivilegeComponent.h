@@ -4,116 +4,99 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerState.h"
-#include "Net/UnrealNetwork.h"
-#include "PaperUnreal/GameFramework2/ActorComponent2.h"
-#include "PaperUnreal/WeakCoroutine/LiveData.h"
+#include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
 #include "PrivilegeComponent.generated.h"
 
 
+class FConditionalComponents
+{
+public:
+	FConditionalComponents() = default;
+
+	void SetComponentOwnerAndGroup(AActor* Actor, UComponentGroupComponent* Group)
+	{
+		ComponentOwner = Actor;
+		ComponentGroup = Group;
+		OnComponentsMaybeChanged();
+	}
+
+	void SetCondition(bool bInCondition)
+	{
+		bCondition = bInCondition;
+		OnComponentsMaybeChanged();
+	}
+
+	void AddClass(UClass* Class)
+	{
+		Classes.Add(Class);
+		OnComponentsMaybeChanged();
+	}
+
+	void RemoveClass(UClass* Class)
+	{
+		Classes.Remove(Class);
+		OnComponentsMaybeChanged();
+	}
+
+private:
+	TArray<UClass*> Classes;
+	TWeakObjectPtr<AActor> ComponentOwner;
+	TWeakObjectPtr<UComponentGroupComponent> ComponentGroup;
+	bool bCondition = false;
+
+	void OnComponentsMaybeChanged();
+};
+
+
 UCLASS(Within=PlayerState)
-class UPrivilegeComponent : public UActorComponent2
+class UPrivilegeComponent : public UComponentGroupComponent
 {
 	GENERATED_BODY()
 
 public:
-	DECLARE_LIVE_DATA_GETTER_SETTER(bHost);
-
-	void AddHostComponentClass(UClass* Class)
+	void AddComponentForPrivilege(FName Privilege, UClass* Class)
 	{
-		check(GetNetMode() != NM_Client);
-		HostComponentClasses.Add(Class);
-		OnHostComponentsMaybeChanged();
+		FindOrAdd(Privilege).AddClass(Class);
 	}
 
-	void RemoveHostComponentClass(UClass* Class)
+	void RemoveComponentForPrivilege(FName Privilege, UClass* Class)
 	{
-		check(GetNetMode() != NM_Client);
-		HostComponentClasses.Remove(Class);
-		OnHostComponentsMaybeChanged();
+		FindOrAdd(Privilege).RemoveClass(Class);
+	}
+
+	void GivePrivilege(FName Privilege)
+	{
+		FindOrAdd(Privilege).SetCondition(true);
+	}
+
+	void TakePrivilge(FName Privilege)
+	{
+		FindOrAdd(Privilege).SetCondition(false);
 	}
 
 private:
-	UPROPERTY(ReplicatedUsing=OnRep_bHost)
-	bool RepbHost = false;
-	mutable TLiveData<bool&> bHost{RepbHost};
-
-	UFUNCTION()
-	void OnRep_bHost() { bHost.Notify(); }
-
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
-	{
-		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-		DOREPLIFETIME(ThisClass, RepbHost);
-	}
-
-	UPROPERTY()
-	TArray<UClass*> HostComponentClasses;
+	TMap<FName, FConditionalComponents> NameToConditionalComponentsMap;
 
 	UPrivilegeComponent()
 	{
-		SetIsReplicatedByDefault(true);
+		SetIsReplicatedByDefault(false);
 	}
 
 	virtual void BeginPlay() override
 	{
 		Super::BeginPlay();
-
-		if (GetNetMode() != NM_Client)
-		{
-			GetbHost().Observe(this, [this](auto) { OnHostComponentsMaybeChanged(); });
-		}
+		check(GetNetMode() != NM_Client);
 	}
 
-	void OnHostComponentsMaybeChanged()
+	FConditionalComponents& FindOrAdd(FName Privilege)
 	{
-		bHost.Get() ? AttachHostComponents() : RemoveHostComponents();
-	}
-
-	void AttachHostComponents()
-	{
-		APlayerController* PC = GetOuterAPlayerState()->GetPlayerController();
-		for (UClass* Each : HostComponentClasses)
+		if (NameToConditionalComponentsMap.Contains(Privilege))
 		{
-			if (!HasComponentOfClass(PC, Each))
-			{
-				NewObject<UActorComponent>(PC, Each)->RegisterComponent();
-			}
+			return NameToConditionalComponentsMap[Privilege];
 		}
-	}
 
-	void RemoveHostComponents()
-	{
-		APlayerController* PC = GetOuterAPlayerState()->GetPlayerController();
-		for (UActorComponent* Each : PC->GetComponents())
-		{
-			if (IsHostComponent(Each))
-			{
-				Each->DestroyComponent();
-			}
-		}
-	}
-
-	bool IsHostComponent(UActorComponent* Component) const
-	{
-		for (UClass* Each : HostComponentClasses)
-		{
-			if (Component->IsA(Each))
-			{
-				return true;
-			}
-		}
-		return false;
-	}
-
-	static bool HasComponentOfClass(AActor* Actor, UClass* Class)
-	{
-		for (UActorComponent* Each : Actor->GetComponents())
-		{
-			if (Each->IsA(Class))
-			{
-				return true;
-			}
-		}
-		return false;
+		FConditionalComponents& Ret = NameToConditionalComponentsMap.Emplace(Privilege);
+		Ret.SetComponentOwnerAndGroup(GetOuterAPlayerState()->GetPlayerController(), this);
+		return Ret;
 	}
 };

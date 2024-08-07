@@ -269,6 +269,32 @@ void FindAndDestroyComponent(AActor* Actor)
 }
 
 
+inline bool HasComponentOfClass(AActor* Actor, UClass* Class)
+{
+	for (UActorComponent* Each : Actor->GetComponents())
+	{
+		if (Each->IsA(Class))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+
+inline bool IsOfClass(UObject* Object, const TArray<UClass*>& Classes)
+{
+	for (UClass* Each : Classes)
+	{
+		if (Object->IsA(Each))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+
 inline FLinearColor NonEyeSoaringRandomColor()
 {
 	return FLinearColor::MakeFromHSV8(FMath::RandRange(0, 255), 220, 100);

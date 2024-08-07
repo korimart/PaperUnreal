@@ -29,7 +29,7 @@ public:
 	UInventoryComponent* InventoryComponent;
 	
 	UPROPERTY()
-	UPrivilegeComponent* PrivilegeComponent;
+	UPrivilegeComponent* ServerPrivilegeComponent;
 
 private:
 	APVPBattlePlayerState()
@@ -37,6 +37,16 @@ private:
 		ReadyStateComponent = CreateDefaultSubobject<UReadyStateComponent>(TEXT("ReadyStateComponent"));
 		TeamComponent = CreateDefaultSubobject<UTeamComponent>(TEXT("TeamComponent"));
 		InventoryComponent = CreateDefaultSubobject<UInventoryComponent>(TEXT("InventoryComponent"));
-		PrivilegeComponent = CreateDefaultSubobject<UPrivilegeComponent>(TEXT("PrivilegeComponent"));
+	}
+
+	virtual void PreInitializeComponents() override
+	{
+		Super::PreInitializeComponents();
+
+		if (GetNetMode() != NM_Client)
+		{
+			ServerPrivilegeComponent = NewObject<UPrivilegeComponent>(this);
+			ServerPrivilegeComponent->RegisterComponent();
+		}
 	}
 };

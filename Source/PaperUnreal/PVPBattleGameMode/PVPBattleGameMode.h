@@ -10,6 +10,13 @@
 DECLARE_LOG_CATEGORY_EXTERN(LogPVPBattleGameMode, Log, All);
 
 
+namespace PVPBattlePrivilege
+{
+	inline FName Host{TEXT("PVPBattlePrivilege_Host")};
+	inline FName Normie{TEXT("PVPBattlePrivilege_Normie")};
+}
+
+
 namespace PVPBattleStage
 {
 	inline FName WaitingForConfig{TEXT("PVPBattleStage_WaitingForConfig")};

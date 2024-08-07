@@ -23,10 +23,7 @@ public:
 	auto GetOwningPlayerState() const
 	{
 		auto PC = CastChecked<APlayerController2>(GetOwningPlayerController());
-		return PC->GetPlayerState() | Awaitables::TransformIfNotError([](APlayerState* PlayerState)
-		{
-			return CastChecked<T>(PlayerState);
-		});
+		return PC->GetPlayerState() | Awaitables::Cast<T>();
 	}
 
 	UEnhancedInputComponent* GetEnhancedInputComponent() const
