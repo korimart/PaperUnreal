@@ -5,17 +5,19 @@
 #include <coroutine>
 #include "CoreMinimal.h"
 #include "AbortablePromise.h"
+#include "AwaitablePromise.h"
 
 
-struct FMinimalAbortableCoroutine
+template <typename T>
+struct TMinimalAbortableCoroutine : TAwaitableCoroutine<T>, TAbortableCoroutine<TMinimalAbortableCoroutine<T>>
 {
-	struct promise_type : TAbortablePromise<promise_type>
+	struct promise_type : TAbortablePromise<promise_type>, TAwaitablePromise<T>
 	{
 		TSharedRef<std::monostate> PromiseLife = MakeShared<std::monostate>();
 
-		FMinimalAbortableCoroutine get_return_object()
+		TMinimalAbortableCoroutine get_return_object()
 		{
-			return {PromiseLife, std::coroutine_handle<promise_type>::from_promise(*this)};
+			return std::coroutine_handle<promise_type>::from_promise(*this);
 		}
 
 		std::suspend_never initial_suspend() const
@@ -26,10 +28,6 @@ struct FMinimalAbortableCoroutine
 		std::suspend_never final_suspend() const noexcept
 		{
 			return {};
-		}
-
-		void return_void() const
-		{
 		}
 
 		void unhandled_exception() const
@@ -55,27 +53,16 @@ struct FMinimalAbortableCoroutine
 	};
 
 	TWeakPtr<std::monostate> PromiseLife;
-	std::coroutine_handle<promise_type> CoroutineHandle;
-	bool bAbortOnDestruction = false;
+	std::coroutine_handle<promise_type> Handle;
 
-	~FMinimalAbortableCoroutine()
+	TMinimalAbortableCoroutine(std::coroutine_handle<promise_type> InHandle)
+		: TAwaitableCoroutine<T>(InHandle), PromiseLife(InHandle.promise().PromiseLife), Handle(InHandle)
 	{
-		if (bAbortOnDestruction)
-		{
-			Abort();
-		}
 	}
 
-	void Abort()
-	{
-		if (PromiseLife.IsValid())
-		{
-			CoroutineHandle.promise().Abort();
-		}
-	}
-
-	void AbortOnDestruction()
-	{
-		bAbortOnDestruction = true;
-	}
+	TMinimalAbortableCoroutine(TMinimalAbortableCoroutine&&) = default;
+	TMinimalAbortableCoroutine& operator=(TMinimalAbortableCoroutine&&) = default;
 };
+
+
+using FMinimalAbortableCoroutine = TMinimalAbortableCoroutine<void>;

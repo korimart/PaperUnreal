@@ -47,13 +47,13 @@ class TWeakCoroutinePromiseType;
 
 
 template <typename T>
-class TWeakCoroutine
+class TWeakCoroutine : public TAwaitableCoroutine<T>, public TAbortableCoroutine<TWeakCoroutine<T>>
 {
 public:
 	using promise_type = TWeakCoroutinePromiseType<T>;
 
 	TWeakCoroutine(std::coroutine_handle<promise_type> InHandle)
-		: Handle(InHandle), PromiseLife(Handle.promise().PromiseLife), PromiseReturn(Handle.promise().GetFuture())
+		: TAwaitableCoroutine<T>(InHandle), Handle(InHandle), PromiseLife(Handle.promise().PromiseLife)
 	{
 	}
 
@@ -61,29 +61,6 @@ public:
 	{
 		Handle.promise().Captures = MoveTemp(Captures);
 		Handle.resume();
-	}
-
-	void Abort()
-	{
-		if (PromiseLife.IsValid())
-		{
-			Handle.promise().Abort();
-		}
-	}
-
-	bool IsDeadMan() const
-	{
-		if (!PromiseLife.IsValid())
-		{
-			return true;
-		}
-		
-		if (Handle.promise().IsAbortRequested())
-		{
-			return true;
-		}
-		
-		return false;
 	}
 
 	void AddToWeakList(const UObject* Object)
@@ -94,25 +71,11 @@ public:
 		}
 	}
 
-	TCancellableFuture<T> ReturnValue()
-	{
-		return MoveTemp(PromiseReturn);
-	}
-
-	friend auto operator co_await(TWeakCoroutine& WeakCoroutine)
-	{
-		return operator co_await(WeakCoroutine.ReturnValue());
-	}
-
-	friend auto operator co_await(TWeakCoroutine&& WeakCoroutine)
-	{
-		return operator co_await(WeakCoroutine.ReturnValue());
-	}
-
 private:
+	friend class TAbortableCoroutine<TWeakCoroutine>;
+	
 	std::coroutine_handle<promise_type> Handle;
 	TWeakPtr<std::monostate> PromiseLife;
-	TCancellableFuture<T> PromiseReturn;
 };
 
 
@@ -125,7 +88,6 @@ class TWeakCoroutinePromiseType : public FLoggingPromise
 public:
 	TWeakCoroutinePromiseType() = default;
 
-	// TODO static assert functor type
 	TWeakCoroutinePromiseType(const std::invocable auto& Lambda)
 		: bInitRequired(true)
 	{
@@ -136,7 +98,7 @@ public:
 		: TWeakPromise<TWeakCoroutinePromiseType>(Object, Forward<ArgTypes>(Args)...)
 	{
 	}
-	
+
 	TWeakCoroutine<T> get_return_object()
 	{
 		return std::coroutine_handle<TWeakCoroutinePromiseType>::from_promise(*this);
@@ -162,7 +124,7 @@ public:
 	{
 		return await_transform(operator co_await(Forward<AnyType>(Any)));
 	}
-	
+
 	template <CUObjectUnsafeWrapper UnsafeWrapperType>
 	auto await_transform(const UnsafeWrapperType& Wrapper)
 	{

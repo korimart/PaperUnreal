@@ -87,25 +87,15 @@ struct TTransformAdaptor : TAwaitableAdaptorBase<TTransformAdaptor<TransformFunc
 
 namespace Awaitables_Private
 {
-	auto TransformIfNotErrorVoidCase(const auto& FailableResult, const auto& TransformFunc)
+	auto TransformIfNotErrorImplVoidCase(const auto& FailableResult, const auto& TransformFunc)
 	{
 		using TransformedType = decltype(TransformFunc());
 		using ReturnType = TFailableResult<TransformedType>;
 		return FailableResult ? ReturnType{TransformFunc()} : ReturnType{FailableResult.GetErrors()};
 	}
-}
-
-
-namespace Awaitables
-{
-	template <typename TransformFuncType>
-	auto Transform(TransformFuncType&& TransformFunc)
-	{
-		return TTransformAdaptor<TransformFuncType>{Forward<TransformFuncType>(TransformFunc)};
-	}
 
 	template <typename TransformFuncType>
-	auto TransformIfNotError(TransformFuncType&& TransformFunc)
+	auto TransformIfNotErrorImpl(TransformFuncType&& TransformFunc)
 	{
 		auto Relay = [TransformFunc = Forward<TransformFuncType>(TransformFunc)]
 			<typename FailableResultType>(const FailableResultType& FailableResult)
@@ -117,8 +107,8 @@ namespace Awaitables
 
 			if constexpr (std::is_void_v<ResultType>)
 			{
-				// SEARCH: 이거 인라인으로 쓰면 컴파일이 안 되는데 이유를 잘 모르겠다
-				return Awaitables_Private::TransformIfNotErrorVoidCase(FailableResult, TransformFunc);
+				// RESEARCH: 이거 인라인으로 쓰면 컴파일이 안 되는데 이유를 잘 모르겠다
+				return TransformIfNotErrorImplVoidCase(FailableResult, TransformFunc);
 			}
 			else if constexpr (TIsInstantiationOf_V<ResultType, TTuple>)
 			{
@@ -147,5 +137,21 @@ namespace Awaitables
 		};
 
 		return TTransformAdaptor<decltype(Relay)>{MoveTemp(Relay)};
+	}
+}
+
+
+namespace Awaitables
+{
+	template <typename TransformFuncType>
+	auto Transform(TransformFuncType&& TransformFunc)
+	{
+		return TTransformAdaptor<TransformFuncType>{Forward<TransformFuncType>(TransformFunc)};
+	}
+
+	template <typename TransformFuncType>
+	auto TransformIfNotError(TransformFuncType&& TransformFunc)
+	{
+		return Awaitables_Private::TransformIfNotErrorImpl(Forward<TransformFuncType>(TransformFunc));
 	}
 }

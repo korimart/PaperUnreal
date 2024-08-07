@@ -43,25 +43,85 @@ private:
 };
 
 
+template <typename Derived>
+class TAbortableCoroutine
+{
+public:
+	~TAbortableCoroutine()
+	{
+		if (bAbortOnDestruction)
+		{
+			Abort();
+		}
+	}
+
+	void Abort()
+	{
+		if (GetPromiseLife().IsValid())
+		{
+			GetHandle().promise().Abort();
+		}
+	}
+
+	void AbortOnDestruction()
+	{
+		bAbortOnDestruction = true;
+	}
+
+	bool IsDeadMan() const
+	{
+		if (!GetPromiseLife().IsValid())
+		{
+			return true;
+		}
+
+		if (GetHandle().promise().IsAbortRequested())
+		{
+			return true;
+		}
+
+		return false;
+	}
+
+private:
+	bool bAbortOnDestruction = false;
+
+	TWeakPtr<std::monostate> GetPromiseLife() const
+	{
+		return static_cast<const Derived*>(this)->PromiseLife;
+	}
+
+	auto GetHandle() const
+	{
+		return static_cast<const Derived*>(this)->Handle;
+	}
+};
+
+
 template <typename AbortableCoroutineType>
 class TAbortableCoroutineHandle
 {
 public:
-	~TAbortableCoroutineHandle()
-	{
-		Reset();
-	}
-	
+	TAbortableCoroutineHandle() = default;
+	~TAbortableCoroutineHandle() { Reset(); }
+	TAbortableCoroutineHandle(TAbortableCoroutineHandle&&) = default;
+	TAbortableCoroutineHandle& operator=(TAbortableCoroutineHandle&&) = default;
+
 	TAbortableCoroutineHandle& operator=(AbortableCoroutineType&& InCoroutine)
 	{
 		Reset();
 		Coroutine.Emplace(MoveTemp(InCoroutine));
 		return *this;
 	}
-	
+
 	operator bool() const
 	{
 		return Coroutine && !Coroutine->IsDeadMan();
+	}
+
+	AbortableCoroutineType* operator->()
+	{
+		return &*Coroutine;
 	}
 
 	void Reset()

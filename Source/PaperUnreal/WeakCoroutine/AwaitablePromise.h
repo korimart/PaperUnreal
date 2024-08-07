@@ -16,7 +16,6 @@ public:
 		this->Promise.SetValue(Forward<U>(Value));
 	}
 
-protected:
 	TCancellableFuture<ReturnType> GetFuture()
 	{
 		return Promise.GetFuture();
@@ -36,7 +35,6 @@ public:
 		this->Promise.SetValue();
 	}
 	
-protected:
 	TCancellableFuture<void> GetFuture()
 	{
 		return Promise.GetFuture();
@@ -44,4 +42,34 @@ protected:
 	
 private:
 	TCancellablePromise<void> Promise;
+};
+
+
+template <typename T>
+class TAwaitableCoroutine
+{
+public:
+	template <typename PromiseType>
+	TAwaitableCoroutine(std::coroutine_handle<PromiseType> Handle)
+		: Return(static_cast<TAwaitablePromise<T>&>(Handle.promise()).GetFuture())
+	{
+	}
+	
+	TCancellableFuture<T> ReturnValue()
+	{
+		return MoveTemp(Return);
+	}
+
+	friend auto operator co_await(TAwaitableCoroutine& Coroutine)
+	{
+		return operator co_await(Coroutine.ReturnValue());
+	}
+
+	friend auto operator co_await(TAwaitableCoroutine&& Coroutine)
+	{
+		return operator co_await(Coroutine.ReturnValue());
+	}
+	
+private:
+	TCancellableFuture<T> Return;
 };

@@ -5,20 +5,18 @@
 #include "CoreMinimal.h"
 #include "ErrorReporting.h"
 #include "MinimalAbortableCoroutine.h"
-#include "NoDestroyAwaitable.h"
 
 
 template <typename InnerAwaitableType, typename PredicateType>
 class TFilterAwaitable
 {
 public:
-	using ResultType = typename decltype(std::declval<InnerAwaitableType>() | Awaitables::NoDestroy())::ResultType;
+	using ResultType = decltype(std::declval<InnerAwaitableType>().await_resume());
 
 	template <typename AwaitableType, typename Pred>
 	TFilterAwaitable(AwaitableType&& Awaitable, Pred&& Predicate)
 		: InnerAwaitable(Forward<AwaitableType>(Awaitable)), Predicate(Forward<Pred>(Predicate))
 	{
-		static_assert(CErrorReportingAwaitable<TFilterAwaitable>);
 	}
 
 	bool await_ready() const
@@ -28,42 +26,46 @@ public:
 
 	void await_suspend(const auto& Handle)
 	{
-		Coroutine = StartFiltering(Handle);
+		bAborted = MakeShared<bool>(false);
+		Coroutine = StartFiltering();
+		Coroutine->ReturnValue().Then([Handle, bAborted = bAborted](const auto& FailableResult)
+		{
+			if (!*bAborted)
+			{
+				FailableResult ? Handle.resume() : Handle.destroy();
+			}
+		});
 	}
 
-	// TODO Inner가 Error reporing이면 에러로 아니면 아닌걸로 변경
-	TFailableResult<ResultType> await_resume()
+	ResultType await_resume()
 	{
+		Coroutine.Reset();
 		return MoveTemp(Ret.GetValue());
 	}
 
 	void await_abort()
 	{
-		if (Coroutine)
-		{
-			Coroutine->Abort();
-		}
+		*bAborted = true;
+		Coroutine.Reset();
 	}
 
 private:
 	InnerAwaitableType InnerAwaitable;
 	PredicateType Predicate;
-	TOptional<FMinimalAbortableCoroutine> Coroutine;
-	TOptional<TFailableResult<ResultType>> Ret;
+	TAbortableCoroutineHandle<FMinimalAbortableCoroutine> Coroutine;
+	TOptional<ResultType> Ret;
+	TSharedPtr<bool> bAborted;
 
-	FMinimalAbortableCoroutine StartFiltering(auto Handle)
+	FMinimalAbortableCoroutine StartFiltering()
 	{
 		while (true)
 		{
-			auto Result = co_await (InnerAwaitable | Awaitables::NoDestroy());
-			if (Predicate(Result))
+			Ret = co_await InnerAwaitable;
+			if (Predicate(*Ret))
 			{
-				Ret = MoveTemp(Result);
 				break;
 			}
 		}
-
-		Handle.resume();
 	}
 };
 
