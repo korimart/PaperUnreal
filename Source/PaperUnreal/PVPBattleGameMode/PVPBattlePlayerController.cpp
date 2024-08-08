@@ -7,6 +7,7 @@
 #include "PVPBattleGameMode.h"
 #include "PaperUnreal/BattleRule/BattleRuleConfigComponent.h"
 #include "PaperUnreal/Development/InGameCheats.h"
+#include "PaperUnreal/ModeAgnostic/CharacterSetterComponent.h"
 #include "PaperUnreal/ModeAgnostic/LifeComponent.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 
@@ -19,6 +20,8 @@ void APVPBattlePlayerController::PreInitializeComponents()
 		ServerPrivilegeComponent = NewObject<UPrivilegeComponent>(this);
 		ServerPrivilegeComponent->RegisterComponent();
 		ServerPrivilegeComponent->AddComponentForPrivilege(PVPBattlePrivilege::Host, UBattleRuleConfigComponent::StaticClass());
+		ServerPrivilegeComponent->AddComponentForPrivilege(PVPBattlePrivilege::Normie, UCharacterSetterComponent::StaticClass());
+		ServerPrivilegeComponent->AddComponentForPrivilege(PVPBattlePrivilege::Normie, UReadySetterComponent::StaticClass());
 	}
 }
 

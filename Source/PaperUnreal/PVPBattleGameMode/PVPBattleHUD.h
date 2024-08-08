@@ -8,7 +8,9 @@
 #include "GameFramework/GameStateBase.h"
 #include "PaperUnreal/BattleRule/BattleRuleConfigComponent.h"
 #include "PaperUnreal/GameFramework2/HUD2.h"
+#include "PaperUnreal/ModeAgnostic/CharacterSetterComponent.h"
 #include "PaperUnreal/ModeAgnostic/ComponentRegistry.h"
+#include "PaperUnreal/ModeAgnostic/ReadyStateComponent.h"
 #include "PaperUnreal/ModeAgnostic/StageComponent.h"
 #include "PaperUnreal/WeakCoroutine/AnyOfAwaitable.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
@@ -51,27 +53,10 @@ private:
 			StageComponent = (co_await WaitForGameState(GetWorld()))->FindComponentByClass<UStageComponent>();
 			check(IsValid(StageComponent));
 
-			RunWeakCoroutine(this, [this]() -> FWeakCoroutine
-			{
-				auto ConfigStream = MakeComponentStream<UBattleRuleConfigComponent>(GetOwningPlayerController());
-				auto StageStream = StageComponent->GetCurrentStage().CreateStream();
-
-				co_await (
-					Stream::Combine(MoveTemp(ConfigStream), MoveTemp(StageStream))
-					| Awaitables::Transform([](UBattleRuleConfigComponent* Config, FName Stage) { return IsValid(Config) && Stage == PVPBattleStage::WaitingForConfig; })
-					| Awaitables::WhileTrue([this]() { return ListenToEditConfigAction(); }));
-			});
+			ListenToEditConfigPrivilege();
 
 			{
-				TAbortableCoroutineHandle SelectCharacterAndPlay = RunWeakCoroutine(this, [this]() -> FWeakCoroutine
-				{
-					auto SelectCharacterWidget = co_await CreateWidget<USelectCharacterWidget>(GetOwningPlayerController(), SelectCharacterWidgetClass);
-					auto S = ScopedAddToViewport(SelectCharacterWidget);
-					const int32 Selection = co_await Awaitables::AnyOf(SelectCharacterWidget->OnManny, SelectCharacterWidget->OnQuinn);
-					
-					// TODO 플레이를 시작하면 플레이 HUD 띄우기
-				});
-				
+				TAbortableCoroutineHandle S = SelectCharacterAndShowHUD();
 				co_await StageComponent->GetCurrentStage().If(PVPBattleStage::Result);
 			}
 
@@ -82,7 +67,15 @@ private:
 		});
 	}
 
-	FWeakCoroutine ListenToEditConfigAction()
+	FWeakCoroutine ListenToEditConfigPrivilege()
+	{
+		co_await (
+			Stream::Combine(MakeComponentStream<UBattleRuleConfigComponent>(GetOwningPlayerController()), StageComponent->GetCurrentStage().CreateStream())
+			| Awaitables::Transform([](UBattleRuleConfigComponent* Config, FName Stage) { return IsValid(Config) && Stage == PVPBattleStage::WaitingForConfig; })
+			| Awaitables::WhileTrue([this]() { return ListenToEditConfigActionTrigger(); }));
+	}
+
+	FWeakCoroutine ListenToEditConfigActionTrigger()
 	{
 		while (true)
 		{
@@ -109,5 +102,29 @@ private:
 
 			ConfigWidget->OnSubmitFailed();
 		}
+	}
+
+	FWeakCoroutine SelectCharacterAndShowHUD() const
+	{
+		co_await SelectCharacter();
+
+		{
+			// TODO wait for game start
+			co_await StageComponent->GetCurrentStage().If(PVPBattleStage::Playing);
+		}
+
+		// TODO 플레이를 시작하면 플레이 HUD 띄우기
+	}
+
+	FWeakCoroutine SelectCharacter() const
+	{
+		auto CharacterSetter = co_await WaitForComponent<UCharacterSetterComponent>(GetOwningPlayerController());
+		auto ReadySetter = co_await WaitForComponent<UReadySetterComponent>(GetOwningPlayerController());
+
+		auto SelectCharacterWidget = co_await CreateWidget<USelectCharacterWidget>(GetOwningPlayerController(), SelectCharacterWidgetClass);
+		auto S = ScopedAddToViewport(SelectCharacterWidget);
+		const int32 Selection = co_await Awaitables::AnyOf(SelectCharacterWidget->OnManny, SelectCharacterWidget->OnQuinn);
+		Selection == 0 ? CharacterSetter->ServerEquipManny() : CharacterSetter->ServerEquipQuinn();
+		ReadySetter->ServerSetReady(true);
 	}
 };

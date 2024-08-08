@@ -46,3 +46,20 @@ private:
 		}
 	}
 };
+
+
+UCLASS(Within=PlayerController)
+class UReadySetterComponent : public UActorComponent2
+{
+	GENERATED_BODY()
+
+public:
+	UFUNCTION(Server, Reliable)
+	void ServerSetReady(bool bReady);
+
+private:
+	UReadySetterComponent()
+	{
+		SetIsReplicatedByDefault(true);
+	}
+};
