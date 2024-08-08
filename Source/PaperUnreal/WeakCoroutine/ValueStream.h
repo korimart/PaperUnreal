@@ -228,10 +228,13 @@ namespace Stream_Private
 			{
 				co_return;
 			}
-
-			// Awaitable이 종료를 요청한 경우 이 코루틴은 더 이상 값을 공급할 수 없음
-			// 그러므로 합친 Value Stream도 새 값을 만들 수 없으므로 닫고 코루틴도 종료한다.
-			if (FailableResult.template ContainsAnyOf<UNoDestroyError>())
+			
+			// 1. UNoDestroyError: Awaitable이 종료를 요청한 경우 이 코루틴은 더 이상 값을 공급할 수 없음
+			// 그러므로 Combined Value Stream도 새 값을 만들 수 없으므로 닫고 코루틴도 종료한다.
+			//
+			// 2. UEndOfStreamError: 만약에 기다리던 것이 Value Stream이었으면 무한대로
+			// UEndOfStreamError를 내뱉으므로 Combined Value Stream에 새 값을 공급하는 것이 불가능
+			if (FailableResult.template ContainsAnyOf<UNoDestroyError, UEndOfStreamError>())
 			{
 				WeakReceiver.Pin()->Close();
 				co_return;
