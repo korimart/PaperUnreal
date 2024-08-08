@@ -72,7 +72,7 @@ void APVPBattleGameMode::BeginPlay()
 
 	RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 	{
-		GetGameState<APVPBattleGameState>()->StageComponent->SetCurrentStage(PVPBattleStage::WaitingForConfig);
+		GetGameState<APVPBattleGameState>()->StageComponent->SetCurrentStage(PVPBattleStage::WaitingForStart);
 
 		{
 			auto FreeRule = NewObject<UFreeRuleComponent>(this);

@@ -69,10 +69,22 @@ private:
 
 	FWeakCoroutine ListenToEditConfigPrivilege()
 	{
-		co_await (
-			Stream::Combine(MakeComponentStream<UBattleRuleConfigComponent>(GetOwningPlayerController()), StageComponent->GetCurrentStage().CreateStream())
-			| Awaitables::Transform([](UBattleRuleConfigComponent* Config, FName Stage) { return IsValid(Config) && Stage == PVPBattleStage::WaitingForConfig; })
-			| Awaitables::WhileTrue([this]() { return ListenToEditConfigActionTrigger(); }));
+		co_await
+		(
+			Stream::Combine
+			(
+				MakeComponentStream<UBattleRuleConfigComponent>(GetOwningPlayerController()),
+				StageComponent->GetCurrentStage().CreateStream()
+			)
+			| Awaitables::Transform([](UBattleRuleConfigComponent* Config, FName Stage)
+			{
+				return IsValid(Config) && Stage == PVPBattleStage::WaitingForStart;
+			})
+			| Awaitables::WhileTrue([this]()
+			{
+				return ListenToEditConfigActionTrigger();
+			})
+		);
 	}
 
 	FWeakCoroutine ListenToEditConfigActionTrigger()
@@ -123,6 +135,7 @@ private:
 
 		auto SelectCharacterWidget = co_await CreateWidget<USelectCharacterWidget>(GetOwningPlayerController(), SelectCharacterWidgetClass);
 		auto S = ScopedAddToViewport(SelectCharacterWidget);
+
 		const int32 Selection = co_await Awaitables::AnyOf(SelectCharacterWidget->OnManny, SelectCharacterWidget->OnQuinn);
 		Selection == 0 ? CharacterSetter->ServerEquipManny() : CharacterSetter->ServerEquipQuinn();
 		ReadySetter->ServerSetReady(true);

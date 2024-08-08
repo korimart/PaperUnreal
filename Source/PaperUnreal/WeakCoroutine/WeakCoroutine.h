@@ -61,6 +61,7 @@ public:
 	{
 	}
 
+	// TODO LambdaCapturableCoroutine으로 이동
 	void Init(TUniquePtr<TUniqueFunction<TWeakCoroutine()>> Captures)
 	{
 		Handle.promise().Captures = MoveTemp(Captures);
