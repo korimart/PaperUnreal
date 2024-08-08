@@ -7,6 +7,7 @@
 #include "TransformAwaitable.h"
 #include "CancellableFuture.h"
 #include "MinimalCoroutine.h"
+#include "NoDestroyAwaitable.h"
 #include "PaperUnreal/GameFramework2/Utils.h"
 #include "ValueStream.generated.h"
 
@@ -213,23 +214,27 @@ TTuple<TValueStream<T>, FDelegateHandle> MakeStreamFromDelegate(
 namespace Stream_Private
 {
 	template <int32 Index>
-	FMinimalCoroutine CombineImpl(auto ValueStream, auto WeakReceiver, auto SharedTuple)
+	FMinimalCoroutine CombineImpl(auto NoDestroyAwaitable, auto WeakReceiver, auto SharedTuple)
 	{
 		using ReceiverValueType = typename std::decay_t<decltype(*WeakReceiver.Pin())>::ValueType;
 
 		while (true)
 		{
-			auto FailableResult = co_await ValueStream;
+			auto FailableResult = co_await NoDestroyAwaitable;
 
+			// Combined Value Stream이 존재하지 않거나 종료된 경우 더 이상 값을 공급할 필요가 없음
+			// 이 코루틴을 종료한다 (값을 공급하는 다른 코루틴들은 자신에게 CPU 타임이 왔을 때 여기에 닿으면서 또한 종료)
 			if (!WeakReceiver.IsValid() || WeakReceiver.Pin()->IsClosed())
 			{
-				break;
+				co_return;
 			}
 
-			if (FailableResult.template ContainsAnyOf<UEndOfStreamError>())
+			// Awaitable이 종료를 요청한 경우 이 코루틴은 더 이상 값을 공급할 수 없음
+			// 그러므로 합친 Value Stream도 새 값을 만들 수 없으므로 닫고 코루틴도 종료한다.
+			if (FailableResult.template ContainsAnyOf<UNoDestroyError>())
 			{
 				WeakReceiver.Pin()->Close();
-				break;
+				co_return;
 			}
 
 			SharedTuple->template Get<Index>().Emplace(MoveTemp(FailableResult));
@@ -239,6 +244,7 @@ namespace Stream_Private
 				return (!OptionalFailableResults.IsSet() || ...);
 			});
 
+			// 값을 공급하는 다른 코루틴이 아직 한 번도 값을 공급하지 않았으면 Combined Value Stream에도 공급할 값이 없음
 			if (bContainsUnset)
 			{
 				continue;
@@ -250,6 +256,8 @@ namespace Stream_Private
 				(Errors.Append(OptionalFailableResults->GetErrors()), ...);
 			});
 
+			// 여러 공급자 중에서 에러를 발생시킨 코루틴이 하나라도 있으면 값을 합칠 수 없으므로
+			// 모든 에러를 긁어모아서 Combined Value Stream에 전달한다
 			if (Errors.Num() > 0)
 			{
 				WeakReceiver.Pin()->ReceiveValue(TFailableResult<ReceiverValueType>{MoveTemp(Errors)});
@@ -270,18 +278,39 @@ namespace Stream_Private
 namespace Stream
 {
 	// TODO live data, multicast delegate를 받는 버전 추가
-	// TODO lvalue도 받도록 수정할 수 있음
-	template <typename... ValueTypes>
-	TValueStream<TTuple<ValueTypes...>> Combine(TValueStream<ValueTypes>&&... ValueStreams)
+	template <typename... AwaitableTypes>
+	auto Combine(AwaitableTypes&&... Awaitables)
 	{
-		TValueStream<TTuple<ValueTypes...>> Ret;
+		// 이 함수의 원리는 다음과 같음
+		// 각 Awaitable에 대해 FMinimalCoroutine을 실행하여 co_await을 하면서 값을 가져온다
+		// (Awaitable이 3개면 FMinimalCoroutine을 세 개 실행)
+		// 세 값이 모두 준비되면 TTuple로 합쳐서 반환값인 Combined Value Stream으로 전달
+		// 만약 세 값 중 하나라도 에러가 발생하면 에러로 전달
+		// 세 코루틴 중 하나라도 종료되면 Combined Value Stream도 닫는다 (UEndOfStreamError)
 
-		auto SharedTuple = MakeShared<TTuple<TOptional<TFailableResult<ValueTypes>>...>>();
+		// NoDestroy를 붙이면 await_resume의 반환이 항상 TFailableResult<ResultType>이 되기 때문에 ResultType을 취할 수 있음
+		using RetTupleType = TTuple<
+			typename decltype((Forward<AwaitableTypes>(Awaitables) | Awaitables::NoDestroy()).await_resume())::ResultType...>;
+
+		using OptionalFailableTupleType = TTuple<
+			TOptional<decltype((Forward<AwaitableTypes>(Awaitables) | Awaitables::NoDestroy()).await_resume())>...>;
+
+		TValueStream<RetTupleType> Ret;
+
+		auto SharedTuple = MakeShared<OptionalFailableTupleType>();
 		[&]<std::size_t... Indices>(std::index_sequence<Indices...>)
 		{
-			(Stream_Private::CombineImpl<Indices>(MoveTemp(ValueStreams), Ret.GetReceiver(), SharedTuple), ...);
-		}(std::index_sequence_for<ValueTypes...>{});
+			(Stream_Private::CombineImpl<Indices>(Forward<AwaitableTypes>(Awaitables) | Awaitables::NoDestroy(), Ret.GetReceiver(), SharedTuple), ...);
+		}(std::index_sequence_for<AwaitableTypes...>{});
 
 		return Ret;
+	}
+
+	template <typename... AwaitableTypes>
+	auto AllOf(AwaitableTypes&&... Awaitables)
+	{
+		return Combine(Forward<AwaitableTypes>(Awaitables)...)
+			| Awaitables::Transform([]<typename... BoolTypes>(BoolTypes... bBools){ return (bBools && ...); })
+			| Awaitables::FilterDuplicate<bool>();
 	}
 }

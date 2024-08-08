@@ -107,7 +107,7 @@ namespace Awaitables
 	auto Filter(PredicateType&& Predicate)
 	{
 		auto Relay = [Predicate = Forward<PredicateType>(Predicate)]
-			<typename FailableResultType>(const FailableResultType& FailableResult)
+			<typename FailableResultType>(const FailableResultType& FailableResult) mutable
 		{
 			// FilterWithError를 사용할 자리에 Filter를 사용하면 여기 걸림
 			static_assert(TIsInstantiationOf_V<FailableResultType, TFailableResult>);
@@ -124,22 +124,32 @@ namespace Awaitables
 
 		return TFilterAdaptor<decltype(Relay)>{MoveTemp(Relay)};
 	}
-	
+
+	template <typename ValueType>
+	auto FilterDuplicate()
+	{
+		return Filter([LastValue = TOptional<ValueType>{}](const ValueType& Value) mutable
+		{
+			const bool bLetItPass = !LastValue || *LastValue != Value;
+			LastValue = Value;
+			return bLetItPass;
+		});
+	}
+
 	template <typename ValueType>
 	auto If(ValueType&& Value)
 	{
 		return Filter([Value = Forward<ValueType>(Value)](const auto& Result) { return Result == Value; });
 	}
-	
+
 	template <typename ValueType>
 	auto IfNot(ValueType&& Value)
 	{
 		return Filter([Value = Forward<ValueType>(Value)](const auto& Result) { return Result != Value; });
 	}
-	
+
 	inline auto IfValid()
 	{
 		return Filter([](auto* Result) { return ::IsValid(Result); });
 	}
-
 }

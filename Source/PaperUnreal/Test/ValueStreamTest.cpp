@@ -1,4 +1,5 @@
 ﻿#include "Misc/AutomationTest.h"
+#include "PaperUnreal/WeakCoroutine/LiveData.h"
 #include "PaperUnreal/WeakCoroutine/ValueStream.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 
@@ -40,6 +41,49 @@ bool FValueStreamTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Stream::Combine 테스트"), Received[2], 7);
 		Delegate0.Broadcast(3);
 		TestEqual(TEXT("Stream::Combine 테스트"), Received[3], 9);
+	}
+
+	{
+		TLiveData<int32> LiveData0;
+		TLiveData<int32> LiveData1;
+		TLiveData<int32> LiveData2;
+
+		TArray<bool> Received;
+		RunWeakCoroutine([&]() -> FWeakCoroutine
+		{
+			auto AllEven = Stream::AllOf(
+				LiveData0.CreateStream() | Awaitables::Transform([](int32 Value) { return Value % 2 == 0; }),
+				LiveData1.CreateStream() | Awaitables::Transform([](int32 Value) { return Value % 2 == 0; }),
+				LiveData2.CreateStream() | Awaitables::Transform([](int32 Value) { return Value % 2 == 0; }));
+
+			while (true)
+			{
+				Received.Add(co_await AllEven);
+			}
+		});
+
+		TestEqual(TEXT("Stream::AllOf 테스트"), Received[0], true);
+
+		LiveData0 = 1;
+		TestEqual(TEXT("Stream::AllOf 테스트"), Received[1], false);
+		LiveData1 = 1;
+		LiveData2 = 1;
+
+		LiveData0 = 2;
+		LiveData1 = 1;
+		LiveData2 = 1;
+		TestEqual(TEXT("Stream::AllOf 테스트"), Received.Num(), 2);
+
+		LiveData0 = 2;
+		LiveData1 = 1;
+		LiveData2 = 2;
+		TestEqual(TEXT("Stream::AllOf 테스트"), Received.Num(), 2);
+
+		LiveData0 = 2;
+		LiveData1 = 2;
+		LiveData2 = 2;
+		TestEqual(TEXT("Stream::AllOf 테스트"), Received[2], true);
+		TestEqual(TEXT("Stream::AllOf 테스트"), Received.Num(), 3);
 	}
 
 	return true;

@@ -75,6 +75,14 @@ private:
 			ListenToEditConfigPrivilege();
 			ListenToStarGamePrivilege();
 
+			// TODO make this work
+			// RunWeakCoroutine(this,
+			// 	Awaitables::AllOf(
+			// 		MakeComponentStream<UBattleRuleConfigComponent>(PC) | Awaitables::IsValid(),
+			// 		StageComponent->GetCurrentStage().CreateStream() | Awaitables::Equals(PVPBattleStage::WaitingForStart),
+			// 		bSelectingCharacter.CreateStream() | Awaitables::Negate())
+			// 	| Awaitables::WhileTrue([this]() { return ListenToEditConfigActionTrigger(); }));
+
 			{
 				TAbortableCoroutineHandle S = SelectCharacterAndShowHUD();
 				co_await StageComponent->GetCurrentStage().If(PVPBattleStage::Result);
