@@ -18,6 +18,7 @@
 #include "PaperUnreal/WeakCoroutine/WhileTrueAwaitable.h"
 #include "PaperUnreal/Widgets/BattleRuleConfigWidget.h"
 #include "PaperUnreal/Widgets/SelectCharacterWidget.h"
+#include "PaperUnreal/Widgets/ToastWidget.h"
 #include "PVPBattleHUD.generated.h"
 
 /**
@@ -31,12 +32,20 @@ class APVPBattleHUD : public AHUD2
 private:
 	UPROPERTY()
 	UStageComponent* StageComponent;
+	
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<UToastWidget> ToastWidgetClass;
+	
+	UPROPERTY()
+	UToastWidget* ToastWidget;
+	FScopedAddToViewport ToastWidgetAddToViewport;
 
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<UBattleRuleConfigWidget> ConfigWidgetClass;
 
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<USelectCharacterWidget> SelectCharacterWidgetClass;
+	TLiveData<bool> bSelectingCharacter{false};
 
 	UPROPERTY(EditAnywhere)
 	UInputAction* EditConfigAction;
@@ -54,6 +63,9 @@ private:
 
 		GetEnhancedInputComponent()->BindAction(EditConfigAction, ETriggerEvent::Triggered, this, &ThisClass::OnEditConfigActionTriggeredFunc);
 		GetEnhancedInputComponent()->BindAction(StartGameAction, ETriggerEvent::Triggered, this, &ThisClass::OnStartGameActionTriggeredFunc);
+
+		ToastWidget = CreateWidget<UToastWidget>(GetOwningPlayerController(), ToastWidgetClass);
+		ToastWidgetAddToViewport = ToastWidget;
 
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
@@ -82,11 +94,12 @@ private:
 			Stream::Combine
 			(
 				MakeComponentStream<UBattleRuleConfigComponent>(GetOwningPlayerController()),
-				StageComponent->GetCurrentStage().CreateStream()
+				StageComponent->GetCurrentStage().CreateStream(),
+				bSelectingCharacter.CreateStream()
 			)
-			| Awaitables::Transform([](UBattleRuleConfigComponent* Config, FName Stage)
+			| Awaitables::Transform([](UBattleRuleConfigComponent* Config, FName Stage, bool bSelectingCharacter)
 			{
-				return IsValid(Config) && Stage == PVPBattleStage::WaitingForStart;
+				return IsValid(Config) && Stage == PVPBattleStage::WaitingForStart && !bSelectingCharacter;
 			})
 			| Awaitables::WhileTrue([this]()
 			{
@@ -97,6 +110,8 @@ private:
 
 	FWeakCoroutine ListenToEditConfigActionTrigger()
 	{
+		FToastHandle ToastHandle = ToastWidget->Toast(FText::FromString(TEXT("[E]를 눌러서 방 설정을 변경할 수 있습니다.")));
+		
 		while (true)
 		{
 			co_await OnEditConfigActionTriggered;
@@ -131,11 +146,12 @@ private:
 			Stream::Combine
 			(
 				MakeComponentStream<UGameStarterComponent>(GetOwningPlayerController()),
-				StageComponent->GetCurrentStage().CreateStream()
+				StageComponent->GetCurrentStage().CreateStream(),
+				bSelectingCharacter.CreateStream()
 			)
-			| Awaitables::Transform([](UGameStarterComponent* Starter, FName Stage)
+			| Awaitables::Transform([](UGameStarterComponent* Starter, FName Stage, bool bSelectingCharacter)
 			{
-				return IsValid(Starter) && Stage == PVPBattleStage::WaitingForStart;
+				return IsValid(Starter) && Stage == PVPBattleStage::WaitingForStart && !bSelectingCharacter;
 			})
 			| Awaitables::WhileTrue([this]()
 			{
@@ -147,42 +163,44 @@ private:
 	FWeakCoroutine ListenToStartGameActionTrigger()
 	{
 		auto GameStarter = co_await GetOwningPlayerController()->FindComponentByClass<UGameStarterComponent>();
-
-		// TODO
-		// auto ConfigWidget = co_await CreateWidget<UBattleRuleConfigWidget>(GetOwningPlayerController(), ConfigWidgetClass);
-		// auto S = ScopedAddToViewport(ConfigWidget);
+		FToastHandle ToastHandle = ToastWidget->Toast(FText::FromString(TEXT("[S]를 눌러서 게임을 시작할 수 있습니다.")));
 
 		while (true)
 		{
 			co_await OnStartGameActionTriggered;
 
-			// TODO clear error message
-			
 			if (co_await GameStarter->StartGame())
 			{
 				break;
 			}
 
-			// TODO display error message
+			RunWeakCoroutine([&]() -> FWeakCoroutine
+			{
+				FToastHandle T = ToastWidget->Toast(FText::FromString(TEXT("게임 시작 조건을 충족하지 못했습니다.")));
+				co_await WaitForSeconds(GetWorld(), 3.f);
+			});
 		}
 	}
 
-	FWeakCoroutine SelectCharacterAndShowHUD() const
+	FWeakCoroutine SelectCharacterAndShowHUD()
 	{
 		co_await SelectCharacter();
 
 		{
-			// TODO wait for game start
+			FToastHandle ToastHandle = ToastWidget->Toast(FText::FromString(TEXT("방장이 게임을 시작하길 기다리는 중...")));
 			co_await StageComponent->GetCurrentStage().If(PVPBattleStage::Playing);
 		}
 
 		// TODO 플레이를 시작하면 플레이 HUD 띄우기
 	}
 
-	FWeakCoroutine SelectCharacter() const
+	FWeakCoroutine SelectCharacter()
 	{
 		auto CharacterSetter = co_await WaitForComponent<UCharacterSetterComponent>(GetOwningPlayerController());
 		auto ReadySetter = co_await WaitForComponent<UReadySetterComponent>(GetOwningPlayerController());
+
+		bSelectingCharacter = true;
+		auto F = FinallyIfValid(this, [this]() { bSelectingCharacter = false; });
 
 		auto SelectCharacterWidget = co_await CreateWidget<USelectCharacterWidget>(GetOwningPlayerController(), SelectCharacterWidgetClass);
 		auto S = ScopedAddToViewport(SelectCharacterWidget);

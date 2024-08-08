@@ -11,7 +11,7 @@
 namespace Utils_Private
 {
 	template <typename FuncType>
-	class TFinally UE_NODISCARD
+	class UE_NODISCARD TFinally
 	{
 	public:
 		TFinally(FuncType InFunc) : Func(InFunc)
@@ -44,28 +44,6 @@ namespace Utils_Private
 
 	private:
 		TOptional<FuncType> Func;
-	};
-
-	struct FScopedAddToViewport UE_NODISCARD
-	{
-		TWeakObjectPtr<UUserWidget> Widget;
-
-		FScopedAddToViewport(UUserWidget* InWidget)
-			: Widget(InWidget)
-		{
-			Widget->AddToViewport();
-		}
-
-		~FScopedAddToViewport()
-		{
-			if (Widget.IsValid() && Widget->IsInViewport())
-			{
-				Widget->RemoveFromParent();
-			}
-		}
-
-		FScopedAddToViewport(const FScopedAddToViewport&) = delete;
-		FScopedAddToViewport& operator=(const FScopedAddToViewport&) = delete;
 	};
 }
 
@@ -200,9 +178,55 @@ UE_NODISCARD auto FinallyIfValid(UObject* Object, FuncType&& Func)
 }
 
 
-inline UE_NODISCARD auto ScopedAddToViewport(UUserWidget* Widget)
+struct UE_NODISCARD FScopedAddToViewport
 {
-	return Utils_Private::FScopedAddToViewport{Widget};
+	TWeakObjectPtr<UUserWidget> Widget;
+
+	FScopedAddToViewport() = default;
+
+	FScopedAddToViewport(UUserWidget* InWidget)
+		: Widget(InWidget)
+	{
+		if (Widget.IsValid())
+		{
+			Widget->AddToViewport();
+		}
+	}
+
+	~FScopedAddToViewport()
+	{
+		Reset();
+	}
+
+	FScopedAddToViewport(const FScopedAddToViewport&) = delete;
+	FScopedAddToViewport& operator=(const FScopedAddToViewport&) = delete;
+
+	FScopedAddToViewport& operator=(UUserWidget* InWidget)
+	{
+		Reset();
+		Widget = InWidget;
+
+		if (Widget.IsValid())
+		{
+			Widget->AddToViewport();
+		}
+
+		return *this;
+	}
+
+	void Reset()
+	{
+		if (Widget.IsValid() && Widget->IsInViewport())
+		{
+			Widget->RemoveFromParent();
+		}
+	}
+};
+
+
+inline FScopedAddToViewport ScopedAddToViewport(UUserWidget* Widget)
+{
+	return Widget;
 }
 
 
