@@ -83,6 +83,11 @@ public:
 		return false;
 	}
 
+	friend void operator<<(TArray<TAbortableCoroutine>& Array, TAbortableCoroutine&& Right)
+	{
+		Array.Add(MoveTemp(Right));
+	}
+
 private:
 	bool bAbortOnDestruction = false;
 

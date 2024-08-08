@@ -167,6 +167,22 @@ namespace Awaitables
 		return Transform([](auto Object) { return ::CastChecked<To>(Object); });
 	}
 
+	inline auto IsValid()
+	{
+		return Transform([](auto Object) { return ::IsValid(Object); });
+	}
+
+	template <typename T>
+	auto Equals(T&& This)
+	{
+		return Transform([This = Forward<T>(This)](const auto& Value) { return Value == This; });
+	}
+	
+	inline auto Negate()
+	{
+		return Transform([](bool bValue) { return !bValue; });
+	}
+
 	template <typename ComponentType>
 	auto FindComponentByClass()
 	{

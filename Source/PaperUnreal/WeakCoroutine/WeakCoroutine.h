@@ -218,6 +218,18 @@ auto RunWeakCoroutine(const UObject* Lifetime, FuncType&& Func)
 }
 
 
+template <typename AwaitableType>
+	requires CAwaitable<AwaitableType> || CAwaitableConvertible<AwaitableType>
+auto RunWeakCoroutine(const UObject* Lifetime, AwaitableType&& Awaitable)
+{
+	return RunWeakCoroutine(Lifetime,
+		[Awaitable = AwaitableType{Forward<AwaitableType>(Awaitable)}]() mutable -> TWeakCoroutine<void>
+		{
+			co_await Awaitable;
+		});
+}
+
+
 struct FCatchAllAdaptor : TAwaitableAdaptorBase<FCatchAllAdaptor>
 {
 	template <CAwaitable AwaitableType>
