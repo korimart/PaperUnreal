@@ -9,7 +9,9 @@
 
 
 template <typename T>
-struct TMinimalAbortableCoroutine : TAwaitableCoroutine<T>, TAbortableCoroutine<TMinimalAbortableCoroutine<T>>
+struct TMinimalAbortableCoroutine
+	: TAwaitableCoroutine<TMinimalAbortableCoroutine<T>, T>
+	  , TAbortableCoroutine<TMinimalAbortableCoroutine<T>>
 {
 	struct promise_type : TAbortablePromise<promise_type>, TAwaitablePromise<T>
 	{
@@ -56,12 +58,19 @@ struct TMinimalAbortableCoroutine : TAwaitableCoroutine<T>, TAbortableCoroutine<
 	std::coroutine_handle<promise_type> Handle;
 
 	TMinimalAbortableCoroutine(std::coroutine_handle<promise_type> InHandle)
-		: TAwaitableCoroutine<T>(InHandle), PromiseLife(InHandle.promise().PromiseLife), Handle(InHandle)
+		: TAwaitableCoroutine<TMinimalAbortableCoroutine, T>(InHandle)
+		  , PromiseLife(InHandle.promise().PromiseLife)
+		  , Handle(InHandle)
 	{
 	}
 
 	TMinimalAbortableCoroutine(TMinimalAbortableCoroutine&&) = default;
 	TMinimalAbortableCoroutine& operator=(TMinimalAbortableCoroutine&&) = default;
+
+	void OnAwaitAbort()
+	{
+		this->Abort();
+	}
 };
 
 

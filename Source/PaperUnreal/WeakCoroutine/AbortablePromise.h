@@ -137,6 +137,16 @@ public:
 			Coroutine.Reset();
 		}
 	}
+	
+	AbortableCoroutineType& Get()
+	{
+		return *Coroutine;
+	}
+	
+	const AbortableCoroutineType& Get() const
+	{
+		return *Coroutine;
+	}
 
 private:
 	TOptional<AbortableCoroutineType> Coroutine;

@@ -45,31 +45,27 @@ private:
 };
 
 
-template <typename T>
-class TAwaitableCoroutine
+template <typename Derived, typename T>
+class TAwaitableCoroutine : public TCancellableFutureAwaitable<TCancellableFuture<T>>
 {
+	using Super = TCancellableFutureAwaitable<TCancellableFuture<T>>;
+	
 public:
 	template <typename PromiseType>
 	TAwaitableCoroutine(std::coroutine_handle<PromiseType> Handle)
-		: Return(static_cast<TAwaitablePromise<T>&>(Handle.promise()).GetFuture())
+		: Super(static_cast<TAwaitablePromise<T>&>(Handle.promise()).GetFuture())
 	{
-	}
-	
-	TCancellableFuture<T> ReturnValue()
-	{
-		return MoveTemp(Return);
 	}
 
-	friend auto operator co_await(TAwaitableCoroutine& Coroutine)
+	void await_abort()
 	{
-		return operator co_await(Coroutine.ReturnValue());
+		Super::await_abort();
+		static_cast<Derived*>(this)->OnAwaitAbort();
 	}
 
-	friend auto operator co_await(TAwaitableCoroutine&& Coroutine)
+	template <typename FuncType>
+	void Then(FuncType&& Func) const
 	{
-		return operator co_await(Coroutine.ReturnValue());
+		this->Future.Then(Forward<FuncType>(Func));
 	}
-	
-private:
-	TCancellableFuture<T> Return;
 };

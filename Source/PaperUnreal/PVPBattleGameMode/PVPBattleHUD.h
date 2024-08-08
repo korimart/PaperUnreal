@@ -81,7 +81,7 @@ private:
 		{
 			co_await OnEditConfigTriggered;
 			TAbortableCoroutineHandle EditConfigCoroutine = EditConfig();
-			co_await Awaitables::AnyOf(OnEditConfigTriggered, EditConfigCoroutine->ReturnValue());
+			co_await Awaitables::AnyOf(OnEditConfigTriggered, EditConfigCoroutine.Get());
 		}
 	}
 

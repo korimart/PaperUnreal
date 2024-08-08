@@ -368,9 +368,11 @@ public:
 		*bAborted = true;
 	}
 
+protected:
+	FutureType Future;
+	
 private:
 	TSharedRef<bool> bAborted = MakeShared<bool>(false);
-	FutureType Future;
 };
 
 template <typename T>

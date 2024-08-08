@@ -29,7 +29,7 @@ public:
 	{
 		bAborted = MakeShared<bool>(false);
 		Worker = Start();
-		Worker->ReturnValue().Then([this, Handle, bAborted = bAborted](const auto& FailableResult)
+		Worker->Then([this, Handle, bAborted = bAborted](const auto& FailableResult)
 		{
 			if (!*bAborted)
 			{

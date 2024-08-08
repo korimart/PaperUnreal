@@ -47,13 +47,17 @@ class TWeakCoroutinePromiseType;
 
 
 template <typename T>
-class TWeakCoroutine : public TAwaitableCoroutine<T>, public TAbortableCoroutine<TWeakCoroutine<T>>
+class TWeakCoroutine
+	: public TAwaitableCoroutine<TWeakCoroutine<T>, T>
+	  , public TAbortableCoroutine<TWeakCoroutine<T>>
 {
 public:
 	using promise_type = TWeakCoroutinePromiseType<T>;
 
 	TWeakCoroutine(std::coroutine_handle<promise_type> InHandle)
-		: TAwaitableCoroutine<T>(InHandle), Handle(InHandle), PromiseLife(Handle.promise().PromiseLife)
+		: TAwaitableCoroutine<TWeakCoroutine<T>, T>(InHandle)
+		  , Handle(InHandle)
+		  , PromiseLife(Handle.promise().PromiseLife)
 	{
 	}
 
@@ -72,10 +76,16 @@ public:
 	}
 
 private:
+	friend class TAwaitableCoroutine<TWeakCoroutine, T>;
 	friend class TAbortableCoroutine<TWeakCoroutine>;
-	
+
 	std::coroutine_handle<promise_type> Handle;
 	TWeakPtr<std::monostate> PromiseLife;
+
+	void OnAwaitAbort()
+	{
+		this->Abort();
+	}
 };
 
 

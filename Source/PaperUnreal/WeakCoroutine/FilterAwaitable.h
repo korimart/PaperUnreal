@@ -28,7 +28,7 @@ public:
 	{
 		bAborted = MakeShared<bool>(false);
 		Coroutine = StartFiltering();
-		Coroutine->ReturnValue().Then([Handle, bAborted = bAborted](const auto& FailableResult)
+		Coroutine->Then([Handle, bAborted = bAborted](const auto& FailableResult)
 		{
 			if (!*bAborted)
 			{

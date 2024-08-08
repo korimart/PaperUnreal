@@ -467,5 +467,23 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("co_await이 발생한 이후 Abort를 호출해도 잘 작동하는지 테스트"), *bLifeDestroyed);
 	}
 
+	{
+		UDummy* Dummy = NewObject<UDummy>();
+		auto Life = MakeUnique<FLife>();
+		auto bLifeDestroyed = Life->bDestroyed;
+
+		FWeakCoroutine Coroutine = RunWeakCoroutine(Dummy, [Dummy, Life = MoveTemp(Life)]() mutable -> FWeakCoroutine
+		{
+			co_await RunWeakCoroutine(Dummy, [Life = MoveTemp(Life)]()-> FWeakCoroutine
+			{
+				co_await Awaitables::Forever();
+			});
+		});
+
+		TestFalse(TEXT(""), *bLifeDestroyed);
+		Coroutine.Abort();
+		TestTrue(TEXT(""), *bLifeDestroyed);
+	}
+
 	return true;
 }

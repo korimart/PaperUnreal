@@ -65,7 +65,7 @@ class UBattleRuleComponent : public UComponentGroupComponent
 	GENERATED_BODY()
 
 public:
-	TCancellableFuture<FBattleRuleResult> Start(UClass* InPawnClass, int32 TeamCount, int32 EachTeamMemberCount)
+	TWeakCoroutine<FBattleRuleResult> Start(UClass* InPawnClass, int32 TeamCount, int32 EachTeamMemberCount)
 	{
 		check(HasBegunPlay());
 
@@ -107,149 +107,139 @@ private:
 	FTeamAllocator TeamAllocator;
 	TMap<int32, FLinearColor> TeamColors;
 
-	// TODO 여기 코루틴들 RunWeakCoroutine 호출 필요 없음
-	void InitiatePawnSpawnSequence(APlayerState* Player)
+	FWeakCoroutine InitiatePawnSpawnSequence(APlayerState* Player)
 	{
-		RunWeakCoroutine(this, [this, Player]() -> FWeakCoroutine
+		co_await AddToWeakList(Player);
+
+		auto TeamComponent = Player->FindComponentByClass<UTeamComponent>();
+		auto ReadyState = Player->FindComponentByClass<UReadyStateComponent>();
+		auto Inventory = Player->FindComponentByClass<UInventoryComponent>();
+
+		// 이 컴포넌트들은 디펜던시: 이 컴포넌트들을 가지는 PlayerState에 대해서만 이 클래스를 사용할 수 있음
+		check(AllValid(TeamComponent, ReadyState, Inventory));
+
+		UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어의 준비 완료를 기다리는 중"), Player);
+		co_await ReadyState->GetbReady().If(true);
+
+		// 죽은 다음에 다시 스폰하는 경우에는 팀이 이미 있음
+		if (TeamComponent->GetTeamIndex().Get() < 0)
 		{
-			co_await AddToWeakList(Player);
-
-			auto TeamComponent = Player->FindComponentByClass<UTeamComponent>();
-			auto ReadyState = Player->FindComponentByClass<UReadyStateComponent>();
-			auto Inventory = Player->FindComponentByClass<UInventoryComponent>();
-
-			// 이 컴포넌트들은 디펜던시: 이 컴포넌트들을 가지는 PlayerState에 대해서만 이 클래스를 사용할 수 있음
-			check(AllValid(TeamComponent, ReadyState, Inventory));
-
-			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어의 준비 완료를 기다리는 중"), Player);
-			co_await ReadyState->GetbReady().If(true);
-
-			// 죽은 다음에 다시 스폰하는 경우에는 팀이 이미 있음
-			if (TeamComponent->GetTeamIndex().Get() < 0)
+			if (TOptional<int32> NextTeamIndex = TeamAllocator.NextTeamIndex())
 			{
-				if (TOptional<int32> NextTeamIndex = TeamAllocator.NextTeamIndex())
-				{
-					TeamComponent->SetTeamIndex(*NextTeamIndex);
-				}
-				else
-				{
-					// TODO 꽉차서 더 이상 입장할 수 없으니 플레이어한테 알려주던가 그런 처리
-					co_return;
-				}
+				TeamComponent->SetTeamIndex(*NextTeamIndex);
 			}
-
-			const int32 ThisPlayerTeamIndex = TeamComponent->GetTeamIndex().Get();
-			AAreaActor* ThisPlayerArea = FindLivingAreaOfTeam(ThisPlayerTeamIndex);
-
-			if (!ThisPlayerArea)
+			else
 			{
-				ThisPlayerArea = InitializeNewAreaActor(ThisPlayerTeamIndex);
-			}
-
-			// 월드가 꽉차서 새 영역을 선포할 수 없음
-			if (!ThisPlayerArea)
-			{
-				// TODO 일단 이 팀은 플레이를 할 수 없는데 나중에 공간이 생길 수도 있음 그 때 스폰해주자
+				// TODO 꽉차서 더 이상 입장할 수 없으니 플레이어한테 알려주던가 그런 처리
 				co_return;
 			}
+		}
 
-			Inventory->SetTracerBaseColor(ALittleBrighter(TeamColors[ThisPlayerTeamIndex]));
+		const int32 ThisPlayerTeamIndex = TeamComponent->GetTeamIndex().Get();
+		AAreaActor* ThisPlayerArea = FindLivingAreaOfTeam(ThisPlayerTeamIndex);
 
-			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어 폰을 스폰합니다"), Player);
-			APawn* Pawn = GameState->ServerPawnSpawner->SpawnAtLocation(
-				PawnClass,
-				ThisPlayerArea->ServerAreaBoundary->GetRandomPointInside(),
-				[&](APawn* ToInit)
-				{
-					auto PawnComponent = NewObject<UBattleRulePawnComponent>(ToInit);
-					PawnComponent->SetDependencies(GameState, ThisPlayerArea);
-					PawnComponent->RegisterComponent();
-				});
-			Player->GetOwningController()->Possess(Pawn);
+		if (!ThisPlayerArea)
+		{
+			ThisPlayerArea = InitializeNewAreaActor(ThisPlayerTeamIndex);
+		}
 
-			co_await InitiatePawnLifeSequence(Pawn->FindComponentByClass<UBattleRulePawnComponent>(), ThisPlayerTeamIndex);
+		// 월드가 꽉차서 새 영역을 선포할 수 없음
+		if (!ThisPlayerArea)
+		{
+			// TODO 일단 이 팀은 플레이를 할 수 없는데 나중에 공간이 생길 수도 있음 그 때 스폰해주자
+			co_return;
+		}
 
-			constexpr float RespawnCool = 5.f;
-			co_await WaitForSeconds(GetWorld(), RespawnCool);
+		Inventory->SetTracerBaseColor(ALittleBrighter(TeamColors[ThisPlayerTeamIndex]));
 
-			UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어 리스폰 시퀀스를 시작합니다"), Player);
-			InitiatePawnSpawnSequence(Player);
+		UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어 폰을 스폰합니다"), Player);
+		APawn* Pawn = GameState->ServerPawnSpawner->SpawnAtLocation(
+			PawnClass,
+			ThisPlayerArea->ServerAreaBoundary->GetRandomPointInside(),
+			[&](APawn* ToInit)
+			{
+				auto PawnComponent = NewObject<UBattleRulePawnComponent>(ToInit);
+				PawnComponent->SetDependencies(GameState, ThisPlayerArea);
+				PawnComponent->RegisterComponent();
+			});
+		Player->GetOwningController()->Possess(Pawn);
+
+		co_await InitiatePawnLifeSequence(Pawn->FindComponentByClass<UBattleRulePawnComponent>(), ThisPlayerTeamIndex);
+
+		constexpr float RespawnCool = 5.f;
+		co_await WaitForSeconds(GetWorld(), RespawnCool);
+
+		UE_LOG(LogBattleRule, Log, TEXT("%p 플레이어 리스폰 시퀀스를 시작합니다"), Player);
+		InitiatePawnSpawnSequence(Player);
+	}
+
+	FWeakCoroutine InitiatePawnLifeSequence(UBattleRulePawnComponent* Pawn, int32 TeamIndex) const
+	{
+		co_await AddToWeakList(Pawn);
+
+		UE_LOG(LogBattleRule, Log, TEXT("%p 폰의 사망을 기다리는 중"), Pawn);
+		co_await Pawn->GetServerLife()->GetbAlive().If(false);
+
+		UE_LOG(LogBattleRule, Log, TEXT("%p 폰이 사망함에 따라 영역 파괴를 검토하는 중"), Pawn);
+		KillAreaIfNobodyAlive(TeamIndex);
+	}
+
+	TWeakCoroutine<FBattleRuleResult> InitiateGameFlow()
+	{
+		UE_LOG(LogBattleRule, Log, TEXT("게임을 시작합니다"));
+
+		auto F = FinallyIfValid(this, [this]() { DestroyComponent(); });
+
+		auto Timeout = RunWeakCoroutine(this, [this]() -> FWeakCoroutine
+		{
+			co_await GameState->ServerWorldTimer->At(GetWorld()->GetTimeSeconds() + 60.f);
 		});
-	}
 
-	TCancellableFuture<void> InitiatePawnLifeSequence(UBattleRulePawnComponent* Pawn, int32 TeamIndex)
-	{
-		return RunWeakCoroutine(this, [this, Pawn, TeamIndex]() -> FWeakCoroutine
+		auto LastManStanding = RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
-			co_await AddToWeakList(Pawn);
+			auto AreaStateTracker = NewObject<UAreaStateTrackerComponent>(GetOwner());
+			AreaStateTracker->SetSpawner(GameState->ServerAreaSpawner);
+			AreaStateTracker->RegisterComponent();
+			co_await AreaStateTracker->ZeroOrOneAreaIsSurviving();
+			AreaStateTracker->DestroyComponent();
+		});
 
-			UE_LOG(LogBattleRule, Log, TEXT("%p 폰의 사망을 기다리는 중"), Pawn);
-			co_await Pawn->GetServerLife()->GetbAlive().If(false);
+		const int32 CompletedAwaitableIndex = co_await Awaitables::AnyOf(
+			Timeout, LastManStanding, UInGameCheats::OnEndGameByCheat);
 
-			UE_LOG(LogBattleRule, Log, TEXT("%p 폰이 사망함에 따라 영역 파괴를 검토하는 중"), Pawn);
-			KillAreaIfNobodyAlive(TeamIndex);
-		}).ReturnValue();
-	}
-
-	TCancellableFuture<FBattleRuleResult> InitiateGameFlow()
-	{
-		return RunWeakCoroutine(this, [this]() -> TWeakCoroutine<FBattleRuleResult>
+		if (CompletedAwaitableIndex != 2 && UInGameCheats::bDoNotEndGameUntilCheat)
 		{
-			UE_LOG(LogBattleRule, Log, TEXT("게임을 시작합니다"));
+			UE_LOG(LogBattleRule, Log, TEXT("게임 끝났지만 치트를 기다리는 중"));
+			co_await UInGameCheats::OnEndGameByCheat;
+		}
 
-			auto F = FinallyIfValid(this, [this]() { DestroyComponent(); });
+		if (CompletedAwaitableIndex == 0)
+		{
+			UE_LOG(LogBattleRule, Log, TEXT("제한시간이 끝나 게임을 종료합니다"));
+		}
+		else if (CompletedAwaitableIndex == 1)
+		{
+			UE_LOG(LogBattleRule, Log, TEXT("팀의 수가 1이하이므로 게임을 종료합니다"));
+		}
 
-			auto Timeout = RunWeakCoroutine(this, [this]() -> FWeakCoroutine
+		// 모종의 이유로 에리어 두 개가 동시에 파괴돼서 무승부가 될 수도 있음 무승부면 결과가 빔
+		// TODO 마지막까지 남은 에리어들을 알아내서 이기게 해줘야 됨
+		FBattleRuleResult GameResult{};
+
+		ForEachComponent<ULifeComponent, UTeamComponent, UAreaBoundaryComponent>
+		(GameState->ServerAreaSpawner->GetSpawnedAreas().Get(), [&](auto Life, auto Team, auto Boundary)
+		{
+			if (Life->GetbAlive().Get())
 			{
-				co_await GameState->ServerWorldTimer->At(GetWorld()->GetTimeSeconds() + 60.f);
-			});
-
-			auto LastManStanding = RunWeakCoroutine(this, [this]() -> FWeakCoroutine
-			{
-				auto AreaStateTracker = NewObject<UAreaStateTrackerComponent>(GetOwner());
-				AreaStateTracker->SetSpawner(GameState->ServerAreaSpawner);
-				AreaStateTracker->RegisterComponent();
-				co_await AreaStateTracker->ZeroOrOneAreaIsSurviving();
-				AreaStateTracker->DestroyComponent();
-			});
-
-			const int32 CompletedAwaitableIndex = co_await Awaitables::AnyOf(
-				Timeout, LastManStanding, UInGameCheats::OnEndGameByCheat);
-
-			if (CompletedAwaitableIndex != 2 && UInGameCheats::bDoNotEndGameUntilCheat)
-			{
-				UE_LOG(LogBattleRule, Log, TEXT("게임 끝났지만 치트를 기다리는 중"));
-				co_await UInGameCheats::OnEndGameByCheat;
+				const float Area = Boundary->GetBoundary().Get().CalculateArea();
+				GameResult.SortedByRank.Emplace(Team->GetTeamIndex().Get(), Area);
 			}
+		});
 
-			if (CompletedAwaitableIndex == 0)
-			{
-				UE_LOG(LogBattleRule, Log, TEXT("제한시간이 끝나 게임을 종료합니다"));
-			}
-			else if (CompletedAwaitableIndex == 1)
-			{
-				UE_LOG(LogBattleRule, Log, TEXT("팀의 수가 1이하이므로 게임을 종료합니다"));
-			}
+		Algo::SortBy(GameResult.SortedByRank, &FBattleRuleResult::FTeamAndArea::Area);
+		std::reverse(GameResult.SortedByRank.begin(), GameResult.SortedByRank.end());
 
-			// 모종의 이유로 에리어 두 개가 동시에 파괴돼서 무승부가 될 수도 있음 무승부면 결과가 빔
-			// TODO 마지막까지 남은 에리어들을 알아내서 이기게 해줘야 됨
-			FBattleRuleResult GameResult{};
-
-			ForEachComponent<ULifeComponent, UTeamComponent, UAreaBoundaryComponent>
-			(GameState->ServerAreaSpawner->GetSpawnedAreas().Get(), [&](auto Life, auto Team, auto Boundary)
-			{
-				if (Life->GetbAlive().Get())
-				{
-					const float Area = Boundary->GetBoundary().Get().CalculateArea();
-					GameResult.SortedByRank.Emplace(Team->GetTeamIndex().Get(), Area);
-				}
-			});
-
-			Algo::SortBy(GameResult.SortedByRank, &FBattleRuleResult::FTeamAndArea::Area);
-			std::reverse(GameResult.SortedByRank.begin(), GameResult.SortedByRank.end());
-
-			co_return GameResult;
-		}).ReturnValue();
+		co_return GameResult;
 	}
 
 	AAreaActor* InitializeNewAreaActor(int32 TeamIndex)
