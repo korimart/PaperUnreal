@@ -30,8 +30,15 @@ class APVPBattleGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
 
+public:
+	bool StartGameIfConditionsMet();
+
 private:
+	FSimpleMulticastDelegate OnGameStartConditionsMet;
+	
 	APVPBattleGameMode();
 
 	virtual void BeginPlay() override;
+	
+	class UPrivilegeComponent* AddPrivilegeComponents(UPrivilegeComponent* Target);
 };

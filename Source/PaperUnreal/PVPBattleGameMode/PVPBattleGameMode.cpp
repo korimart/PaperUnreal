@@ -6,21 +6,35 @@
 #include "PVPBattleHUD.h"
 #include "PVPBattlePlayerController.h"
 #include "PVPBattlePlayerState.h"
-#include "PaperUnreal/Development/InGameCheats.h"
 #include "PaperUnreal/BattleRule/BattleRuleComponent.h"
-#include "PaperUnreal/BattleRule/BattleRuleConfigComponent.h"
 #include "PaperUnreal/FreeRule/FreeRuleComponent.h"
 #include "PaperUnreal/ModeAgnostic/FixedCameraPawn.h"
+#include "PaperUnreal/ModeAgnostic/GameStarterComponent.h"
 #include "UObject/ConstructorHelpers.h"
 
 
 DEFINE_LOG_CATEGORY(LogPVPBattleGameMode);
 
 
+bool APVPBattleGameMode::StartGameIfConditionsMet()
+{
+	const int32 ReadyCount = Algo::TransformAccumulate(
+				::GetComponents<UReadyStateComponent>(GetGameState<APVPBattleGameState>()->GetPlayerStateArray().Get()),
+				[](auto Each) { return Each->GetbReady().Get() ? 1 : 0; },
+				0);
+
+	if (ReadyCount >= 2)
+	{
+		OnGameStartConditionsMet.Broadcast();
+		return true;
+	}
+	
+	return false;
+}
+
 APVPBattleGameMode::APVPBattleGameMode()
 {
 	GameStateClass = APVPBattleGameState::StaticClass();
-	PlayerControllerClass = APVPBattlePlayerController::StaticClass();
 	PlayerStateClass = APVPBattlePlayerState::StaticClass();
 	SpectatorClass = AFixedCameraPawn::StaticClass();
 
@@ -55,7 +69,8 @@ void APVPBattleGameMode::BeginPlay()
 			= GetGameState<APVPBattleGameState>()->GetPlayerStateArray().CreateAddStream()
 			| Awaitables::Transform(&APVPBattlePlayerState::GetPlayerController)
 			| Awaitables::CastChecked<APVPBattlePlayerController>()
-			| Awaitables::Transform(&APVPBattlePlayerController::ServerPrivilegeComponent);
+			| Awaitables::Transform(&APVPBattlePlayerController::ServerPrivilegeComponent)
+			| Awaitables::Transform([this](UPrivilegeComponent* Component) { return AddPrivilegeComponents(Component); });
 
 		{
 			auto FirstPlayerPrivilege = co_await PrivilegeStream;
@@ -79,14 +94,12 @@ void APVPBattleGameMode::BeginPlay()
 			FreeRule->RegisterComponent();
 			FreeRule->Start(DefaultPawnClass);
 			auto F = FinallyIfValid(FreeRule, [FreeRule]() { FreeRule->DestroyComponent(); });
-
-			// TODO 방설정 완료될 때까지 대기
-
-			auto AtLeast2Ready = GetGameState<APVPBattleGameState>()->ReadyStateTrackerComponent->ReadyCountIsAtLeast(2);
-			auto ReadyByCheat = MakeFutureFromDelegate(UInGameCheats::OnStartGameByCheat);
-			co_await Awaitables::AnyOf(AtLeast2Ready, ReadyByCheat);
+			
+			co_await OnGameStartConditionsMet;
 		}
 
+		GetGameState<APVPBattleGameState>()->StageComponent->SetCurrentStage(PVPBattleStage::Playing);
+		
 		const FBattleRuleResult GameResult = co_await [&]()
 		{
 			auto BattleRule = NewObject<UBattleRuleComponent>(this);
@@ -111,4 +124,20 @@ void APVPBattleGameMode::BeginPlay()
 
 		// TODO repeat
 	});
+}
+
+UPrivilegeComponent* APVPBattleGameMode::AddPrivilegeComponents(UPrivilegeComponent* Target)
+{
+	Target->AddComponentForPrivilege(PVPBattlePrivilege::Host, UBattleRuleConfigComponent::StaticClass());
+	Target->AddComponentForPrivilege(PVPBattlePrivilege::Host, UGameStarterComponent::StaticClass(),
+		FComponentInitializer::CreateWeakLambda(this, [this](UActorComponent* Component)
+		{
+			Cast<UGameStarterComponent>(Component)
+				->ServerGameStarter.BindUObject(this, &ThisClass::StartGameIfConditionsMet);
+		}));
+
+	Target->AddComponentForPrivilege(PVPBattlePrivilege::Normie, UCharacterSetterComponent::StaticClass());
+	Target->AddComponentForPrivilege(PVPBattlePrivilege::Normie, UReadySetterComponent::StaticClass());
+
+	return Target;
 }

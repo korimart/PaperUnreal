@@ -10,6 +10,7 @@
 #include "PaperUnreal/GameFramework2/HUD2.h"
 #include "PaperUnreal/ModeAgnostic/CharacterSetterComponent.h"
 #include "PaperUnreal/ModeAgnostic/ComponentRegistry.h"
+#include "PaperUnreal/ModeAgnostic/GameStarterComponent.h"
 #include "PaperUnreal/ModeAgnostic/ReadyStateComponent.h"
 #include "PaperUnreal/ModeAgnostic/StageComponent.h"
 #include "PaperUnreal/WeakCoroutine/AnyOfAwaitable.h"
@@ -39,14 +40,20 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	UInputAction* EditConfigAction;
-	FSimpleMulticastDelegate OnEditConfigTriggered;
-	void OnEditConfigTriggeredFunc() { OnEditConfigTriggered.Broadcast(); }
+	FSimpleMulticastDelegate OnEditConfigActionTriggered;
+	void OnEditConfigActionTriggeredFunc() { OnEditConfigActionTriggered.Broadcast(); }
+
+	UPROPERTY(EditAnywhere)
+	UInputAction* StartGameAction;
+	FSimpleMulticastDelegate OnStartGameActionTriggered;
+	void OnStartGameActionTriggeredFunc() { OnStartGameActionTriggered.Broadcast(); }
 
 	virtual void BeginPlay() override
 	{
 		Super::BeginPlay();
 
-		GetEnhancedInputComponent()->BindAction(EditConfigAction, ETriggerEvent::Triggered, this, &ThisClass::OnEditConfigTriggeredFunc);
+		GetEnhancedInputComponent()->BindAction(EditConfigAction, ETriggerEvent::Triggered, this, &ThisClass::OnEditConfigActionTriggeredFunc);
+		GetEnhancedInputComponent()->BindAction(StartGameAction, ETriggerEvent::Triggered, this, &ThisClass::OnStartGameActionTriggeredFunc);
 
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
@@ -54,6 +61,7 @@ private:
 			check(IsValid(StageComponent));
 
 			ListenToEditConfigPrivilege();
+			ListenToStarGamePrivilege();
 
 			{
 				TAbortableCoroutineHandle S = SelectCharacterAndShowHUD();
@@ -91,9 +99,9 @@ private:
 	{
 		while (true)
 		{
-			co_await OnEditConfigTriggered;
+			co_await OnEditConfigActionTriggered;
 			TAbortableCoroutineHandle EditConfigCoroutine = EditConfig();
-			co_await Awaitables::AnyOf(OnEditConfigTriggered, EditConfigCoroutine.Get());
+			co_await Awaitables::AnyOf(OnEditConfigActionTriggered, EditConfigCoroutine.Get());
 		}
 	}
 
@@ -113,6 +121,49 @@ private:
 			}
 
 			ConfigWidget->OnSubmitFailed();
+		}
+	}
+
+	FWeakCoroutine ListenToStarGamePrivilege()
+	{
+		co_await
+		(
+			Stream::Combine
+			(
+				MakeComponentStream<UGameStarterComponent>(GetOwningPlayerController()),
+				StageComponent->GetCurrentStage().CreateStream()
+			)
+			| Awaitables::Transform([](UGameStarterComponent* Starter, FName Stage)
+			{
+				return IsValid(Starter) && Stage == PVPBattleStage::WaitingForStart;
+			})
+			| Awaitables::WhileTrue([this]()
+			{
+				return ListenToStartGameActionTrigger();
+			})
+		);
+	}
+
+	FWeakCoroutine ListenToStartGameActionTrigger()
+	{
+		auto GameStarter = co_await GetOwningPlayerController()->FindComponentByClass<UGameStarterComponent>();
+
+		// TODO
+		// auto ConfigWidget = co_await CreateWidget<UBattleRuleConfigWidget>(GetOwningPlayerController(), ConfigWidgetClass);
+		// auto S = ScopedAddToViewport(ConfigWidget);
+
+		while (true)
+		{
+			co_await OnStartGameActionTriggered;
+
+			// TODO clear error message
+			
+			if (co_await GameStarter->StartGame())
+			{
+				break;
+			}
+
+			// TODO display error message
 		}
 	}
 

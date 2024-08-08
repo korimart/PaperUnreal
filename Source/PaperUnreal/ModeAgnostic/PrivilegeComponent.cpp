@@ -17,9 +17,14 @@ void FConditionalComponents::OnComponentsMaybeChanged()
 		{
 			if (!HasComponentOfClass(ComponentOwner.Get(), Each))
 			{
-				ComponentGroup
-					->NewChildComponent<UActorComponent2>(ComponentOwner.Get(), Each)
-					->RegisterComponent();
+				auto Component = ComponentGroup->NewChildComponent<UActorComponent2>(ComponentOwner.Get(), Each);
+
+				if (FComponentInitializer* Initializer = Initializers.Find(Each))
+				{
+					Initializer->ExecuteIfBound(Component);
+				}
+
+				Component->RegisterComponent();
 			}
 		}
 	}

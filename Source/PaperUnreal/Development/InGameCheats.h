@@ -22,8 +22,6 @@ class UInGameCheats : public UCheatManagerExtension
 
 public:
 	inline static bool bDoNotEndGameUntilCheat{true};
-
-	inline static FSimpleMulticastDelegate OnStartGameByCheat{};
 	inline static FSimpleMulticastDelegate OnEndGameByCheat{};
 
 private:
@@ -61,12 +59,6 @@ private:
 		{
 			Each->FindComponentByClass<UReadyStateComponent>()->SetbReady(bReady);
 		}
-	}
-
-	UFUNCTION(Exec, BlueprintAuthorityOnly)
-	void StartGame()
-	{
-		OnStartGameByCheat.Broadcast();
 	}
 
 	UFUNCTION(Exec, BlueprintAuthorityOnly)

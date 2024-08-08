@@ -7,6 +7,9 @@
 #include "PrivilegeComponent.generated.h"
 
 
+DECLARE_DELEGATE_OneParam(FComponentInitializer, UActorComponent*);
+
+
 class FConditionalComponents
 {
 public:
@@ -31,6 +34,11 @@ public:
 		OnComponentsMaybeChanged();
 	}
 
+	void AddInitializer(UClass* Class, const FComponentInitializer& Initializer)
+	{
+		Initializers.FindOrAdd(Class) = Initializer;
+	}
+
 	void RemoveClass(UClass* Class)
 	{
 		Classes.Remove(Class);
@@ -39,6 +47,7 @@ public:
 
 private:
 	TArray<UClass*> Classes;
+	TMap<UClass*, FComponentInitializer> Initializers;
 	TWeakObjectPtr<AActor> ComponentOwner;
 	TWeakObjectPtr<UComponentGroupComponent> ComponentGroup;
 	bool bCondition = false;
@@ -55,6 +64,12 @@ class UPrivilegeComponent : public UComponentGroupComponent
 public:
 	void AddComponentForPrivilege(FName Privilege, UClass* Class)
 	{
+		FindOrAdd(Privilege).AddClass(Class);
+	}
+	
+	void AddComponentForPrivilege(FName Privilege, UClass* Class, const FComponentInitializer& Initializer)
+	{
+		FindOrAdd(Privilege).AddInitializer(Class, Initializer);
 		FindOrAdd(Privilege).AddClass(Class);
 	}
 
