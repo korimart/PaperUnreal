@@ -120,6 +120,11 @@ public:
 	TAbortableCoroutineHandle& operator=(AbortableCoroutineType&& InCoroutine)
 	{
 		Reset();
+
+		// Reset의 호출이 콜백을 불러서 여기 두 번 들어온 경우 Reset 이후에도 Set일 수 있음
+		// (operator=의 호출이 operator=를 호출하는 circular 관계라는 뜻)
+		check(!Coroutine);
+		
 		Coroutine.Emplace(MoveTemp(InCoroutine));
 		return *this;
 	}
@@ -138,8 +143,12 @@ public:
 	{
 		if (Coroutine)
 		{
-			Coroutine->Abort();
+			auto Copy = MoveTemp(Coroutine);
 			Coroutine.Reset();
+
+			// 이 호출로 인해 콜백이 실행되면서 다시 여기 들어오는 것을 방지하기 위해
+			// 미리 Coroutine을 Reset하고 호출함
+			Copy->Abort();
 		}
 	}
 	

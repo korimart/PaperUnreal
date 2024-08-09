@@ -46,6 +46,19 @@ public:
 };
 
 
+USTRUCT()
+struct FToastRowWithIdAndPriority
+{
+	GENERATED_BODY()
+	
+	UPROPERTY()
+	UToastRowWidget* RowWidget;
+
+	uint32 Id;
+	int32 Priority;
+};
+
+
 /**
  * 
  */
@@ -55,13 +68,16 @@ class UToastWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	FToastHandle Toast(const FText& Text)
+	FToastHandle Toast(const FText& Text, int32 InPriority = 0)
 	{
 		const uint32 Id = NextId++;
 		auto Row = CreateWidget<UToastRowWidget>(this, RowClass);
 		Row->SetText(Text);
-		IdToWidgetMap.FindOrAdd(Id) = Row;
-		ToastPanel->AddChild(Row);
+
+		const int32 Index = Algo::LowerBoundBy(ToastRows, InPriority, &FToastRowWithIdAndPriority::Priority, TGreater<>{});
+		ToastRows.Insert({Row, Id, InPriority}, Index);
+		RebuildToastPanel();
+		
 		return {this, Id};
 	}
 
@@ -73,7 +89,7 @@ private:
 	UPanelWidget* ToastPanel;
 
 	UPROPERTY()
-	TMap<uint32, UWidget*> IdToWidgetMap;
+	TArray<FToastRowWithIdAndPriority> ToastRows;
 
 	uint32 NextId = 0;
 
@@ -82,14 +98,24 @@ private:
 	virtual void NativeOnInitialized() override
 	{
 		Super::NativeOnInitialized();
+		RebuildToastPanel();
+	}
+
+	void RebuildToastPanel()
+	{
 		ToastPanel->ClearChildren();
+		for (const FToastRowWithIdAndPriority& Each : ToastRows)
+		{
+			ToastPanel->AddChild(Each.RowWidget);
+		}
 	}
 	
 	void RemoveToastById(uint32 Id)
 	{
-		if (UWidget* Found = IdToWidgetMap.FindRef(Id))
+		if (FToastRowWithIdAndPriority* Found = Algo::FindBy(ToastRows, Id, &FToastRowWithIdAndPriority::Id))
 		{
-			Found->RemoveFromParent();
+			Found->RowWidget->RemoveFromParent();
+			ToastRows.RemoveAll([Id = Found->Id](const auto& Each){ return Each.Id == Id; });
 		}
 	}
 };

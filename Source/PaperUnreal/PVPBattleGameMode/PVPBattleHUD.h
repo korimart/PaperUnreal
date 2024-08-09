@@ -44,7 +44,6 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<USelectCharacterWidget> SelectCharacterWidgetClass;
-	TLiveData<bool> bSelectingCharacter{false};
 
 	UPROPERTY(EditAnywhere)
 	UInputAction* EditConfigAction;
@@ -61,6 +60,9 @@ private:
 	FSimpleMulticastDelegate OnSelectCharacterActionTriggered;
 	void OnSelectCharacterActionTriggeredFunc() { OnSelectCharacterActionTriggered.Broadcast(); }
 
+	TAbortableCoroutineHandle<FWeakCoroutine> OpenDialog;
+	TLiveData<bool> bDialogOpen;
+
 	virtual void BeginPlay() override
 	{
 		Super::BeginPlay();
@@ -72,7 +74,7 @@ private:
 		ToastWidget = CreateWidget<UToastWidget>(GetOwningPlayerController(), ToastWidgetClass);
 
 		RunWeakCoroutine(this,
-			bSelectingCharacter.CreateStream()
+			bDialogOpen.CreateStream()
 			| Awaitables::Negate()
 			| Awaitables::WhileTrue([this]() { return ShowToastWidget(); }));
 
@@ -111,23 +113,27 @@ private:
 			TArray<TAbortableCoroutine<FWeakCoroutine>> Handles;
 
 			Handles << RunWeakCoroutine(this,
-				MakeComponentStream<UBattleRuleConfigComponent>(PC)
-				| Awaitables::IsValid()
+				Stream::AllOf(
+					MakeComponentStream<UBattleRuleConfigComponent>(PC) | Awaitables::IsValid(),
+					bDialogOpen.CreateStream() | Awaitables::Negate())
 				| Awaitables::WhileTrue([this]() { return ListenToEditConfigActionTrigger(); }));
 
 			Handles << RunWeakCoroutine(this,
-				MakeComponentStream<UGameStarterComponent>(PC)
-				| Awaitables::IsValid()
+				Stream::AllOf(
+					MakeComponentStream<UGameStarterComponent>(PC) | Awaitables::IsValid(),
+					bDialogOpen.CreateStream() | Awaitables::Negate())
 				| Awaitables::WhileTrue([this]() { return ListenToStartGameActionTrigger(); }));
 
 			Handles << RunWeakCoroutine(this,
-				MakeComponentStream<UCharacterSetterComponent>(PC)
-				| Awaitables::IsValid()
+				Stream::AllOf(
+					MakeComponentStream<UCharacterSetterComponent>(PC) | Awaitables::IsValid(),
+					bDialogOpen.CreateStream() | Awaitables::Negate())
 				| Awaitables::WhileTrue([this]() { return ListenToSelectCharacterActionTrigger(); }));
 
 			FToastHandle ToastHandle = ToastWidget->Toast(FText::FromString(TEXT("방장이 게임을 시작하길 기다리는 중...")));
 
 			co_await StageComponent->GetCurrentStage().If(PVPBattleStage::Playing);
+			OpenDialog.Reset();
 		}
 
 		// TODO 플레이를 시작하면 플레이 HUD 띄우기
@@ -135,20 +141,22 @@ private:
 
 	FWeakCoroutine ListenToEditConfigActionTrigger()
 	{
-		FToastHandle ToastHandle = ToastWidget->Toast(FText::FromString(TEXT("[E]를 눌러서 방 설정을 변경할 수 있습니다.")));
+		FToastHandle ToastHandle = ToastWidget->Toast(FText::FromString(TEXT("[E]를 눌러서 방 설정을 변경할 수 있습니다.")), 99);
 
-		while (true)
+		co_await OnEditConfigActionTriggered;
+
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
-			co_await OnEditConfigActionTriggered;
-			TAbortableCoroutineHandle EditConfigCoroutine = EditConfig();
-			co_await Awaitables::AnyOf(OnEditConfigActionTriggered, EditConfigCoroutine.Get());
-		}
+			OpenDialog = EditConfig();
+			co_await Awaitables::AnyOf(OnEditConfigActionTriggered, OpenDialog.Get());
+			OpenDialog.Reset();
+		});
 	}
 
 	FWeakCoroutine ListenToStartGameActionTrigger()
 	{
 		auto GameStarter = co_await GetOwningPlayerController()->FindComponentByClass<UGameStarterComponent>();
-		FToastHandle ToastHandle = ToastWidget->Toast(FText::FromString(TEXT("[S]를 눌러서 게임을 시작할 수 있습니다.")));
+		FToastHandle ToastHandle = ToastWidget->Toast(FText::FromString(TEXT("[S]를 눌러서 게임을 시작할 수 있습니다.")), 98);
 
 		while (true)
 		{
@@ -161,7 +169,7 @@ private:
 
 			RunWeakCoroutine([&]() -> FWeakCoroutine
 			{
-				FToastHandle T = ToastWidget->Toast(FText::FromString(TEXT("게임 시작 조건을 충족하지 못했습니다.")));
+				FToastHandle T = ToastWidget->Toast(FText::FromString(TEXT("게임 시작 조건을 충족하지 못했습니다.")), -1);
 				co_await WaitForSeconds(GetWorld(), 3.f);
 			});
 		}
@@ -170,21 +178,25 @@ private:
 	FWeakCoroutine ListenToSelectCharacterActionTrigger()
 	{
 		auto CharacterSetter = co_await GetOwningPlayerController()->FindComponentByClass<UCharacterSetterComponent>();
-		FToastHandle ToastHandle = ToastWidget->Toast(FText::FromString(TEXT("[H]를 눌러서 캐릭터를 변경할 수 있습니다.")));
+		FToastHandle ToastHandle = ToastWidget->Toast(FText::FromString(TEXT("[H]를 눌러서 캐릭터를 변경할 수 있습니다.")), 97);
 
-		while (true)
+		co_await OnSelectCharacterActionTriggered;
+
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
-			co_await OnSelectCharacterActionTriggered;
-			TAbortableCoroutineHandle H = SelectCharacter();
-			co_await Awaitables::AnyOf(OnSelectCharacterActionTriggered, H.Get());
-		}
+			OpenDialog = SelectCharacter();
+			co_await Awaitables::AnyOf(OnSelectCharacterActionTriggered, OpenDialog.Get());
+			OpenDialog.Reset();
+		});
 	}
 
-	FWeakCoroutine EditConfig() const
+	FWeakCoroutine EditConfig()
 	{
 		auto ConfigComponent = co_await GetOwningPlayerController()->FindComponentByClass<UBattleRuleConfigComponent>();
 		auto ConfigWidget = co_await CreateWidget<UBattleRuleConfigWidget>(GetOwningPlayerController(), ConfigWidgetClass);
 		auto S = ScopedAddToViewport(ConfigWidget);
+		bDialogOpen = true;
+		auto F = FinallyIfValid(this, [this]() { bDialogOpen = false; });
 
 		ConfigWidget->OnInitialConfig(co_await ConfigComponent->FetchConfig());
 
@@ -204,11 +216,10 @@ private:
 		auto CharacterSetter = co_await WaitForComponent<UCharacterSetterComponent>(GetOwningPlayerController());
 		auto ReadySetter = co_await WaitForComponent<UReadySetterComponent>(GetOwningPlayerController());
 
-		bSelectingCharacter = true;
-		auto F = FinallyIfValid(this, [this]() { bSelectingCharacter = false; });
-
 		auto SelectCharacterWidget = co_await CreateWidget<USelectCharacterWidget>(GetOwningPlayerController(), SelectCharacterWidgetClass);
 		auto S = ScopedAddToViewport(SelectCharacterWidget);
+		bDialogOpen = true;
+		auto F = FinallyIfValid(this, [this]() { bDialogOpen = false; });
 
 		const int32 Selection = co_await Awaitables::AnyOf(SelectCharacterWidget->OnManny, SelectCharacterWidget->OnQuinn);
 		Selection == 0 ? CharacterSetter->ServerEquipManny() : CharacterSetter->ServerEquipQuinn();
