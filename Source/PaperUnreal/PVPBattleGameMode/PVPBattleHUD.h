@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "PVPBattleGameMode.h"
+#include "PVPBattleGameState.h"
 #include "Blueprint/UserWidget.h"
 #include "GameFramework/GameStateBase.h"
 #include "PaperUnreal/BattleRule/BattleRuleConfigComponent.h"
@@ -32,6 +33,9 @@ class APVPBattleHUD : public AHUD2
 private:
 	UPROPERTY()
 	UStageComponent* StageComponent;
+	
+	UPROPERTY()
+	UWorldTimerComponent* WorldTimerComponent;
 
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<UToastWidget> ToastWidgetClass;
@@ -70,6 +74,8 @@ private:
 		GetEnhancedInputComponent()->BindAction(StartGameAction, ETriggerEvent::Triggered, this, &ThisClass::OnStartGameActionTriggeredFunc);
 		GetEnhancedInputComponent()->BindAction(SelectCharacterAction, ETriggerEvent::Triggered, this, &ThisClass::OnSelectCharacterActionTriggeredFunc);
 
+		StageComponent = GetWorld()->GetGameState<APVPBattleGameState>()->StageComponent;
+		WorldTimerComponent = GetWorld()->GetGameState<APVPBattleGameState>()->WorldTimerComponent;
 		ToastWidget = CreateWidget<UToastWidget>(GetOwningPlayerController(), ToastWidgetClass);
 
 		RunWeakCoroutine(this,
@@ -79,9 +85,6 @@ private:
 
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
-			StageComponent = (co_await WaitForGameState(GetWorld()))->FindComponentByClass<UStageComponent>();
-			check(IsValid(StageComponent));
-
 			{
 				TAbortableCoroutineHandle S = SelectCharacterAndShowHUD();
 				co_await StageComponent->GetCurrentStage().If(PVPBattleStage::Result);
@@ -128,7 +131,20 @@ private:
 
 			FToastHandle ToastHandle = ToastWidget->Toast(FText::FromString(TEXT("방장이 게임을 시작하길 기다리는 중...")));
 
-			co_await StageComponent->GetCurrentStage().If(PVPBattleStage::Playing);
+			co_await StageComponent->GetCurrentStage().IfNot(PVPBattleStage::WaitingForStart);
+		}
+
+		{
+			const float StartTime = co_await StageComponent->GetStageWorldStartTime(PVPBattleStage::Playing);
+
+			TOptional CountDownToast = ToastWidget->Toast(FText::FromString(TEXT("게임 시작을 준비하는 중...")));
+			co_await WorldTimerComponent->At(StartTime - 3);
+			CountDownToast = ToastWidget->Toast(FText::FromString(TEXT("3초 뒤에 게임이 시작됩니다.")));
+			co_await WorldTimerComponent->At(StartTime - 2);
+			CountDownToast = ToastWidget->Toast(FText::FromString(TEXT("2초 뒤에 게임이 시작됩니다.")));
+			co_await WorldTimerComponent->At(StartTime - 1);
+			CountDownToast = ToastWidget->Toast(FText::FromString(TEXT("1초 뒤에 게임이 시작됩니다.")));
+			co_await StageComponent->GetCurrentStage().IfNot(PVPBattleStage::WillPlay);
 		}
 
 		// TODO 플레이를 시작하면 플레이 HUD 띄우기

@@ -18,6 +18,11 @@ class UWorldTimerComponent : public UActorComponent2
 public:
 	TCancellableFuture<void> At(float WorldSeconds)
 	{
+		if (WorldSeconds < GetOuterAGameStateBase2()->GetLatestServerWorldTimeSeconds())
+		{
+			return std::monostate{};
+		}
+		
 		auto [Promise, Future] = MakePromise<void>();
 		PendingTimers.Emplace(WorldSeconds, MoveTemp(Promise));
 		return MoveTemp(Future);

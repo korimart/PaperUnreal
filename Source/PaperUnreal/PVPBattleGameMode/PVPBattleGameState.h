@@ -6,6 +6,7 @@
 #include "PaperUnreal/GameFramework2/GameStateBase2.h"
 #include "PaperUnreal/ModeAgnostic/ReadyStateTrackerComponent.h"
 #include "PaperUnreal/ModeAgnostic/StageComponent.h"
+#include "PaperUnreal/ModeAgnostic/WorldTimerComponent.h"
 #include "PVPBattleGameState.generated.h"
 
 /**
@@ -18,6 +19,9 @@ class APVPBattleGameState : public AGameStateBase2
 
 public:
 	UPROPERTY()
+	UWorldTimerComponent* WorldTimerComponent;
+	
+	UPROPERTY()
 	UStageComponent* StageComponent;
 	
 	UPROPERTY()
@@ -26,6 +30,7 @@ public:
 private:
 	APVPBattleGameState()
 	{
+		WorldTimerComponent = CreateDefaultSubobject<UWorldTimerComponent>(TEXT("WorldTimerComponent"));
 		StageComponent = CreateDefaultSubobject<UStageComponent>(TEXT("StageComponent"));
 		ReadyStateTrackerComponent = CreateDefaultSubobject<UReadyStateTrackerComponent>(TEXT("ReadyStateTrackerComponent"));
 	}

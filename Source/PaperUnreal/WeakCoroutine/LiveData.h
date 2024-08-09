@@ -99,6 +99,8 @@ public:
 	// Value Stream을 Value를 넣을 수 있게 됨
 	FLiveDataBase(const FLiveDataBase&) = delete;
 	FLiveDataBase& operator=(const FLiveDataBase&) = delete;
+
+	FLiveDataBase(FLiveDataBase&&) = default;
 	
 protected:
 	bool bExecutingCallbacks = false;
@@ -637,6 +639,12 @@ public:
 	auto If(ArgType&& OfThis)
 	{
 		return CreateStream() | Awaitables::If(Forward<ArgType>(OfThis));
+	}
+	
+	template <typename ArgType>
+	auto IfNot(ArgType&& OfThis)
+	{
+		return CreateStream() | Awaitables::IfNot(Forward<ArgType>(OfThis));
 	}
 
 	//

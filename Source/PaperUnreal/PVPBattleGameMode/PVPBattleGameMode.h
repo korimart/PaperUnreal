@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+#include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 #include "PVPBattleGameMode.generated.h"
 
 
@@ -20,6 +21,7 @@ namespace PVPBattlePrivilege
 namespace PVPBattleStage
 {
 	inline FName WaitingForStart{TEXT("PVPBattleStage_WaitingForConfig")};
+	inline FName WillPlay{TEXT("PVPBattleStage_WillPlay")};
 	inline FName Playing{TEXT("PVPBattleStage_Playing")};
 	inline FName Result{TEXT("PVPBattleStage_Result")};
 }
@@ -39,6 +41,7 @@ private:
 	APVPBattleGameMode();
 
 	virtual void BeginPlay() override;
-	
-	class UPrivilegeComponent* AddPrivilegeComponents(UPrivilegeComponent* Target);
+
+	FWeakCoroutine InitPrivilegeComponentOfNewPlayers();
+	FWeakCoroutine InitiateGameFlow();
 };

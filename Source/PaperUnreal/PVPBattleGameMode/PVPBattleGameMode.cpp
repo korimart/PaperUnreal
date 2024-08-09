@@ -19,16 +19,16 @@ DEFINE_LOG_CATEGORY(LogPVPBattleGameMode);
 bool APVPBattleGameMode::StartGameIfConditionsMet()
 {
 	const int32 ReadyCount = Algo::TransformAccumulate(
-				::GetComponents<UReadyStateComponent>(GetGameState<APVPBattleGameState>()->GetPlayerStateArray().Get()),
-				[](auto Each) { return Each->GetbReady().Get() ? 1 : 0; },
-				0);
+		::GetComponents<UReadyStateComponent>(GetGameState<APVPBattleGameState>()->GetPlayerStateArray().Get()),
+		[](auto Each) { return Each->GetbReady().Get() ? 1 : 0; },
+		0);
 
 	if (ReadyCount >= 2)
 	{
 		OnGameStartConditionsMet.Broadcast();
 		return true;
 	}
-	
+
 	return false;
 }
 
@@ -63,81 +63,90 @@ void APVPBattleGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
-	RunWeakCoroutine(this, [this]() -> FWeakCoroutine
-	{
-		auto PrivilegeStream
-			= GetGameState<APVPBattleGameState>()->GetPlayerStateArray().CreateAddStream()
-			| Awaitables::Transform(&APVPBattlePlayerState::GetPlayerController)
-			| Awaitables::CastChecked<APVPBattlePlayerController>()
-			| Awaitables::Transform(&APVPBattlePlayerController::ServerPrivilegeComponent)
-			| Awaitables::Transform([this](UPrivilegeComponent* Component) { return AddPrivilegeComponents(Component); });
-
-		{
-			auto FirstPlayerPrivilege = co_await PrivilegeStream;
-			FirstPlayerPrivilege->GivePrivilege(PVPBattlePrivilege::Host);
-			FirstPlayerPrivilege->GivePrivilege(PVPBattlePrivilege::Normie);
-		}
-
-		while (true)
-		{
-			auto PlayerPrivilege = co_await PrivilegeStream;
-			PlayerPrivilege->GivePrivilege(PVPBattlePrivilege::Normie);
-		}
-	});
-
-	RunWeakCoroutine(this, [this]() -> FWeakCoroutine
-	{
-		GetGameState<APVPBattleGameState>()->StageComponent->SetCurrentStage(PVPBattleStage::WaitingForStart);
-
-		{
-			auto FreeRule = NewObject<UFreeRuleComponent>(this);
-			FreeRule->RegisterComponent();
-			FreeRule->Start(DefaultPawnClass);
-			auto F = FinallyIfValid(FreeRule, [FreeRule]() { FreeRule->DestroyComponent(); });
-			
-			co_await OnGameStartConditionsMet;
-		}
-
-		GetGameState<APVPBattleGameState>()->StageComponent->SetCurrentStage(PVPBattleStage::Playing);
-		
-		const FBattleRuleResult GameResult = co_await [&]()
-		{
-			auto BattleRule = NewObject<UBattleRuleComponent>(this);
-			BattleRule->RegisterComponent();
-			return BattleRule->Start(DefaultPawnClass, 2, 2);
-		}();
-
-		GetGameState<APVPBattleGameState>()->StageComponent->SetCurrentStage(PVPBattleStage::Result);
-
-		for (const auto& Each : GameResult.SortedByRank)
-		{
-			UE_LOG(LogPVPBattleGameMode, Log, TEXT("게임 결과 팀 : %d / 면적 : %f"), Each.TeamIndex, Each.Area);
-		}
-
-		for (APlayerState* Each : GetWorld()->GetGameState()->PlayerArray)
-		{
-			Each->GetPlayerController()->ChangeState(NAME_Spectating);
-			Each->GetPlayerController()->ClientGotoState(NAME_Spectating);
-		}
-
-		// TODO replicate game result
-
-		// TODO repeat
-	});
+	InitPrivilegeComponentOfNewPlayers();
+	InitiateGameFlow();
 }
 
-UPrivilegeComponent* APVPBattleGameMode::AddPrivilegeComponents(UPrivilegeComponent* Target)
+FWeakCoroutine APVPBattleGameMode::InitPrivilegeComponentOfNewPlayers()
 {
-	Target->AddComponentForPrivilege(PVPBattlePrivilege::Host, UBattleRuleConfigComponent::StaticClass());
-	Target->AddComponentForPrivilege(PVPBattlePrivilege::Host, UGameStarterComponent::StaticClass(),
-		FComponentInitializer::CreateWeakLambda(this, [this](UActorComponent* Component)
-		{
-			Cast<UGameStarterComponent>(Component)
-				->ServerGameStarter.BindUObject(this, &ThisClass::StartGameIfConditionsMet);
-		}));
+	auto AddPrivilegeComponents = [this](UPrivilegeComponent* Target)
+	{
+		Target->AddComponentForPrivilege(PVPBattlePrivilege::Host, UBattleRuleConfigComponent::StaticClass());
+		Target->AddComponentForPrivilege(PVPBattlePrivilege::Host, UGameStarterComponent::StaticClass(),
+			FComponentInitializer::CreateWeakLambda(this, [this](UActorComponent* Component)
+			{
+				Cast<UGameStarterComponent>(Component)
+					->ServerGameStarter.BindUObject(this, &ThisClass::StartGameIfConditionsMet);
+			}));
+		Target->AddComponentForPrivilege(PVPBattlePrivilege::Normie, UCharacterSetterComponent::StaticClass());
+		Target->AddComponentForPrivilege(PVPBattlePrivilege::Normie, UReadySetterComponent::StaticClass());
+		return Target;
+	};
 
-	Target->AddComponentForPrivilege(PVPBattlePrivilege::Normie, UCharacterSetterComponent::StaticClass());
-	Target->AddComponentForPrivilege(PVPBattlePrivilege::Normie, UReadySetterComponent::StaticClass());
+	auto PrivilegeStream
+		= GetGameState<APVPBattleGameState>()->GetPlayerStateArray().CreateAddStream()
+		| Awaitables::Transform(&APVPBattlePlayerState::GetPlayerController)
+		| Awaitables::CastChecked<APVPBattlePlayerController>()
+		| Awaitables::Transform(&APVPBattlePlayerController::ServerPrivilegeComponent)
+		| Awaitables::Transform([&](UPrivilegeComponent* Component) { return AddPrivilegeComponents(Component); });
 
-	return Target;
+	{
+		auto FirstPlayerPrivilege = co_await PrivilegeStream;
+		FirstPlayerPrivilege->GivePrivilege(PVPBattlePrivilege::Host);
+		FirstPlayerPrivilege->GivePrivilege(PVPBattlePrivilege::Normie);
+	}
+
+	while (true)
+	{
+		auto PlayerPrivilege = co_await PrivilegeStream;
+		PlayerPrivilege->GivePrivilege(PVPBattlePrivilege::Normie);
+	}
+}
+
+FWeakCoroutine APVPBattleGameMode::InitiateGameFlow()
+{
+	auto StageComponent = co_await GetGameState<APVPBattleGameState>()->StageComponent;
+
+	StageComponent->SetCurrentStage(PVPBattleStage::WaitingForStart);
+
+	{
+		auto FreeRule = NewObject<UFreeRuleComponent>(this);
+		FreeRule->RegisterComponent();
+		FreeRule->Start(DefaultPawnClass);
+		auto F = FinallyIfValid(FreeRule, [FreeRule]() { FreeRule->DestroyComponent(); });
+
+		co_await OnGameStartConditionsMet;
+		
+		StageComponent->SetCurrentStage(PVPBattleStage::WillPlay);
+
+		const float PlayStartTime = GetWorld()->GetTimeSeconds() + 5.f;
+		StageComponent->SetStageWorldStartTime(PVPBattleStage::Playing, PlayStartTime);
+
+		co_await GetGameState<APVPBattleGameState>()->WorldTimerComponent->At(PlayStartTime);
+		StageComponent->SetCurrentStage(PVPBattleStage::Playing);
+	}
+
+	const FBattleRuleResult GameResult = co_await [&]()
+	{
+		auto BattleRule = NewObject<UBattleRuleComponent>(this);
+		BattleRule->RegisterComponent();
+		return BattleRule->Start(DefaultPawnClass, 2, 2);
+	}();
+
+	StageComponent->SetCurrentStage(PVPBattleStage::Result);
+
+	for (const auto& Each : GameResult.SortedByRank)
+	{
+		UE_LOG(LogPVPBattleGameMode, Log, TEXT("게임 결과 팀 : %d / 면적 : %f"), Each.TeamIndex, Each.Area);
+	}
+
+	for (APlayerState* Each : GetWorld()->GetGameState()->PlayerArray)
+	{
+		Each->GetPlayerController()->ChangeState(NAME_Spectating);
+		Each->GetPlayerController()->ClientGotoState(NAME_Spectating);
+	}
+
+	// TODO replicate game result
+
+	// TODO repeat
 }
