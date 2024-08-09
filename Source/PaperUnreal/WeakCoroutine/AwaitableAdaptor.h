@@ -24,7 +24,7 @@ public:
 		: AwaitableProducer(MoveTemp(Producer))
 	{
 	}
-
+	
 	bool await_ready() const
 	{
 		return const_cast<TAwaitableGetterAwaitable*>(this)->await_ready();

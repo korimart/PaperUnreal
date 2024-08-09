@@ -213,6 +213,21 @@ TTuple<TValueStream<T>, FDelegateHandle> MakeStreamFromDelegate(
 
 namespace Stream_Private
 {
+	// Awaitable에 대해 co_await이 호출되어 있는 상태에서 Awaitable이 파괴되는 경우가 있음
+	// Awaitable이 coroutine 안에 선언돼 위치가 변하지 않는 상태(copy/move 하지 않는 상태)일 때
+	// Awaitable을 레퍼런스로 가져다가 co_await 할 때, 같은 coroutine에서 그렇게 하면
+	// coroutine frame의 파괴 시 선언의 역순으로 파괴가 일어나기 때문에 co_await되는 Awaitable이 가장 늦게
+	// 파괴되어 상관이 없지만 다른 코루틴으로 가져가서 co_await하면 co_await되는 Awaitable이 먼저 파괴될 수 있음
+	// 그리고 그 코루틴에 resume이 일어나면 이 awaitable에 await_resume을 호출하는데 이미 파괴된 상태이기 때문에
+	// 쓰레기 메모리에 함수를 호출하는 것이 됨
+	//
+	// 원래 lvalue에 co_await할 시 lvalue object의 생명주기는 프로그래머가 관리하는 디자인으로 생각을 했지만
+	// Stream::Combine의 구현이 lvalue를 다른 코루틴으로 가져가서 co_await하는데 이 사실을 프로그래머가 알기 어려움
+	// Filter와 같은 Awaitable도 다른 코루틴으로 가져가서 co_await하는 건 똑같지만 자신이 파괴될 때 해당 코루틴을
+	// 파괴하기 때문에 이러한 문제가 발생하지 않음 Stream::Combine은 구현 방식의 차이로 combined value stream에
+	// 누가 값을 공급하는지를 알지 못함 -> 그러므로 자신이 파괴될 때 공급자 Coroutine들을 파괴하는 것이 불가능함
+	// lvalue를 허용하려면 어떠한 메카니즘으로 combined stream의 end of stream 시 공급자 coroutine들을
+	// 즉시 중단하는 방법을 생각해야 함
 	template <int32 Index>
 	FMinimalCoroutine CombineImpl(auto NoDestroyAwaitable, auto WeakReceiver, auto SharedTuple)
 	{
@@ -228,7 +243,7 @@ namespace Stream_Private
 			{
 				co_return;
 			}
-			
+
 			// 1. UNoDestroyError: Awaitable이 종료를 요청한 경우 이 코루틴은 더 이상 값을 공급할 수 없음
 			// 그러므로 Combined Value Stream도 새 값을 만들 수 없으므로 닫고 코루틴도 종료한다.
 			//
@@ -283,6 +298,7 @@ namespace Stream
 	// TODO live data, multicast delegate를 받는 버전 추가
 	template <typename... AwaitableTypes>
 	auto Combine(AwaitableTypes&&... Awaitables)
+		requires (!std::is_reference_v<AwaitableTypes> && ...) // lvalue 비허용에 대한 이유는 CombineImpl 주석 참고
 	{
 		// 이 함수의 원리는 다음과 같음
 		// 각 Awaitable에 대해 FMinimalCoroutine을 실행하여 co_await을 하면서 값을 가져온다
@@ -313,7 +329,7 @@ namespace Stream
 	auto AllOf(AwaitableTypes&&... Awaitables)
 	{
 		return Combine(Forward<AwaitableTypes>(Awaitables)...)
-			| Awaitables::Transform([]<typename... BoolTypes>(BoolTypes... bBools){ return (bBools && ...); })
+			| Awaitables::Transform([]<typename... BoolTypes>(BoolTypes... bBools) { return (bBools && ...); })
 			| Awaitables::FilterDuplicate<bool>();
 	}
 }
