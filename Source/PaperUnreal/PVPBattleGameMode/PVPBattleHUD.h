@@ -19,6 +19,7 @@
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 #include "PaperUnreal/WeakCoroutine/WhileTrueAwaitable.h"
 #include "PaperUnreal/Widgets/BattleRuleConfigWidget.h"
+#include "PaperUnreal/Widgets/TeamScoresWidget.h"
 #include "PaperUnreal/Widgets/SelectCharacterWidget.h"
 #include "PaperUnreal/Widgets/ToastWidget.h"
 #include "PVPBattleHUD.generated.h"
@@ -38,6 +39,9 @@ private:
 	UPROPERTY()
 	UWorldTimerComponent* WorldTimerComponent;
 
+	UPROPERTY()
+	UBattleRuleGameStateComponent* GameState;
+
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<UToastWidget> ToastWidgetClass;
 
@@ -49,6 +53,9 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<USelectCharacterWidget> SelectCharacterWidgetClass;
+	
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<UTeamScoresWidget> TeamScoresWidgetClass;
 
 	UPROPERTY(EditAnywhere)
 	UInputAction* EditConfigAction;
@@ -148,11 +155,14 @@ private:
 			co_await StageComponent->GetCurrentStage().IfNot(PVPBattleStage::WillPlay);
 		}
 
+		GameState = (co_await WaitForComponent<UBattleRuleGameStateComponent>(GetWorld()->GetGameState())).Unsafe();
+		TAbortableCoroutineHandle TeamScores = ShowTeamScores();
+
 		auto PawnStream = GetOwningPawn2().CreateStream()
 			| Awaitables::IfValid()
 			// TODO WaitForComponent가 필요하지 않을지 고민
 			| Awaitables::FindComponentByClass<UBattleRulePawnComponent>();
-		
+
 		TOptional<FToastHandle> DeadMessage;
 		while (true)
 		{
@@ -161,7 +171,7 @@ private:
 			DeadMessage.Reset();
 
 			// TODO 플레이 HUD 열기
-			
+
 			co_await PawnLife->GetbAlive().If(false);
 			DeadMessage = ToastWidget->Toast(FText::FromString(TEXT("부활 대기 중...")));
 		}
@@ -262,5 +272,35 @@ private:
 		const int32 Selection = co_await Awaitables::AnyOf(SelectCharacterWidget->OnManny, SelectCharacterWidget->OnQuinn);
 		Selection == 0 ? CharacterSetter->ServerEquipManny() : CharacterSetter->ServerEquipQuinn();
 		ReadySetter->ServerSetReady(true);
+	}
+
+	FWeakCoroutine ShowTeamScores()
+	{
+		auto TeamScoresWidget = co_await CreateWidget<UTeamScoresWidget>(GetOwningPlayerController(), TeamScoresWidgetClass);
+		auto S = ScopedAddToViewport(TeamScoresWidget);
+		
+		TAbortPtr<UAreaSpawnerComponent> AreaSpawner = co_await GameState->GetAreaSpawner();
+		auto AreaStream = AreaSpawner->GetSpawnedAreas().CreateAddStream() | Awaitables::IfValid();
+
+		while (true)
+		{
+			AAreaActor* Area = (co_await AreaStream).Unsafe();
+			
+			RunWeakCoroutine(Area, [Area, TeamScoresWidget = TeamScoresWidget.Unsafe()]() -> FWeakCoroutine
+			{
+				co_await AddToWeakList(TeamScoresWidget);
+				
+				auto AreaAreaStream = Area->GetServerCalculatedArea().CreateStream();
+				while (true)
+				{
+					const float AreaArea = co_await AreaAreaStream;
+					
+					TeamScoresWidget->FindOrSetTeamScore(
+						Area->TeamComponent->GetTeamIndex().Get(),
+						Area->GetAreaBaseColor().Get(),
+						AreaArea);
+				}
+			});
+		}
 	}
 };

@@ -146,7 +146,7 @@ public:
 		}
 
 		const FVector SpawnLocation{CellToSpawnAreaIn->GetCenter(), AreaHeight};
-		AAreaActor* Ret = GetWorld()->SpawnActor<AAreaActor>(SpawnLocation, {});
+		AAreaActor* Ret = GetWorld()->SpawnActor<AAreaActor>(SpawnLocation, FRotator::ZeroRotator);
 
 		Initializer(Ret);
 

@@ -198,7 +198,7 @@ private:
 		auto LastManStanding = RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
 			auto AreaStateTracker = NewObject<UAreaStateTrackerComponent>(GetOwner());
-			AreaStateTracker->SetSpawner(GameState->ServerAreaSpawner);
+			AreaStateTracker->SetSpawner(GameState->GetAreaSpawner().Get());
 			AreaStateTracker->RegisterComponent();
 			co_await AreaStateTracker->ZeroOrOneAreaIsSurviving();
 			AreaStateTracker->DestroyComponent();
@@ -227,7 +227,7 @@ private:
 		FBattleRuleResult GameResult{};
 
 		ForEachComponent<ULifeComponent, UTeamComponent, UAreaBoundaryComponent>
-		(GameState->ServerAreaSpawner->GetSpawnedAreas().Get(), [&](auto Life, auto Team, auto Boundary)
+		(GameState->GetAreaSpawner().Get()->GetSpawnedAreas().Get(), [&](auto Life, auto Team, auto Boundary)
 		{
 			if (Life->GetbAlive().Get())
 			{
@@ -244,7 +244,7 @@ private:
 
 	AAreaActor* InitializeNewAreaActor(int32 TeamIndex)
 	{
-		return GameState->ServerAreaSpawner->SpawnAreaAtRandomEmptyLocation([&](AAreaActor* Area)
+		return GameState->GetAreaSpawner().Get()->SpawnAreaAtRandomEmptyLocation([&](AAreaActor* Area)
 		{
 			Area->TeamComponent->SetTeamIndex(TeamIndex);
 
@@ -292,9 +292,10 @@ private:
 		}
 	}
 
+	// TODO move to game state
 	AAreaActor* FindLivingAreaOfTeam(int32 TeamIndex) const
 	{
-		return ValidOrNull(GameState->ServerAreaSpawner->GetSpawnedAreas().Get().FindByPredicate([&](AAreaActor* Each)
+		return ValidOrNull(GameState->GetAreaSpawner().Get()->GetSpawnedAreas().Get().FindByPredicate([&](AAreaActor* Each)
 		{
 			return IsValid(Each)
 				&& Each->LifeComponent->GetbAlive().Get()
@@ -302,6 +303,7 @@ private:
 		}));
 	}
 
+	// TODO move to game state
 	TArray<ULifeComponent*> GetPawnLivesOfTeam(int32 TeamIndex) const
 	{
 		TArray<ULifeComponent*> Ret;

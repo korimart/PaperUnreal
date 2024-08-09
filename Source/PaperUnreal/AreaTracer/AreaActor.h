@@ -10,6 +10,7 @@
 #include "PaperUnreal/ModeAgnostic/LifeComponent.h"
 #include "PaperUnreal/ModeAgnostic/SolidColorMaterial.h"
 #include "PaperUnreal/ModeAgnostic/TeamComponent.h"
+#include "PaperUnreal/WeakCoroutine/WhileTrueAwaitable.h"
 #include "AreaActor.generated.h"
 
 
@@ -32,19 +33,28 @@ public:
 	UAreaMeshComponent* ClientAreaMesh;
 
 	DECLARE_LIVE_DATA_GETTER_SETTER(AreaBaseColor);
+	DECLARE_LIVE_DATA_GETTER_SETTER(ServerCalculatedArea);
 
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_AreaBaseColor)
 	FLinearColor RepAreaBaseColor;
 	mutable TLiveData<FLinearColor&> AreaBaseColor{RepAreaBaseColor};
 
+	UPROPERTY(ReplicatedUsing=OnRep_ServerCalculatedArea)
+	float RepServerCalculatedArea;
+	mutable TLiveData<float&> ServerCalculatedArea{RepServerCalculatedArea};
+
 	UFUNCTION()
 	void OnRep_AreaBaseColor() { AreaBaseColor.Notify(); }
+
+	UFUNCTION()
+	void OnRep_ServerCalculatedArea() { ServerCalculatedArea.Notify(); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 		DOREPLIFETIME(ThisClass, RepAreaBaseColor);
+		DOREPLIFETIME(ThisClass, RepServerCalculatedArea);
 	}
 
 	AAreaActor()
@@ -68,6 +78,22 @@ private:
 			}
 		});
 		ServerAreaBoundary->RegisterComponent();
+
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
+		{
+			auto BoundaryStream = Stream::Combine(
+				ServerAreaBoundary->GetBoundary().CreateStream(), LifeComponent->GetbAlive().CreateStream());
+			
+			while (true)
+			{
+				const auto [Boundary, bAlive] = co_await BoundaryStream;
+				ServerCalculatedArea = bAlive ? Boundary.CalculateArea() : 0.f;
+				if (!bAlive)
+				{
+					break;
+				}
+			}
+		});
 
 		if (GetNetMode() != NM_Standalone)
 		{
@@ -107,7 +133,7 @@ private:
 				Material.SetColor(co_await ColorStream);
 			}
 		});
-	    
+
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
 			co_await LifeComponent->GetbAlive().If(false);
