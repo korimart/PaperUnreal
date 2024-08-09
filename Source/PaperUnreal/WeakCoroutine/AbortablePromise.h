@@ -83,11 +83,6 @@ public:
 		return false;
 	}
 
-	friend void operator<<(TArray<TAbortableCoroutine>& Array, TAbortableCoroutine&& Right)
-	{
-		Array.Add(MoveTemp(Right));
-	}
-
 private:
 	bool bAbortOnDestruction = false;
 
@@ -109,8 +104,14 @@ class TAbortableCoroutineHandle
 public:
 	TAbortableCoroutineHandle() = default;
 	~TAbortableCoroutineHandle() { Reset(); }
-	TAbortableCoroutineHandle(TAbortableCoroutineHandle&&) = default;
-	TAbortableCoroutineHandle& operator=(TAbortableCoroutineHandle&&) = default;
+	
+	TAbortableCoroutineHandle(TAbortableCoroutineHandle&& Other)
+		: Coroutine(MoveTemp(Other).Coroutine)
+	{
+		Other.Coroutine.Reset();
+	}
+	
+	TAbortableCoroutineHandle& operator=(TAbortableCoroutineHandle&&) = delete;
 
 	TAbortableCoroutineHandle(AbortableCoroutineType&& InCoroutine)
 		: Coroutine(MoveTemp(InCoroutine))
@@ -137,6 +138,11 @@ public:
 	AbortableCoroutineType* operator->()
 	{
 		return &*Coroutine;
+	}
+	
+	friend void operator<<(TArray<TAbortableCoroutineHandle>& Array, TAbortableCoroutineHandle&& Right)
+	{
+		Array.Add(MoveTemp(Right));
 	}
 
 	void Reset()

@@ -110,7 +110,7 @@ private:
 
 			APlayerController* PC = GetOwningPlayerController();
 
-			TArray<TAbortableCoroutine<FWeakCoroutine>> Handles;
+			TArray<TAbortableCoroutineHandle<FWeakCoroutine>> Handles;
 
 			Handles << RunWeakCoroutine(this,
 				Stream::AllOf(

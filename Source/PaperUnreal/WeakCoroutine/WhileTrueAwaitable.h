@@ -46,6 +46,7 @@ public:
 	
 	void await_abort()
 	{
+		*bAborted = true;
 		Worker.Reset();
 	}
 
