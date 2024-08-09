@@ -17,7 +17,7 @@ class APlayerController2 : public APlayerController
 	GENERATED_BODY()
 
 public:
-	TLiveDataView<APawn*> GetPossessedPawn() { return PossessedPawn; }
+	TLiveDataView<APawn*> GetPawn2() { return Pawn2; }
 	TLiveDataView<TObjectPtr<APlayerState>&> GetPlayerState() { return PlayerStateLiveData; }
 	
 protected:
@@ -76,12 +76,12 @@ protected:
 	}
 
 private:
-	TLiveData<APawn*> PossessedPawn;
+	TLiveData<APawn*> Pawn2;
 	TLiveData<TObjectPtr<APlayerState>&> PlayerStateLiveData{PlayerState};
 	
 	UFUNCTION()
 	void OnPossessedPawnChangedDynamicCallback(APawn* InOldPawn, APawn* InNewPawn)
 	{
-		PossessedPawn = InNewPawn;
+		Pawn2 = InNewPawn;
 	}
 };

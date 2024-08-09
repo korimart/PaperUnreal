@@ -8,6 +8,7 @@
 #include "Blueprint/UserWidget.h"
 #include "GameFramework/GameStateBase.h"
 #include "PaperUnreal/BattleRule/BattleRuleConfigComponent.h"
+#include "PaperUnreal/BattleRule/BattleRulePawnComponent.h"
 #include "PaperUnreal/GameFramework2/HUD2.h"
 #include "PaperUnreal/ModeAgnostic/CharacterSetterComponent.h"
 #include "PaperUnreal/ModeAgnostic/ComponentRegistry.h"
@@ -33,7 +34,7 @@ class APVPBattleHUD : public AHUD2
 private:
 	UPROPERTY()
 	UStageComponent* StageComponent;
-	
+
 	UPROPERTY()
 	UWorldTimerComponent* WorldTimerComponent;
 
@@ -147,7 +148,23 @@ private:
 			co_await StageComponent->GetCurrentStage().IfNot(PVPBattleStage::WillPlay);
 		}
 
-		// TODO 플레이를 시작하면 플레이 HUD 띄우기
+		auto PawnStream = GetOwningPawn2().CreateStream()
+			| Awaitables::IfValid()
+			// TODO WaitForComponent가 필요하지 않을지 고민
+			| Awaitables::FindComponentByClass<UBattleRulePawnComponent>();
+		
+		TOptional<FToastHandle> DeadMessage;
+		while (true)
+		{
+			UBattleRulePawnComponent* Pawn = (co_await PawnStream).Unsafe();
+			ULifeComponent* PawnLife = (co_await Pawn->GetLife()).Unsafe();
+			DeadMessage.Reset();
+
+			// TODO 플레이 HUD 열기
+			
+			co_await PawnLife->GetbAlive().If(false);
+			DeadMessage = ToastWidget->Toast(FText::FromString(TEXT("부활 대기 중...")));
+		}
 	}
 
 	FWeakCoroutine ListenToEditConfigActionTrigger()

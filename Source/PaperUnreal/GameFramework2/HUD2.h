@@ -19,11 +19,9 @@ class AHUD2 : public AHUD
 	GENERATED_BODY()
 
 public:
-	template <typename T>
-	auto GetOwningPlayerState() const
+	auto GetOwningPawn2() const
 	{
-		auto PC = CastChecked<APlayerController2>(GetOwningPlayerController());
-		return PC->GetPlayerState() | Awaitables::Cast<T>();
+		return CastChecked<APlayerController2>(GetOwningPlayerController())->GetPawn2();
 	}
 
 	UEnhancedInputComponent* GetEnhancedInputComponent() const

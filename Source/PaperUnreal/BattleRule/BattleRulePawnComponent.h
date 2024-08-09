@@ -31,6 +31,11 @@ public:
 		return RepLife;
 	}
 
+	TLiveDataView<ULifeComponent*&> GetLife() const
+	{
+		return Life;
+	}
+
 	void SetDependencies(
 		UBattleRuleGameStateComponent* InGameState,
 		AAreaActor* InHomeArea)
@@ -48,7 +53,7 @@ private:
 
 	UPROPERTY(ReplicatedUsing=OnRep_Life)
 	ULifeComponent* RepLife;
-	TLiveData<ULifeComponent*&> Life{RepLife};
+	mutable TLiveData<ULifeComponent*&> Life{RepLife};
 
 	UFUNCTION()
 	void OnRep_TracerPathProvider() { TracerPathProvider.Notify(); }
