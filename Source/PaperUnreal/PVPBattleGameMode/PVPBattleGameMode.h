@@ -20,7 +20,7 @@ namespace PVPBattlePrivilege
 
 namespace PVPBattleStage
 {
-	inline FName WaitingForStart{TEXT("PVPBattleStage_WaitingForConfig")};
+	inline FName WaitingForStart{TEXT("PVPBattleStage_WaitingForStart")};
 	inline FName WillPlay{TEXT("PVPBattleStage_WillPlay")};
 	inline FName Playing{TEXT("PVPBattleStage_Playing")};
 	inline FName Result{TEXT("PVPBattleStage_Result")};
