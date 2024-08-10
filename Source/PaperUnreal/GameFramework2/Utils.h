@@ -239,6 +239,18 @@ T PopFront(TArray<T>& Array, int32 Index = 0)
 }
 
 
+template <typename T, typename ProjectionType>
+T& FindOrAddBy(TArray<T>& Array, const auto& Value, ProjectionType&& Projection)
+{
+	if (T* Found = Algo::FindBy(Array, Value, Forward<ProjectionType>(Projection)))
+	{
+		return *Found;
+	}
+
+	return Array.AddDefaulted_GetRef();
+}
+
+
 template <typename T, typename U>
 TArray<T*> GetComponents(const TArray<U>& Actors)
 {

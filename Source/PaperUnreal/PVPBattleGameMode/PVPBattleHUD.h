@@ -286,11 +286,13 @@ private:
 		{
 			AAreaActor* Area = (co_await AreaStream).Unsafe();
 			
-			RunWeakCoroutine(Area, [Area, TeamScoresWidget = TeamScoresWidget.Unsafe()]() -> FWeakCoroutine
+			RunWeakCoroutine([Area, TeamScoresWidget = TeamScoresWidget.Unsafe()]() -> FWeakCoroutine
 			{
+				co_await AddToWeakList(Area);
 				co_await AddToWeakList(TeamScoresWidget);
 				
 				auto AreaAreaStream = Area->GetServerCalculatedArea().CreateStream();
+				
 				while (true)
 				{
 					const float AreaArea = co_await AreaAreaStream;

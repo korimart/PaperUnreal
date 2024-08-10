@@ -10,7 +10,6 @@
 #include "PaperUnreal/ModeAgnostic/LifeComponent.h"
 #include "PaperUnreal/ModeAgnostic/SolidColorMaterial.h"
 #include "PaperUnreal/ModeAgnostic/TeamComponent.h"
-#include "PaperUnreal/WeakCoroutine/WhileTrueAwaitable.h"
 #include "AreaActor.generated.h"
 
 
