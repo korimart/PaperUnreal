@@ -14,6 +14,7 @@ namespace AreaStateTracker
 }
 
 
+// TODO replace with coroutine
 UCLASS()
 class UAreaStateTrackerComponent : public UStateTrackerComponent
 {

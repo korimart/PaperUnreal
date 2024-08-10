@@ -126,7 +126,7 @@ FWeakCoroutine APVPBattleGameMode::InitiateGameFlow()
 		StageComponent->SetCurrentStage(PVPBattleStage::Playing);
 	}
 
-	const FBattleRuleResult GameResult = co_await [&]()
+	auto ResultComponent = co_await [&]()
 	{
 		auto BattleRule = NewObject<UBattleRuleComponent>(this);
 		BattleRule->RegisterComponent();
@@ -134,11 +134,7 @@ FWeakCoroutine APVPBattleGameMode::InitiateGameFlow()
 	}();
 
 	StageComponent->SetCurrentStage(PVPBattleStage::Result);
-
-	for (const auto& Each : GameResult.SortedByRank)
-	{
-		UE_LOG(LogPVPBattleGameMode, Log, TEXT("게임 결과 팀 : %d / 면적 : %f"), Each.TeamIndex, Each.Area);
-	}
+	StageComponent->SetStageWorldStartTime(PVPBattleStage::Result, GetWorld()->GetTimeSeconds());
 
 	for (APlayerState* Each : GetWorld()->GetGameState()->PlayerArray)
 	{
@@ -146,7 +142,6 @@ FWeakCoroutine APVPBattleGameMode::InitiateGameFlow()
 		Each->GetPlayerController()->ClientGotoState(NAME_Spectating);
 	}
 
-	// TODO replicate game result
-
-	// TODO repeat
+	// TODO 클라이언트들이 result를 보기에 충분한 시간을 준다
+	// ResultComponent->DestroyComponent();
 }

@@ -47,15 +47,52 @@ private:
 };
 
 
+USTRUCT()
+struct FBattleRuleResultEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	int32 TeamIndex;
+
+	UPROPERTY()
+	FLinearColor Color;
+
+	UPROPERTY()
+	float Area;
+};
+
+
+USTRUCT()
 struct FBattleRuleResult
 {
-	struct FTeamAndArea
-	{
-		int32 TeamIndex;
-		float Area;
-	};
+	GENERATED_BODY()
 
-	TArray<FTeamAndArea> SortedByRank;
+	UPROPERTY()
+	TArray<FBattleRuleResultEntry> Entries;
+};
+
+
+UCLASS()
+class UBattleRuleResultComponent : public UActorComponent2
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(Replicated)
+	FBattleRuleResult Result;
+
+private:
+	UBattleRuleResultComponent()
+	{
+		SetIsReplicatedByDefault(true);
+	}
+	
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
+	{
+		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+		DOREPLIFETIME_CONDITION(ThisClass, Result, COND_InitialOnly);
+	}
 };
 
 
@@ -65,7 +102,7 @@ class UBattleRuleComponent : public UComponentGroupComponent
 	GENERATED_BODY()
 
 public:
-	TWeakCoroutine<FBattleRuleResult> Start(UClass* InPawnClass, int32 TeamCount, int32 EachTeamMemberCount)
+	TWeakCoroutine<UBattleRuleResultComponent*> Start(UClass* InPawnClass, int32 TeamCount, int32 EachTeamMemberCount)
 	{
 		check(HasBegunPlay());
 
@@ -184,7 +221,7 @@ private:
 		KillAreaIfNobodyAlive(TeamIndex);
 	}
 
-	TWeakCoroutine<FBattleRuleResult> InitiateGameFlow()
+	TWeakCoroutine<UBattleRuleResultComponent*> InitiateGameFlow()
 	{
 		UE_LOG(LogBattleRule, Log, TEXT("게임을 시작합니다"));
 
@@ -222,24 +259,24 @@ private:
 			UE_LOG(LogBattleRule, Log, TEXT("팀의 수가 1이하이므로 게임을 종료합니다"));
 		}
 
-		// 모종의 이유로 에리어 두 개가 동시에 파괴돼서 무승부가 될 수도 있음 무승부면 결과가 빔
-		// TODO 마지막까지 남은 에리어들을 알아내서 이기게 해줘야 됨
-		FBattleRuleResult GameResult{};
+		auto Ret = NewObject<UBattleRuleResultComponent>(GetWorld()->GetGameState());
+		Ret->RegisterComponent();
 
-		ForEachComponent<ULifeComponent, UTeamComponent, UAreaBoundaryComponent>
-		(GameState->GetAreaSpawner().Get()->GetSpawnedAreas().Get(), [&](auto Life, auto Team, auto Boundary)
+		for (const auto& [TeamIndex, Color] : TeamColors)
 		{
-			if (Life->GetbAlive().Get())
-			{
-				const float Area = Boundary->GetBoundary().Get().CalculateArea();
-				GameResult.SortedByRank.Emplace(Team->GetTeamIndex().Get(), Area);
-			}
-		});
+			AAreaActor* Area = FindLivingAreaOfTeam(TeamIndex);
+			const float AreaArea = Area ? Area->GetServerCalculatedArea().Get() : 0.f;
+			Ret->Result.Entries.Add({
+				.TeamIndex = TeamIndex,
+				.Color = Color,
+				.Area = AreaArea,
+			});
+		}
 
-		Algo::SortBy(GameResult.SortedByRank, &FBattleRuleResult::FTeamAndArea::Area);
-		std::reverse(GameResult.SortedByRank.begin(), GameResult.SortedByRank.end());
+		// TODO 두 에리어가 동시에 파괴되면 무승부가 발생할 수 있음
+		Algo::SortBy(Ret->Result.Entries, &FBattleRuleResultEntry::Area, TGreater{});
 
-		co_return GameResult;
+		co_return Ret;
 	}
 
 	AAreaActor* InitializeNewAreaActor(int32 TeamIndex)

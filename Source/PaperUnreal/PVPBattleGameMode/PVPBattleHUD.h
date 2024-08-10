@@ -7,6 +7,7 @@
 #include "PVPBattleGameState.h"
 #include "Blueprint/UserWidget.h"
 #include "GameFramework/GameStateBase.h"
+#include "PaperUnreal/BattleRule/BattleRuleComponent.h"
 #include "PaperUnreal/BattleRule/BattleRuleConfigComponent.h"
 #include "PaperUnreal/BattleRule/BattleRulePawnComponent.h"
 #include "PaperUnreal/GameFramework2/HUD2.h"
@@ -312,9 +313,14 @@ private:
 		auto ResultWidget = co_await CreateWidget<UBattleRuleResultWidget>(GetOwningPlayerController(), ResultWidgetClass);
 		auto S = ScopedAddToViewport(ResultWidget);
 
-		co_await WaitForSeconds(GetWorld(), 3.f);
-		// wait for result and set
-
+		const float ResultStartTime = co_await StageComponent->GetStageWorldStartTime(PVPBattleStage::Result);
+		co_await WorldTimerComponent->At(ResultStartTime + 3.f);
+		
+		auto Result = co_await WaitForComponent<UBattleRuleResultComponent>(GetWorld()->GetGameState());
+		for (const FBattleRuleResultEntry& Each : Result->Result.Entries)
+		{
+			ResultWidget->TeamScoresWidget->FindOrSetTeamScore(Each.TeamIndex, Each.Color, Each.Area);
+		}
 		ResultWidget->OnScoresSet();
 		
 		co_await Awaitables::Forever();
