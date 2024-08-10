@@ -87,6 +87,7 @@ TCancellableFuture<ComponentType*> WaitForComponent(AActor* Owner)
 }
 
 
+// TODO 같은 타입의 컴포넌트가 여러개 들어오는 경우에 대해 대응되어 있지 않음
 template <typename ComponentType>
 // 현재 UActorComponentEx만 Registry를 사용하므로 실수 다른 컴포넌트를 넣지 않도록 체크
 	requires std::is_base_of_v<UActorComponent2, ComponentType>

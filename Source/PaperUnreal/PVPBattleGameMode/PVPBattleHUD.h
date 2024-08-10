@@ -100,13 +100,13 @@ private:
 		{
 			while (true)
 			{
+				if (StageComponent->GetCurrentStage().Get() != PVPBattleStage::Result)
 				{
 					TAbortableCoroutineHandle S = SelectCharacterAndShowHUD();
 					co_await StageComponent->GetCurrentStage().If(PVPBattleStage::Result);
 				}
 
-				ShowResults();
-				co_await StageComponent->GetCurrentStage().IfNot(PVPBattleStage::Result);
+				co_await ShowResults();
 			}
 		});
 	}
@@ -119,9 +119,10 @@ private:
 
 	FWeakCoroutine SelectCharacterAndShowHUD()
 	{
+		co_await SelectCharacter();
+		
+		if (StageComponent->GetCurrentStage().Get() == PVPBattleStage::WaitingForStart)
 		{
-			co_await SelectCharacter();
-
 			APlayerController* PC = GetOwningPlayerController();
 
 			TArray<TAbortableCoroutineHandle<FWeakCoroutine>> Handles;
@@ -146,6 +147,7 @@ private:
 			co_await StageComponent->GetCurrentStage().IfNot(PVPBattleStage::WaitingForStart);
 		}
 
+		if (StageComponent->GetCurrentStage().Get() == PVPBattleStage::WillPlay)
 		{
 			const float StartTime = co_await StageComponent->GetStageWorldStartTime(PVPBattleStage::Playing);
 
@@ -315,14 +317,14 @@ private:
 
 		const float ResultStartTime = co_await StageComponent->GetStageWorldStartTime(PVPBattleStage::Result);
 		co_await WorldTimerComponent->At(ResultStartTime + 3.f);
-		
+
 		auto Result = co_await WaitForComponent<UBattleRuleResultComponent>(GetWorld()->GetGameState());
 		for (const FBattleRuleResultEntry& Each : Result->Result.Entries)
 		{
 			ResultWidget->TeamScoresWidget->FindOrSetTeamScore(Each.TeamIndex, Each.Color, Each.Area);
 		}
 		ResultWidget->OnScoresSet();
-		
-		co_await Awaitables::Forever();
+
+		co_await ResultWidget->OnConfirmed;
 	}
 };

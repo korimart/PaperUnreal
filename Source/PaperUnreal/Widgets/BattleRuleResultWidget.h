@@ -16,6 +16,8 @@ class UBattleRuleResultWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
+	FSimpleMulticastDelegate OnConfirmed;
+	
 	UPROPERTY(meta=(BindWidget))
 	UTeamScoresWidget* TeamScoresWidget;
 
