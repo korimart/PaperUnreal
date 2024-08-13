@@ -176,3 +176,11 @@ ReplicatedAreaExpander
 13. weak coroutine을 awaitable로 만들어서 future를 통하지 않고 값을 반환할 수 있음
 14. AllOf 개념 이상하니까 삭제하고 Awaitables::Join 구현
 15. LiveData lock을 새로운 클래스로 분리
+
+Rule -> GameModeComponent
+GameState -> GameStateComponent
+PVPBattle도 액터가 아닌 ComponentGroupComponent로 볼 수 있음 (free game mode + battle game mode)
+위처럼 하면 GameFramework Actor들을 Component로 대체하므로 파괴 재생성이 용이해짐
+(AHUD는 PlayerControllerComponent -> HUDComponent 이렇게 컨트롤 가능하지만 컴포넌트로 만들지 않아도
+파괴 재생성이 용이하기 때문에 액터로 해도 상관 없을 것 같다)
+StageComponent는 PVP도 필요하고 Battle도 필요한데 어떻게 할 것인가 PVP가 Battle한테 넘길까 생각해보니까 Battle은 필요 없음
