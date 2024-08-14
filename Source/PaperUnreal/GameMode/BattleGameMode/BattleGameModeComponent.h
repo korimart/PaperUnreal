@@ -104,11 +104,17 @@ class UBattleGameModeComponent : public UGameModeComponent
 	GENERATED_BODY()
 
 public:
-	TWeakCoroutine<UBattleResultComponent*> Start(int32 TeamCount, int32 EachTeamMemberCount)
+	void Configure(int32 TeamCount, int32 EachTeamMemberCount)
+	{
+		check(!bConfigured.Get());
+		
+		TeamAllocator.Configure(TeamCount, EachTeamMemberCount);
+		bConfigured = true;
+	}
+
+	TWeakCoroutine<UBattleResultComponent*> Start()
 	{
 		check(HasBegunPlay());
-
-		TeamAllocator.Configure(TeamCount, EachTeamMemberCount);
 
 		GameStateComponent = NewChildComponent<UBattleGameStateComponent>(GetWorld()->GetGameState());
 		GameStateComponent->RegisterComponent();
@@ -123,13 +129,16 @@ private:
 	FTeamAllocator TeamAllocator;
 	TMap<int32, FLinearColor> TeamColors;
 
+	TLiveData<bool> bConfigured{false};
+	TLiveData<bool> bGameStarted{false};
+
 	virtual void OnPostLogin(APlayerController* PC) override
 	{
 		// 디펜던시: parent game mode에서 미리 만들었을 것이라고 가정함
 		check(!!PC->PlayerState->FindComponentByClass<UReadyStateComponent>());
-		
+
 		NewChildComponent<UBattlePlayerStateComponent>(PC->PlayerState)->RegisterComponent();
-		InitiatePawnSpawnSequence(PC);
+		InitiatePlayerSequence(PC);
 	}
 
 	virtual void OnPostLogout(APlayerController* PC) override
@@ -144,9 +153,12 @@ private:
 		}
 	}
 
-	FWeakCoroutine InitiatePawnSpawnSequence(APlayerController* Player)
+	FWeakCoroutine InitiatePlayerSequence(APlayerController* Player)
 	{
 		co_await AddToWeakList(Player);
+		
+		UE_LOG(LogBattleGameMode, Log, TEXT("%p 플레이어 입장 게임설정을 기다리는 중"), Player);
+		co_await (bConfigured.CreateStream() | Awaitables::If(true));
 
 		auto ReadyState = Player->PlayerState->FindComponentByClass<UReadyStateComponent>();
 		auto PlayerStateComponent = Player->PlayerState->FindComponentByClass<UBattlePlayerStateComponent>();
@@ -156,26 +168,39 @@ private:
 		UE_LOG(LogBattleGameMode, Log, TEXT("%p 플레이어의 준비 완료를 기다리는 중"), Player);
 		co_await ReadyState->GetbReady().If(true);
 
-		// 죽은 다음에 다시 스폰하는 경우에는 팀이 이미 있음
-		if (TeamComponent->GetTeamIndex().Get() < 0)
+		if (TOptional<int32> NextTeamIndex = TeamAllocator.NextTeamIndex())
 		{
-			if (TOptional<int32> NextTeamIndex = TeamAllocator.NextTeamIndex())
-			{
-				TeamComponent->SetTeamIndex(*NextTeamIndex);
-			}
-			else
-			{
-				// TODO 꽉차서 더 이상 입장할 수 없으니 플레이어한테 알려주던가 그런 처리
-				co_return;
-			}
+			TeamComponent->SetTeamIndex(*NextTeamIndex);
+		}
+		else
+		{
+			// TODO 꽉차서 더 이상 입장할 수 없으니 플레이어한테 알려주던가 그런 처리
+			co_return;
 		}
 
 		const int32 ThisPlayerTeamIndex = TeamComponent->GetTeamIndex().Get();
-		AAreaActor* ThisPlayerArea = FindLivingAreaOfTeam(ThisPlayerTeamIndex);
 
+		if (!TeamColors.Contains(ThisPlayerTeamIndex))
+		{
+			TeamColors.FindOrAdd(ThisPlayerTeamIndex) = NonEyeSoaringRandomColor();
+		}
+
+		Inventory->SetTracerBaseColor(ALittleBrighter(TeamColors[ThisPlayerTeamIndex]));
+
+		UE_LOG(LogBattleGameMode, Log, TEXT("%p 플레이어 팀 세팅 완료 게임 시작을 기다리는 중"), Player);
+		co_await (bGameStarted.CreateStream() | Awaitables::If(true));
+		
+		InitiatePawnSpawnSequence(Player, ThisPlayerTeamIndex);
+	}
+
+	FWeakCoroutine InitiatePawnSpawnSequence(APlayerController* Player, int32 TeamIndex)
+	{
+		co_await AddToWeakList(Player);
+
+		AAreaActor* ThisPlayerArea = FindLivingAreaOfTeam(TeamIndex);
 		if (!ThisPlayerArea)
 		{
-			ThisPlayerArea = InitializeNewAreaActor(ThisPlayerTeamIndex);
+			ThisPlayerArea = InitializeNewAreaActor(TeamIndex);
 		}
 
 		// 월드가 꽉차서 새 영역을 선포할 수 없음
@@ -184,8 +209,6 @@ private:
 			// TODO 일단 이 팀은 플레이를 할 수 없는데 나중에 공간이 생길 수도 있음 그 때 스폰해주자
 			co_return;
 		}
-
-		Inventory->SetTracerBaseColor(ALittleBrighter(TeamColors[ThisPlayerTeamIndex]));
 
 		UE_LOG(LogBattleGameMode, Log, TEXT("%p 플레이어 폰을 스폰합니다"), Player);
 		APawn* Pawn = GameStateComponent->ServerPawnSpawner->SpawnAtLocation(
@@ -199,13 +222,13 @@ private:
 			});
 		Player->Possess(Pawn);
 
-		co_await InitiatePawnLifeSequence(Pawn->FindComponentByClass<UBattlePawnComponent>(), ThisPlayerTeamIndex);
+		co_await InitiatePawnLifeSequence(Pawn->FindComponentByClass<UBattlePawnComponent>(), TeamIndex);
 
 		constexpr float RespawnCool = 5.f;
 		co_await WaitForSeconds(GetWorld(), RespawnCool);
 
 		UE_LOG(LogBattleGameMode, Log, TEXT("%p 플레이어 리스폰 시퀀스를 시작합니다"), Player);
-		InitiatePawnSpawnSequence(Player);
+		InitiatePawnSpawnSequence(Player, TeamIndex);
 	}
 
 	FWeakCoroutine InitiatePawnLifeSequence(UBattlePawnComponent* Pawn, int32 TeamIndex) const
@@ -222,6 +245,7 @@ private:
 	TWeakCoroutine<UBattleResultComponent*> InitiateGameFlow()
 	{
 		UE_LOG(LogBattleGameMode, Log, TEXT("게임을 시작합니다"));
+		bGameStarted = true;
 
 		auto F = FinallyIfValid(this, [this]() { DestroyComponent(); });
 
@@ -282,12 +306,6 @@ private:
 		return GameStateComponent->GetAreaSpawner().Get()->SpawnAreaAtRandomEmptyLocation([&](AAreaActor* Area)
 		{
 			Area->TeamComponent->SetTeamIndex(TeamIndex);
-
-			if (!TeamColors.Contains(TeamIndex))
-			{
-				TeamColors.FindOrAdd(TeamIndex) = NonEyeSoaringRandomColor();
-			}
-
 			Area->SetAreaBaseColor(TeamColors.FindRef(TeamIndex));
 
 			RunWeakCoroutine(this, [this, Area, TeamIndex]() -> FWeakCoroutine

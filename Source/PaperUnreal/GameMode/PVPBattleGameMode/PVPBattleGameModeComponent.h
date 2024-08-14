@@ -61,7 +61,7 @@ private:
 	{
 		GameStateComponent = NewChildComponent<UPVPBattleGameStateComponent>(GetGameState());
 		GameStateComponent->RegisterComponent();
-		
+
 		WorldTimerComponent = NewChildComponent<UWorldTimerComponent>(GetGameState());
 		WorldTimerComponent->RegisterComponent();
 	}
@@ -80,7 +80,7 @@ private:
 		Privilege->AddComponentForPrivilege(PVPBattlePrivilege::Normie, UReadySetterComponent::StaticClass());
 		Privilege->RegisterComponent();
 		Privileges.Add(Privilege);
-		
+
 		auto ReadyState = NewChildComponent<UReadyStateComponent>(PC->PlayerState);
 		ReadyState->RegisterComponent();
 		ReadyStates.Add(ReadyState);
@@ -133,29 +133,27 @@ private:
 
 		StageComponent->SetCurrentStage(PVPBattleStage::WaitingForStart);
 
-		{
-			auto FreeGameMode = NewChildComponent<UFreeGameModeComponent>();
-			FreeGameMode->RegisterComponent();
-			FreeGameMode->Start();
-			auto F = FinallyIfValid(FreeGameMode, [FreeGameMode]() { FreeGameMode->DestroyComponent(); });
+		auto FreeGameMode = NewChildComponent<UFreeGameModeComponent>();
+		FreeGameMode->RegisterComponent();
+		FreeGameMode->Start();
 
-			co_await OnGameStartConditionsMet;
+		co_await OnGameStartConditionsMet;
 
-			StageComponent->SetCurrentStage(PVPBattleStage::WillPlay);
+		StageComponent->SetCurrentStage(PVPBattleStage::WillPlay);
 
-			const float PlayStartTime = GetWorld()->GetTimeSeconds() + 5.f;
-			StageComponent->SetStageWorldStartTime(PVPBattleStage::Playing, PlayStartTime);
+		auto BattleGameMode = NewChildComponent<UBattleGameModeComponent>();
+		BattleGameMode->RegisterComponent();
+		// TODO real numbers
+		BattleGameMode->Configure(2, 2);
 
-			co_await WorldTimerComponent->At(PlayStartTime);
-			StageComponent->SetCurrentStage(PVPBattleStage::Playing);
-		}
+		const float PlayStartTime = GetWorld()->GetTimeSeconds() + 5.f;
+		StageComponent->SetStageWorldStartTime(PVPBattleStage::Playing, PlayStartTime);
 
-		auto ResultComponent = co_await [&]()
-		{
-			auto BattleGameMode = NewChildComponent<UBattleGameModeComponent>();
-			BattleGameMode->RegisterComponent();
-			return BattleGameMode->Start(2, 2);
-		}();
+		co_await WorldTimerComponent->At(PlayStartTime);
+		StageComponent->SetCurrentStage(PVPBattleStage::Playing);
+
+		FreeGameMode->DestroyComponent();
+		co_await BattleGameMode->Start();
 
 		StageComponent->SetCurrentStage(PVPBattleStage::Result);
 		StageComponent->SetStageWorldStartTime(PVPBattleStage::Result, GetWorld()->GetTimeSeconds());

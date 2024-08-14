@@ -30,7 +30,7 @@ protected:
 	{
 		SetIsReplicatedByDefault(false);
 	}
-	
+
 	virtual void OnPostLogin(APlayerController* PC)
 	{
 	}
@@ -74,8 +74,15 @@ private:
 	{
 		if (Component->IsA<UGameModeComponent>())
 		{
-			ChildGameModeComponents.Add(Cast<UGameModeComponent>(Component));
-			ChildGameModeComponents.Last()->bHasParent = true;
+			UGameModeComponent* Child = Cast<UGameModeComponent>(Component);
+			Child->bHasParent = true;
+			
+			for (auto It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+			{
+				Child->DispatchPostLogin(It->Get());
+			}
+			
+			ChildGameModeComponents.Add(Child);
 		}
 	}
 
