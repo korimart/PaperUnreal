@@ -16,12 +16,29 @@ class UPVPBattleGameStateComponent : public UComponentGroupComponent
 	GENERATED_BODY()
 
 public:
-	UPROPERTY()
-	UStageComponent* StageComponent;
-
-private:
-	UPVPBattleGameStateComponent()
+	TLiveDataView<UStageComponent*&> GetStageComponent() const
 	{
-		StageComponent = CreateDefaultSubobject<UStageComponent>(TEXT("StageComponent"));
+		return StageComponent;
+	}
+	
+private:
+	UPROPERTY(ReplicatedUsing=OnRep_StageComponent)
+	UStageComponent* RepStageComponent;
+	mutable TLiveData<UStageComponent*&> StageComponent{RepStageComponent};
+
+	UFUNCTION()
+	void OnRep_StageComponent() { StageComponent.Notify(); }
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
+	{
+		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+		DOREPLIFETIME_CONDITION(ThisClass, RepStageComponent, COND_InitialOnly);
+	}
+
+	virtual void AttachServerMachineComponents() override
+	{
+		RepStageComponent = NewChildComponent<UStageComponent>();
+		RepStageComponent->RegisterComponent();
 	}
 };

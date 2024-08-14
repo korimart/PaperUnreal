@@ -87,8 +87,6 @@ private:
 		GetEnhancedInputComponent()->BindAction(StartGameAction, ETriggerEvent::Triggered, this, &ThisClass::OnStartGameActionTriggeredFunc);
 		GetEnhancedInputComponent()->BindAction(SelectCharacterAction, ETriggerEvent::Triggered, this, &ThisClass::OnSelectCharacterActionTriggeredFunc);
 
-		StageComponent = GetWorld()->GetGameState()->FindComponentByClass<UPVPBattleGameStateComponent>()->StageComponent;
-
 		// TODO worldtimer가 hud보다 오래살 수 있음
 		WorldTimerComponent = NewObject<UWorldTimerComponent>(GetWorld()->GetGameState());
 		WorldTimerComponent->RegisterComponent();
@@ -102,6 +100,10 @@ private:
 
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
+			auto GameState = co_await WaitForGameState(GetWorld());
+			auto BattleGameState = co_await WaitForComponent<UPVPBattleGameStateComponent>(GameState);
+			StageComponent = (co_await BattleGameState->GetStageComponent()).Unsafe();
+			
 			while (true)
 			{
 				if (StageComponent->GetCurrentStage().Get() != PVPBattleStage::Result)

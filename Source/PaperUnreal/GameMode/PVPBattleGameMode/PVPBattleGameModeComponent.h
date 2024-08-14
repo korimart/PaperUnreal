@@ -60,7 +60,10 @@ private:
 	virtual void AttachServerMachineComponents() override
 	{
 		GameStateComponent = NewChildComponent<UPVPBattleGameStateComponent>(GetGameState());
+		GameStateComponent->RegisterComponent();
+		
 		WorldTimerComponent = NewChildComponent<UWorldTimerComponent>(GetGameState());
+		WorldTimerComponent->RegisterComponent();
 	}
 
 	virtual void OnPostLogin(APlayerController* PC) override
@@ -126,7 +129,7 @@ private:
 
 	FWeakCoroutine InitiateGameFlow()
 	{
-		auto StageComponent = co_await GameStateComponent->StageComponent;
+		auto StageComponent = co_await GameStateComponent->GetStageComponent();
 
 		StageComponent->SetCurrentStage(PVPBattleStage::WaitingForStart);
 

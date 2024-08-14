@@ -18,7 +18,7 @@ public:
 	{
 		return NewChildComponent<T>(GetOwner());
 	}
-	
+
 	template <typename T, typename... ArgTypes>
 	T* NewChildComponent(AActor* Actor, ArgTypes&&... Args)
 	{
@@ -34,11 +34,11 @@ protected:
 		bWantsInitializeComponent = true;
 		SetIsReplicatedByDefault(true);
 	}
-	
-	virtual void BeginPlay() override
+
+	virtual void InitializeComponent() override
 	{
-		Super::BeginPlay();
-		
+		Super::InitializeComponent();
+
 		if (GetNetMode() != NM_Client)
 		{
 			AttachServerMachineComponents();
@@ -50,7 +50,15 @@ protected:
 		}
 	}
 
-	virtual void AttachServerMachineComponents() {}
-	virtual void AttachPlayerMachineComponents() {}
-	virtual void OnNewChildComponent(UActorComponent2* Component) {}
+	virtual void AttachServerMachineComponents()
+	{
+	}
+
+	virtual void AttachPlayerMachineComponents()
+	{
+	}
+
+	virtual void OnNewChildComponent(UActorComponent2* Component)
+	{
+	}
 };
