@@ -3,17 +3,17 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "PaperUnreal/GameFramework2/GameStateBase2.h"
+#include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/ReadyStateTrackerComponent.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/StageComponent.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/WorldTimerComponent.h"
-#include "PVPBattleGameState.generated.h"
+#include "PVPBattleGameStateComponent.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class APVPBattleGameState : public AGameStateBase2
+class UPVPBattleGameStateComponent : public UComponentGroupComponent
 {
 	GENERATED_BODY()
 
@@ -28,7 +28,7 @@ public:
 	UReadyStateTrackerComponent* ReadyStateTrackerComponent;
 
 private:
-	APVPBattleGameState()
+	UPVPBattleGameStateComponent()
 	{
 		WorldTimerComponent = CreateDefaultSubobject<UWorldTimerComponent>(TEXT("WorldTimerComponent"));
 		StageComponent = CreateDefaultSubobject<UStageComponent>(TEXT("StageComponent"));

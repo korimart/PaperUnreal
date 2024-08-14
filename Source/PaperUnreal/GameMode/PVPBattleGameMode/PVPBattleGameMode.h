@@ -8,40 +8,13 @@
 #include "PVPBattleGameMode.generated.h"
 
 
-DECLARE_LOG_CATEGORY_EXTERN(LogPVPBattleGameMode, Log, All);
-
-
-namespace PVPBattlePrivilege
-{
-	inline FName Host{TEXT("PVPBattlePrivilege_Host")};
-	inline FName Normie{TEXT("PVPBattlePrivilege_Normie")};
-}
-
-
-namespace PVPBattleStage
-{
-	inline FName WaitingForStart{TEXT("PVPBattleStage_WaitingForStart")};
-	inline FName WillPlay{TEXT("PVPBattleStage_WillPlay")};
-	inline FName Playing{TEXT("PVPBattleStage_Playing")};
-	inline FName Result{TEXT("PVPBattleStage_Result")};
-}
-
-
 UCLASS()
 class APVPBattleGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
 
-public:
-	bool StartGameIfConditionsMet();
-
 private:
-	FSimpleMulticastDelegate OnGameStartConditionsMet;
-	
 	APVPBattleGameMode();
 
 	virtual void BeginPlay() override;
-
-	FWeakCoroutine InitPrivilegeComponentOfNewPlayers();
-	FWeakCoroutine InitiateGameFlow();
 };

@@ -3,8 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "PVPBattleGameMode.h"
-#include "PVPBattleGameState.h"
+#include "PVPBattleGameModeComponent.h"
+#include "PVPBattleGameStateComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "PaperUnreal/GameMode/BattleGameMode/BattleGameModeComponent.h"
 #include "PaperUnreal/GameMode/BattleGameMode/BattleConfigComponent.h"
@@ -24,6 +24,7 @@
 #include "PaperUnreal/Widgets/SelectCharacterWidget.h"
 #include "PaperUnreal/Widgets/ToastWidget.h"
 #include "PVPBattleHUD.generated.h"
+
 
 /**
  * 
@@ -86,8 +87,8 @@ private:
 		GetEnhancedInputComponent()->BindAction(StartGameAction, ETriggerEvent::Triggered, this, &ThisClass::OnStartGameActionTriggeredFunc);
 		GetEnhancedInputComponent()->BindAction(SelectCharacterAction, ETriggerEvent::Triggered, this, &ThisClass::OnSelectCharacterActionTriggeredFunc);
 
-		StageComponent = GetWorld()->GetGameState<APVPBattleGameState>()->StageComponent;
-		WorldTimerComponent = GetWorld()->GetGameState<APVPBattleGameState>()->WorldTimerComponent;
+		StageComponent = GetWorld()->GetGameState<UPVPBattleGameStateComponent>()->StageComponent;
+		WorldTimerComponent = GetWorld()->GetGameState<UPVPBattleGameStateComponent>()->WorldTimerComponent;
 		ToastWidget = CreateWidget<UToastWidget>(GetOwningPlayerController(), ToastWidgetClass);
 
 		RunWeakCoroutine(this,

@@ -13,6 +13,12 @@ class UComponentGroupComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
+	template <typename T>
+	T* NewChildComponent()
+	{
+		return NewChildComponent<T>(GetOwner());
+	}
+	
 	template <typename T, typename... ArgTypes>
 	T* NewChildComponent(AActor* Actor, ArgTypes&&... Args)
 	{
