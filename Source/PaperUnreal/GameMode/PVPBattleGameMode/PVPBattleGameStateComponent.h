@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
-#include "PaperUnreal/GameMode/ModeAgnostic/ReadyStateTrackerComponent.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/StageComponent.h"
 #include "PVPBattleGameStateComponent.generated.h"
 
@@ -19,14 +18,10 @@ class UPVPBattleGameStateComponent : public UComponentGroupComponent
 public:
 	UPROPERTY()
 	UStageComponent* StageComponent;
-	
-	UPROPERTY()
-	UReadyStateTrackerComponent* ReadyStateTrackerComponent;
 
 private:
 	UPVPBattleGameStateComponent()
 	{
 		StageComponent = CreateDefaultSubobject<UStageComponent>(TEXT("StageComponent"));
-		ReadyStateTrackerComponent = CreateDefaultSubobject<UReadyStateTrackerComponent>(TEXT("ReadyStateTrackerComponent"));
 	}
 };

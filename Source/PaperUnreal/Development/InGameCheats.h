@@ -5,10 +5,11 @@
 #include "CoreMinimal.h"
 #include "EngineUtils.h"
 #include "GameFramework/CheatManager.h"
+#include "GameFramework/PlayerState.h"
 #include "PaperUnreal/AreaTracer/TracerPathComponent.h"
 #include "PaperUnreal/GameFramework2/Character2.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/InventoryComponent.h"
-#include "PaperUnreal/GameMode/PVPBattleGameMode/PVPBattleGameStateComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/ReadyStateComponent.h"
 #include "InGameCheats.generated.h"
 
 

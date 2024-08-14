@@ -3,13 +3,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/GameModeBase.h"
-#include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
+#include "PaperUnreal/GameFramework2/GameModeBase2.h"
 #include "PVPBattleGameMode.generated.h"
 
 
 UCLASS()
-class APVPBattleGameMode : public AGameModeBase
+class APVPBattleGameMode : public AGameModeBase2
 {
 	GENERATED_BODY()
 

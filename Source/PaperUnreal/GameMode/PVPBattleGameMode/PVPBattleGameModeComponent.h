@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "PVPBattleGameStateComponent.h"
 #include "Algo/Accumulate.h"
 #include "PaperUnreal/GameFramework2/GameModeComponent.h"
 #include "PaperUnreal/GameMode/BattleGameMode/BattleConfigComponent.h"
