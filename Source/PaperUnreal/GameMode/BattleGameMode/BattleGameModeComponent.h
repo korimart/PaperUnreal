@@ -89,7 +89,7 @@ private:
 	{
 		SetIsReplicatedByDefault(true);
 	}
-	
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -113,25 +113,6 @@ public:
 		GameStateComponent = NewChildComponent<UBattleGameStateComponent>(GetWorld()->GetGameState());
 		GameStateComponent->RegisterComponent();
 
-		auto PlayerStateArray = GetWorld()->GetGameState<AGameStateBase2>()->GetPlayerStateArray();
-
-		PlayerStateArray.ObserveAddIfValid(this, [this](APlayerState* Player)
-		{
-			InitiatePawnSpawnSequence(Player);
-		});
-
-		PlayerStateArray.ObserveRemoveIfValid(this, [this](APlayerState* Player)
-		{
-			if (APawn* Pawn = Player->GetPawn())
-			{
-				if (auto PawnComponent = Pawn->FindComponentByClass<UBattlePawnComponent>())
-				{
-					UE_LOG(LogBattleGameMode, Log, TEXT("%p 플레이어가 접속을 종료함에 따라 폰을 사망시킵니다"), Player);
-					PawnComponent->GetServerLife()->SetbAlive(false);
-				}
-			}
-		});
-
 		return InitiateGameFlow();
 	}
 
@@ -142,21 +123,33 @@ private:
 	FTeamAllocator TeamAllocator;
 	TMap<int32, FLinearColor> TeamColors;
 
-	virtual void AttachPlayerStateComponents(APlayerState* PS) override
+	virtual void OnPostLogin(APlayerController* PC) override
 	{
-		NewChildComponent<UBattlePlayerStateComponent>(PS)->RegisterComponent();
+		// 디펜던시: parent game mode에서 미리 만들었을 것이라고 가정함
+		check(!!PC->PlayerState->FindComponentByClass<UReadyStateComponent>());
+		
+		NewChildComponent<UBattlePlayerStateComponent>(PC->PlayerState)->RegisterComponent();
+		InitiatePawnSpawnSequence(PC);
 	}
 
-	FWeakCoroutine InitiatePawnSpawnSequence(APlayerState* Player)
+	virtual void OnPostLogout(APlayerController* PC) override
+	{
+		if (APawn* Pawn = PC->GetPawn())
+		{
+			if (auto PawnComponent = Pawn->FindComponentByClass<UBattlePawnComponent>())
+			{
+				UE_LOG(LogBattleGameMode, Log, TEXT("%p 플레이어가 접속을 종료함에 따라 폰을 사망시킵니다"), PC);
+				PawnComponent->GetServerLife()->SetbAlive(false);
+			}
+		}
+	}
+
+	FWeakCoroutine InitiatePawnSpawnSequence(APlayerController* Player)
 	{
 		co_await AddToWeakList(Player);
 
-		// 이 컴포넌트들은 디펜던시: 이 컴포넌트들을 가지는 PlayerState에 대해서만 이 클래스를 사용할 수 있음
-		auto ReadyState = Player->FindComponentByClass<UReadyStateComponent>();
-		check(AllValid(ReadyState));
-
-		// 아래 컴포넌트들은 내가 준비함
-		auto PlayerStateComponent = Player->FindComponentByClass<UBattlePlayerStateComponent>();
+		auto ReadyState = Player->PlayerState->FindComponentByClass<UReadyStateComponent>();
+		auto PlayerStateComponent = Player->PlayerState->FindComponentByClass<UBattlePlayerStateComponent>();
 		auto TeamComponent = PlayerStateComponent->ServerTeamComponent;
 		auto Inventory = PlayerStateComponent->ServerInventoryComponent;
 
@@ -204,7 +197,7 @@ private:
 				PawnComponent->SetDependencies(GameStateComponent, ThisPlayerArea);
 				PawnComponent->RegisterComponent();
 			});
-		Player->GetOwningController()->Possess(Pawn);
+		Player->Possess(Pawn);
 
 		co_await InitiatePawnLifeSequence(Pawn->FindComponentByClass<UBattlePawnComponent>(), ThisPlayerTeamIndex);
 

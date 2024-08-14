@@ -6,7 +6,6 @@
 #include "FreePawnComponent.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
 #include "PaperUnreal/GameFramework2/GameModeComponent.h"
-#include "PaperUnreal/GameFramework2/GameStateBase2.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/CharacterMeshFromInventory.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/PawnSpawnerComponent.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/ReadyStateComponent.h"
@@ -22,48 +21,47 @@ class UFreeGameModeComponent : public UGameModeComponent
 public:
 	void Start()
 	{
+		check(HasBegunPlay());
 		PawnSpawner = NewChildComponent<UPawnSpawnerComponent>(GetOwner());
 		PawnSpawner->DestroyPawnsOnEndPlay();
 		PawnSpawner->RegisterComponent();
-
-		auto PlayerStateArray = GetWorld()->GetGameState<AGameStateBase2>()->GetPlayerStateArray();
-
-		PlayerStateArray.ObserveAddIfValid(this, [this](APlayerState* Player)
-		{
-			InitiatePawnSpawnSequence(Player);
-		});
-
-		PlayerStateArray.ObserveRemoveIfValid(this, [this](APlayerState* Player)
-		{
-			if (APawn* Pawn = Player->GetPawn())
-			{
-				Pawn->Destroy();
-			}
-		});
 	}
 
 private:
 	UPROPERTY()
 	UPawnSpawnerComponent* PawnSpawner;
 
-	virtual void AttachPlayerStateComponents(APlayerState* PS) override
+	virtual void OnPostLogin(APlayerController* PC) override
 	{
-		NewChildComponent<UInventoryComponent>(PS)->RegisterComponent();
+		// 디펜던시: parent game mode에서 미리 만들었을 것이라고 가정함
+		check(!!PC->PlayerState->FindComponentByClass<UReadyStateComponent>());
+		
+		NewChildComponent<UInventoryComponent>(PC->PlayerState)->RegisterComponent();
+		
+		InitiatePawnSpawnSequence(PC);
 	}
 
-	FWeakCoroutine InitiatePawnSpawnSequence(APlayerState* Player)
+	virtual void OnPostLogout(APlayerController* PC) override
+	{
+		if (APawn* Pawn = PC->GetPawn())
+		{
+			Pawn->Destroy();
+		}
+	}
+
+	FWeakCoroutine InitiatePawnSpawnSequence(APlayerController* Player)
 	{
 		co_await AddToWeakList(Player);
 
-		Player->FindComponentByClass<UInventoryComponent>()->SetTracerBaseColor(NonEyeSoaringRandomColor());
+		Player->PlayerState->FindComponentByClass<UInventoryComponent>()->SetTracerBaseColor(NonEyeSoaringRandomColor());
 
-		co_await Player->FindComponentByClass<UReadyStateComponent>()->GetbReady().If(true);
+		co_await Player->PlayerState->FindComponentByClass<UReadyStateComponent>()->GetbReady().If(true);
 
 		APawn* Pawn = PawnSpawner->SpawnAtLocation(
 			GetDefaultPawnClass(),
 			{1500.f, 1500.f, 100.f},
 			[&](APawn* Spawned) { NewChildComponent<UFreePawnComponent>(Spawned)->RegisterComponent(); });
 
-		Player->GetOwningController()->Possess(Pawn);
+		Player->Possess(Pawn);
 	}
 };

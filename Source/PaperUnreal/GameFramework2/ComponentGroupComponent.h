@@ -24,6 +24,7 @@ public:
 	{
 		T* Component = NewObject<T>(Actor, Forward<ArgTypes>(Args)...);
 		Component->AddLifeDependency(this);
+		OnNewChildComponent(Component);
 		return Component;
 	}
 
@@ -51,4 +52,5 @@ protected:
 
 	virtual void AttachServerMachineComponents() {}
 	virtual void AttachPlayerMachineComponents() {}
+	virtual void OnNewChildComponent(UActorComponent2* Component) {}
 };

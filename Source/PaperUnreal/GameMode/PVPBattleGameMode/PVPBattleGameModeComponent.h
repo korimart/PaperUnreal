@@ -44,7 +44,7 @@ class UPVPBattleGameModeComponent : public UGameModeComponent
 private:
 	UPROPERTY()
 	UPVPBattleGameStateComponent* GameStateComponent;
-	
+
 	UPROPERTY()
 	UWorldTimerComponent* WorldTimerComponent;
 
@@ -63,7 +63,7 @@ private:
 		WorldTimerComponent = NewChildComponent<UWorldTimerComponent>(GetGameState());
 	}
 
-	virtual void AttachPlayerControllerComponents(APlayerController* PC) override
+	virtual void OnPostLogin(APlayerController* PC) override
 	{
 		auto Privilege = NewChildComponent<UPrivilegeComponent>(PC);
 		Privilege->AddComponentForPrivilege(PVPBattlePrivilege::Host, UBattleConfigComponent::StaticClass());
@@ -77,22 +77,27 @@ private:
 		Privilege->AddComponentForPrivilege(PVPBattlePrivilege::Normie, UReadySetterComponent::StaticClass());
 		Privilege->RegisterComponent();
 		Privileges.Add(Privilege);
-	}
-
-	virtual void AttachPlayerStateComponents(APlayerState* PS) override
-	{
-		auto ReadyState = NewChildComponent<UReadyStateComponent>(PS);
+		
+		auto ReadyState = NewChildComponent<UReadyStateComponent>(PC->PlayerState);
 		ReadyState->RegisterComponent();
 		ReadyStates.Add(ReadyState);
+	}
+
+	virtual void BeginPlay() override
+	{
+		Super::BeginPlay();
+
+		InitPrivilegeComponentOfNewPlayers();
+		InitiateGameFlow();
 	}
 
 	bool StartGameIfConditionsMet()
 	{
 		ReadyStates.RemoveAll([](UReadyStateComponent* Each) { return !IsValid(Each); });
-		
+
 		const int32 ReadyCount = Algo::TransformAccumulate(
 			ReadyStates, [](auto Each) { return Each->GetbReady().Get() ? 1 : 0; }, 0);
-		
+
 		if (ReadyCount >= 2)
 		{
 			OnGameStartConditionsMet.Broadcast();
