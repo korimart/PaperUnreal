@@ -184,3 +184,5 @@ PVPBattle도 액터가 아닌 ComponentGroupComponent로 볼 수 있음 (free ga
 (AHUD는 PlayerControllerComponent -> HUDComponent 이렇게 컨트롤 가능하지만 컴포넌트로 만들지 않아도
 파괴 재생성이 용이하기 때문에 액터로 해도 상관 없을 것 같다)
 StageComponent는 PVP도 필요하고 Battle도 필요한데 어떻게 할 것인가 PVP가 Battle한테 넘길까 생각해보니까 Battle은 필요 없음
+
+16. 프로그램 종료할 때 newobject 실패하는 거 수정
