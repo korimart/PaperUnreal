@@ -25,12 +25,6 @@ class UBattlePawnComponent : public UComponentGroupComponent
 	GENERATED_BODY()
 
 public:
-	ULifeComponent* GetServerLife() const
-	{
-		check(GetNetMode() != NM_Client);
-		return RepLife;
-	}
-
 	TLiveDataView<ULifeComponent*&> GetLife() const
 	{
 		return Life;

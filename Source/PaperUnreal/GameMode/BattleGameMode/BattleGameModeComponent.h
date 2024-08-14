@@ -148,7 +148,7 @@ private:
 			if (auto PawnComponent = Pawn->FindComponentByClass<UBattlePawnComponent>())
 			{
 				UE_LOG(LogBattleGameMode, Log, TEXT("%p 플레이어가 접속을 종료함에 따라 폰을 사망시킵니다"), PC);
-				PawnComponent->GetServerLife()->SetbAlive(false);
+				PawnComponent->GetLife().Get()->SetbAlive(false);
 			}
 		}
 	}
@@ -236,7 +236,7 @@ private:
 		co_await AddToWeakList(Pawn);
 
 		UE_LOG(LogBattleGameMode, Log, TEXT("%p 폰의 사망을 기다리는 중"), Pawn);
-		co_await Pawn->GetServerLife()->GetbAlive().If(false);
+		co_await Pawn->GetLife().Get()->GetbAlive().If(false);
 
 		UE_LOG(LogBattleGameMode, Log, TEXT("%p 폰이 사망함에 따라 영역 파괴를 검토하는 중"), Pawn);
 		KillAreaIfNobodyAlive(TeamIndex);
