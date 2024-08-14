@@ -3,7 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "PVPBattlePlayerController.h"
 #include "Algo/Accumulate.h"
 #include "PaperUnreal/GameFramework2/GameModeComponent.h"
 #include "PaperUnreal/GameMode/BattleGameMode/BattleConfigComponent.h"
@@ -44,7 +43,14 @@ class UPVPBattleGameModeComponent : public UGameModeComponent
 private:
 	UPROPERTY()
 	UPVPBattleGameStateComponent* GameStateComponent;
-	
+
+	UPROPERTY()
+	TArray<UPrivilegeComponent*> _0;
+	TLiveData<TArray<UPrivilegeComponent*>&> Privileges{_0};
+
+	UPROPERTY()
+	TArray<UReadyStateComponent*> ReadyStates;
+
 	FSimpleMulticastDelegate OnGameStartConditionsMet;
 
 	virtual void AttachServerMachineComponents() override
@@ -52,13 +58,36 @@ private:
 		GameStateComponent = NewChildComponent<UPVPBattleGameStateComponent>();
 	}
 
+	virtual void AttachPlayerControllerComponents(APlayerController* PC) override
+	{
+		auto Privilege = NewChildComponent<UPrivilegeComponent>(PC);
+		Privilege->AddComponentForPrivilege(PVPBattlePrivilege::Host, UBattleConfigComponent::StaticClass());
+		Privilege->AddComponentForPrivilege(PVPBattlePrivilege::Host, UGameStarterComponent::StaticClass(),
+			FComponentInitializer::CreateWeakLambda(this, [this](UActorComponent* Component)
+			{
+				Cast<UGameStarterComponent>(Component)
+					->ServerGameStarter.BindUObject(this, &ThisClass::StartGameIfConditionsMet);
+			}));
+		Privilege->AddComponentForPrivilege(PVPBattlePrivilege::Normie, UCharacterSetterComponent::StaticClass());
+		Privilege->AddComponentForPrivilege(PVPBattlePrivilege::Normie, UReadySetterComponent::StaticClass());
+		Privilege->RegisterComponent();
+		Privileges.Add(Privilege);
+	}
+
+	virtual void AttachPlayerStateComponents(APlayerState* PS) override
+	{
+		auto ReadyState = NewChildComponent<UReadyStateComponent>(PS);
+		ReadyState->RegisterComponent();
+		ReadyStates.Add(ReadyState);
+	}
+
 	bool StartGameIfConditionsMet()
 	{
+		ReadyStates.RemoveAll([](UReadyStateComponent* Each) { return !IsValid(Each); });
+		
 		const int32 ReadyCount = Algo::TransformAccumulate(
-			::GetComponents<UReadyStateComponent>(GetGameState()->GetPlayerStateArray().Get()),
-			[](auto Each) { return Each->GetbReady().Get() ? 1 : 0; },
-			0);
-
+			ReadyStates, [](auto Each) { return Each->GetbReady().Get() ? 1 : 0; }, 0);
+		
 		if (ReadyCount >= 2)
 		{
 			OnGameStartConditionsMet.Broadcast();
@@ -70,25 +99,7 @@ private:
 
 	FWeakCoroutine InitPrivilegeComponentOfNewPlayers()
 	{
-		auto AddPrivilegeComponents = [this](UPrivilegeComponent* Target)
-		{
-			Target->AddComponentForPrivilege(PVPBattlePrivilege::Host, UBattleConfigComponent::StaticClass());
-			Target->AddComponentForPrivilege(PVPBattlePrivilege::Host, UGameStarterComponent::StaticClass(),
-				FComponentInitializer::CreateWeakLambda(this, [this](UActorComponent* Component)
-				{
-					Cast<UGameStarterComponent>(Component)
-						->ServerGameStarter.BindUObject(this, &ThisClass::StartGameIfConditionsMet);
-				}));
-			Target->AddComponentForPrivilege(PVPBattlePrivilege::Normie, UCharacterSetterComponent::StaticClass());
-			Target->AddComponentForPrivilege(PVPBattlePrivilege::Normie, UReadySetterComponent::StaticClass());
-			return Target;
-		};
-
-		auto PrivilegeStream
-			= GetGameState()->GetPlayerStateArray().CreateAddStream()
-			| Awaitables::Transform(&APlayerState::GetPlayerController)
-			| Awaitables::FindComponentByClass<UPrivilegeComponent>()
-			| Awaitables::Transform([&](UPrivilegeComponent* Component) { return AddPrivilegeComponents(Component); });
+		auto PrivilegeStream = Privileges.CreateAddStream();
 
 		{
 			auto FirstPlayerPrivilege = co_await PrivilegeStream;

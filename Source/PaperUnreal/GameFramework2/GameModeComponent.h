@@ -24,4 +24,19 @@ public:
 	{
 		return GetOuterAGameModeBase()->DefaultPawnClass;
 	}
+
+protected:
+	virtual void AttachPlayerControllerComponents(APlayerController* PC) {}
+	virtual void AttachPlayerStateComponents(APlayerState* PS) {}
+
+	virtual void BeginPlay() override
+	{
+		Super::BeginPlay();
+
+		GetGameState()->GetPlayerStateArray().ObserveAddIfValid(this, [this](APlayerState* PS)
+		{
+			AttachPlayerControllerComponents(PS->GetPlayerController());
+			AttachPlayerStateComponents(PS);
+		});
+	}
 };

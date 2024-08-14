@@ -2,14 +2,12 @@
 
 #include "PVPBattleGameMode.h"
 #include "PVPBattleHUD.h"
-#include "PVPBattlePlayerState.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/FixedCameraPawn.h"
 #include "UObject/ConstructorHelpers.h"
 
 
 APVPBattleGameMode::APVPBattleGameMode()
 {
-	PlayerStateClass = APVPBattlePlayerState::StaticClass();
 	SpectatorClass = AFixedCameraPawn::StaticClass();
 
 	static ConstructorHelpers::FClassFinder<APawn> PlayerPawnBPClass(TEXT("/Game/TopDown/Blueprints/BP_TopDownCharacter"));
@@ -36,4 +34,6 @@ APVPBattleGameMode::APVPBattleGameMode()
 void APVPBattleGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+
+	NewObject<UPVPBattleGameModeComponent>(this)->RegisterComponent();
 }

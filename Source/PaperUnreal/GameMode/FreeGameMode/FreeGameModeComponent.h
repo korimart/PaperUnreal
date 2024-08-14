@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "FreePawnComponent.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
+#include "PaperUnreal/GameFramework2/GameModeComponent.h"
 #include "PaperUnreal/GameFramework2/GameStateBase2.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/CharacterMeshFromInventory.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/PawnSpawnerComponent.h"
@@ -13,8 +14,8 @@
 #include "FreeGameModeComponent.generated.h"
 
 
-UCLASS(Within=GameModeBase)
-class UFreeGameModeComponent : public UComponentGroupComponent
+UCLASS()
+class UFreeGameModeComponent : public UGameModeComponent
 {
 	GENERATED_BODY()
 
@@ -50,22 +51,24 @@ private:
 	UPROPERTY()
 	UPawnSpawnerComponent* PawnSpawner;
 
-	void InitiatePawnSpawnSequence(APlayerState* Player)
+	virtual void AttachPlayerStateComponents(APlayerState* PS) override
 	{
-		RunWeakCoroutine(this, [this, Player]() -> FWeakCoroutine
-		{
-			co_await AddToWeakList(Player);
+		NewChildComponent<UInventoryComponent>(PS)->RegisterComponent();
+	}
 
-			Player->FindComponentByClass<UInventoryComponent>()->SetTracerBaseColor(NonEyeSoaringRandomColor());
+	FWeakCoroutine InitiatePawnSpawnSequence(APlayerState* Player)
+	{
+		co_await AddToWeakList(Player);
 
-			co_await Player->FindComponentByClass<UReadyStateComponent>()->GetbReady().If(true);
+		Player->FindComponentByClass<UInventoryComponent>()->SetTracerBaseColor(NonEyeSoaringRandomColor());
 
-			APawn* Pawn = PawnSpawner->SpawnAtLocation(
-				PawnClass,
-				{1500.f, 1500.f, 100.f},
-				[&](APawn* Spawned) { NewChildComponent<UFreePawnComponent>(Spawned)->RegisterComponent(); });
+		co_await Player->FindComponentByClass<UReadyStateComponent>()->GetbReady().If(true);
 
-			Player->GetOwningController()->Possess(Pawn);
-		});
+		APawn* Pawn = PawnSpawner->SpawnAtLocation(
+			PawnClass,
+			{1500.f, 1500.f, 100.f},
+			[&](APawn* Spawned) { NewChildComponent<UFreePawnComponent>(Spawned)->RegisterComponent(); });
+
+		Player->GetOwningController()->Possess(Pawn);
 	}
 };

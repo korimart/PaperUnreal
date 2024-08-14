@@ -5,11 +5,13 @@
 #include "CoreMinimal.h"
 #include "BattleGameStateComponent.h"
 #include "BattlePawnComponent.h"
+#include "BattlePlayerStateComponent.h"
 #include "GameFramework/PlayerState.h"
 #include "PaperUnreal/AreaTracer/AreaSpawnerComponent.h"
 #include "PaperUnreal/AreaTracer/AreaStateTrackerComponent.h"
 #include "PaperUnreal/Development/InGameCheats.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
+#include "PaperUnreal/GameFramework2/GameModeComponent.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/InventoryComponent.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/PawnSpawnerComponent.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/ReadyStateComponent.h"
@@ -97,7 +99,7 @@ private:
 
 
 UCLASS(Within=GameModeBase)
-class UBattleGameModeComponent : public UComponentGroupComponent
+class UBattleGameModeComponent : public UGameModeComponent
 {
 	GENERATED_BODY()
 
@@ -109,8 +111,8 @@ public:
 		PawnClass = InPawnClass;
 		TeamAllocator.Configure(TeamCount, EachTeamMemberCount);
 
-		GameState = NewChildComponent<UBattleGameStateComponent>(GetWorld()->GetGameState());
-		GameState->RegisterComponent();
+		GameStateComponent = NewChildComponent<UBattleGameStateComponent>(GetWorld()->GetGameState());
+		GameStateComponent->RegisterComponent();
 
 		auto PlayerStateArray = GetWorld()->GetGameState<AGameStateBase2>()->GetPlayerStateArray();
 
@@ -139,21 +141,28 @@ private:
 	UClass* PawnClass;
 
 	UPROPERTY()
-	UBattleGameStateComponent* GameState;
+	UBattleGameStateComponent* GameStateComponent;
 
 	FTeamAllocator TeamAllocator;
 	TMap<int32, FLinearColor> TeamColors;
+
+	virtual void AttachPlayerStateComponents(APlayerState* PS) override
+	{
+		NewChildComponent<UBattlePlayerStateComponent>(PS)->RegisterComponent();
+	}
 
 	FWeakCoroutine InitiatePawnSpawnSequence(APlayerState* Player)
 	{
 		co_await AddToWeakList(Player);
 
-		auto TeamComponent = Player->FindComponentByClass<UTeamComponent>();
-		auto ReadyState = Player->FindComponentByClass<UReadyStateComponent>();
-		auto Inventory = Player->FindComponentByClass<UInventoryComponent>();
-
 		// 이 컴포넌트들은 디펜던시: 이 컴포넌트들을 가지는 PlayerState에 대해서만 이 클래스를 사용할 수 있음
-		check(AllValid(TeamComponent, ReadyState, Inventory));
+		auto ReadyState = Player->FindComponentByClass<UReadyStateComponent>();
+		check(AllValid(ReadyState));
+
+		// 아래 컴포넌트들은 내가 준비함
+		auto PlayerStateComponent = Player->FindComponentByClass<UBattlePlayerStateComponent>();
+		auto TeamComponent = PlayerStateComponent->ServerTeamComponent;
+		auto Inventory = PlayerStateComponent->ServerInventoryComponent;
 
 		UE_LOG(LogBattleGameMode, Log, TEXT("%p 플레이어의 준비 완료를 기다리는 중"), Player);
 		co_await ReadyState->GetbReady().If(true);
@@ -190,13 +199,13 @@ private:
 		Inventory->SetTracerBaseColor(ALittleBrighter(TeamColors[ThisPlayerTeamIndex]));
 
 		UE_LOG(LogBattleGameMode, Log, TEXT("%p 플레이어 폰을 스폰합니다"), Player);
-		APawn* Pawn = GameState->ServerPawnSpawner->SpawnAtLocation(
+		APawn* Pawn = GameStateComponent->ServerPawnSpawner->SpawnAtLocation(
 			PawnClass,
 			ThisPlayerArea->ServerAreaBoundary->GetRandomPointInside(),
 			[&](APawn* ToInit)
 			{
 				auto PawnComponent = NewObject<UBattlePawnComponent>(ToInit);
-				PawnComponent->SetDependencies(GameState, ThisPlayerArea);
+				PawnComponent->SetDependencies(GameStateComponent, ThisPlayerArea);
 				PawnComponent->RegisterComponent();
 			});
 		Player->GetOwningController()->Possess(Pawn);
@@ -229,13 +238,13 @@ private:
 
 		auto Timeout = RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
-			co_await GameState->ServerWorldTimer->At(GetWorld()->GetTimeSeconds() + 60.f);
+			co_await GameStateComponent->ServerWorldTimer->At(GetWorld()->GetTimeSeconds() + 60.f);
 		});
 
 		auto LastManStanding = RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
 			auto AreaStateTracker = NewObject<UAreaStateTrackerComponent>(GetOwner());
-			AreaStateTracker->SetSpawner(GameState->GetAreaSpawner().Get());
+			AreaStateTracker->SetSpawner(GameStateComponent->GetAreaSpawner().Get());
 			AreaStateTracker->RegisterComponent();
 			co_await AreaStateTracker->ZeroOrOneAreaIsSurviving();
 			AreaStateTracker->DestroyComponent();
@@ -281,7 +290,7 @@ private:
 
 	AAreaActor* InitializeNewAreaActor(int32 TeamIndex)
 	{
-		return GameState->GetAreaSpawner().Get()->SpawnAreaAtRandomEmptyLocation([&](AAreaActor* Area)
+		return GameStateComponent->GetAreaSpawner().Get()->SpawnAreaAtRandomEmptyLocation([&](AAreaActor* Area)
 		{
 			Area->TeamComponent->SetTeamIndex(TeamIndex);
 
@@ -332,7 +341,7 @@ private:
 	// TODO move to game state
 	AAreaActor* FindLivingAreaOfTeam(int32 TeamIndex) const
 	{
-		return ValidOrNull(GameState->GetAreaSpawner().Get()->GetSpawnedAreas().Get().FindByPredicate([&](AAreaActor* Each)
+		return ValidOrNull(GameStateComponent->GetAreaSpawner().Get()->GetSpawnedAreas().Get().FindByPredicate([&](AAreaActor* Each)
 		{
 			return IsValid(Each)
 				&& Each->LifeComponent->GetbAlive().Get()
@@ -344,7 +353,7 @@ private:
 	TArray<ULifeComponent*> GetPawnLivesOfTeam(int32 TeamIndex) const
 	{
 		TArray<ULifeComponent*> Ret;
-		for (APawn* Each : GameState->ServerPawnSpawner->GetSpawnedPawns().Get())
+		for (APawn* Each : GameStateComponent->ServerPawnSpawner->GetSpawnedPawns().Get())
 		{
 			if (!IsValid(Each) || !Each->GetPlayerState())
 			{

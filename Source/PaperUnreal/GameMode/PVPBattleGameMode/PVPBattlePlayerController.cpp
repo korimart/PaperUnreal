@@ -8,16 +8,6 @@
 #include "PaperUnreal/GameMode/ModeAgnostic/LifeComponent.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 
-void APVPBattlePlayerController::PreInitializeComponents()
-{
-	Super::PreInitializeComponents();
-
-	if (GetNetMode() != NM_Client)
-	{
-		ServerPrivilegeComponent = NewObject<UPrivilegeComponent>(this);
-		ServerPrivilegeComponent->RegisterComponent();
-	}
-}
 
 void APVPBattlePlayerController::BeginPlay()
 {
