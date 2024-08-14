@@ -10,18 +10,12 @@
 
 void UCharacterSetterComponent::ServerEquipManny_Implementation()
 {
-	GetOuterAPlayerController()->PlayerState->FindComponentByClass<UInventoryComponent>()->SetCharacterMesh(
-		TSoftObjectPtr<USkeletalMesh>
-		{
-			FSoftObjectPath{TEXT("/Script/Engine.SkeletalMesh'/Game/Characters/Mannequins/Meshes/SKM_Manny.SKM_Manny'")}
-		});
+	MostRecentChoice = FSoftObjectPath{TEXT("/Script/Engine.SkeletalMesh'/Game/Characters/Mannequins/Meshes/SKM_Manny.SKM_Manny'")};
+	GetOuterAPlayerController()->PlayerState->FindComponentByClass<UInventoryComponent>()->SetCharacterMesh(MostRecentChoice);
 }
 
 void UCharacterSetterComponent::ServerEquipQuinn_Implementation()
 {
-	GetOuterAPlayerController()->PlayerState->FindComponentByClass<UInventoryComponent>()->SetCharacterMesh(
-		TSoftObjectPtr<USkeletalMesh>
-		{
-			FSoftObjectPath{TEXT("/Script/Engine.SkeletalMesh'/Game/Characters/Mannequins/Meshes/SKM_Quinn.SKM_Quinn'")}
-		});
+	MostRecentChoice = FSoftObjectPath{TEXT("/Script/Engine.SkeletalMesh'/Game/Characters/Mannequins/Meshes/SKM_Quinn.SKM_Quinn'")};
+	GetOuterAPlayerController()->PlayerState->FindComponentByClass<UInventoryComponent>()->SetCharacterMesh(MostRecentChoice);
 }

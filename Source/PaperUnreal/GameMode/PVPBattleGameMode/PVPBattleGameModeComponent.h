@@ -49,8 +49,8 @@ private:
 	UWorldTimerComponent* WorldTimerComponent;
 
 	UPROPERTY()
-	TArray<UPrivilegeComponent*> _0;
-	TLiveData<TArray<UPrivilegeComponent*>&> Privileges{_0};
+	TArray<UPrivilegeComponent*> Privileges_Backing;
+	TLiveData<TArray<UPrivilegeComponent*>&> Privileges{Privileges_Backing};
 
 	UPROPERTY()
 	TArray<UReadyStateComponent*> ReadyStates;

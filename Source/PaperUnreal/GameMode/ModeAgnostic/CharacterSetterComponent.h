@@ -13,6 +13,9 @@ class UCharacterSetterComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
+	UPROPERTY()
+	TSoftObjectPtr<USkeletalMesh> MostRecentChoice;
+	
 	UFUNCTION(Server, Reliable)
 	void ServerEquipManny();
 	
