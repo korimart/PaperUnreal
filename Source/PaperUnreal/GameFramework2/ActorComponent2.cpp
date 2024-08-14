@@ -3,7 +3,7 @@
 
 #include "ActorComponent2.h"
 
-#include "PaperUnreal/ModeAgnostic/ComponentRegistry.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/ComponentRegistry.h"
 
 void UActorComponent2::BeginPlay()
 {

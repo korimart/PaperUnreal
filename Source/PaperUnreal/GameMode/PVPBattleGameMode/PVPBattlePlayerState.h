@@ -4,10 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerState.h"
-#include "PaperUnreal/ModeAgnostic/InventoryComponent.h"
-#include "PaperUnreal/ModeAgnostic/PrivilegeComponent.h"
-#include "PaperUnreal/ModeAgnostic/ReadyStateComponent.h"
-#include "PaperUnreal/ModeAgnostic/TeamComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/InventoryComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/PrivilegeComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/ReadyStateComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/TeamComponent.h"
 #include "PVPBattlePlayerState.generated.h"
 
 /**

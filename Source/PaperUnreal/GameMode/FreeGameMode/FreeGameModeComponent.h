@@ -6,9 +6,9 @@
 #include "FreePawnComponent.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
 #include "PaperUnreal/GameFramework2/GameStateBase2.h"
-#include "PaperUnreal/ModeAgnostic/CharacterMeshFromInventory.h"
-#include "PaperUnreal/ModeAgnostic/PawnSpawnerComponent.h"
-#include "PaperUnreal/ModeAgnostic/ReadyStateComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/CharacterMeshFromInventory.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/PawnSpawnerComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/ReadyStateComponent.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 #include "FreeGameModeComponent.generated.h"
 

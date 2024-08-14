@@ -5,7 +5,7 @@
 
 #include "EnhancedInputSubsystems.h"
 #include "PaperUnreal/Development/InGameCheats.h"
-#include "PaperUnreal/ModeAgnostic/LifeComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/LifeComponent.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 
 void APVPBattlePlayerController::PreInitializeComponents()

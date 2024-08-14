@@ -7,9 +7,9 @@
 #include "AreaMeshGeneratorComponent.h"
 #include "ReplicatedAreaBoundaryComponent.h"
 #include "PaperUnreal/GameFramework2/Actor2.h"
-#include "PaperUnreal/ModeAgnostic/LifeComponent.h"
-#include "PaperUnreal/ModeAgnostic/SolidColorMaterial.h"
-#include "PaperUnreal/ModeAgnostic/TeamComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/LifeComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/SolidColorMaterial.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/TeamComponent.h"
 #include "AreaActor.generated.h"
 
 

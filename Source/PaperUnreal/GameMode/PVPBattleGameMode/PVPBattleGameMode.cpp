@@ -6,10 +6,10 @@
 #include "PVPBattleHUD.h"
 #include "PVPBattlePlayerController.h"
 #include "PVPBattlePlayerState.h"
-#include "PaperUnreal/BattleGameMode/BattleGameModeComponent.h"
-#include "PaperUnreal/FreeGameMode/FreeGameModeComponent.h"
-#include "PaperUnreal/ModeAgnostic/FixedCameraPawn.h"
-#include "PaperUnreal/ModeAgnostic/GameStarterComponent.h"
+#include "PaperUnreal/GameMode/BattleGameMode/BattleGameModeComponent.h"
+#include "PaperUnreal/GameMode/FreeGameMode/FreeGameModeComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/FixedCameraPawn.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/GameStarterComponent.h"
 #include "UObject/ConstructorHelpers.h"
 
 

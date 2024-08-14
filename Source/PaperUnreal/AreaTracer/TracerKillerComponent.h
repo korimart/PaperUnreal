@@ -6,7 +6,7 @@
 #include "TracerOverlapCheckerComponent.h"
 #include "TracerPathComponent.h"
 #include "PaperUnreal/GameFramework2/ActorComponent2.h"
-#include "PaperUnreal/ModeAgnostic/LifeComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/LifeComponent.h"
 #include "TracerKillerComponent.generated.h"
 
 

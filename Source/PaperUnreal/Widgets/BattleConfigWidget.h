@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "PaperUnreal/BattleGameMode/BattleConfigComponent.h"
+#include "PaperUnreal/GameMode/BattleGameMode/BattleConfigComponent.h"
 #include "BattleConfigWidget.generated.h"
 
 /**

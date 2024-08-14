@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "AreaSpawnerComponent.h"
-#include "PaperUnreal/ModeAgnostic/StateTrackerComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/StateTrackerComponent.h"
 #include "AreaStateTrackerComponent.generated.h"
 
 

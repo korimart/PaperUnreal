@@ -4,9 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "PaperUnreal/GameFramework2/GameStateBase2.h"
-#include "PaperUnreal/ModeAgnostic/ReadyStateTrackerComponent.h"
-#include "PaperUnreal/ModeAgnostic/StageComponent.h"
-#include "PaperUnreal/ModeAgnostic/WorldTimerComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/ReadyStateTrackerComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/StageComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/WorldTimerComponent.h"
 #include "PVPBattleGameState.generated.h"
 
 /**

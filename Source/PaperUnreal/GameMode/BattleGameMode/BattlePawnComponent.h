@@ -12,8 +12,8 @@
 #include "PaperUnreal/AreaTracer/TracerOverlapCheckerComponent.h"
 #include "PaperUnreal/AreaTracer/TracerToAreaConverterComponent.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
-#include "PaperUnreal/ModeAgnostic/CharacterMeshFromInventory.h"
-#include "PaperUnreal/ModeAgnostic/LineMeshComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/CharacterMeshFromInventory.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/LineMeshComponent.h"
 #include "BattlePawnComponent.generated.h"
 
 

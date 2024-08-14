@@ -7,8 +7,8 @@
 #include "GameFramework/CheatManager.h"
 #include "PaperUnreal/AreaTracer/TracerPathComponent.h"
 #include "PaperUnreal/GameFramework2/Character2.h"
-#include "PaperUnreal/ModeAgnostic/InventoryComponent.h"
-#include "PaperUnreal/PVPBattleGameMode/PVPBattleGameState.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/InventoryComponent.h"
+#include "PaperUnreal/GameMode/PVPBattleGameMode/PVPBattleGameState.h"
 #include "InGameCheats.generated.h"
 
 

@@ -6,8 +6,8 @@
 #include "GameFramework/GameStateBase.h"
 #include "PaperUnreal/AreaTracer/AreaSpawnerComponent.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
-#include "PaperUnreal/ModeAgnostic/PawnSpawnerComponent.h"
-#include "PaperUnreal/ModeAgnostic/WorldTimerComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/PawnSpawnerComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/WorldTimerComponent.h"
 #include "BattleGameStateComponent.generated.h"
 
 

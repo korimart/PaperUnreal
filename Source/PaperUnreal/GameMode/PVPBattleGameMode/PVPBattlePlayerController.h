@@ -3,8 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "PaperUnreal/ModeAgnostic/PrivilegeComponent.h"
-#include "PaperUnreal/ModeAgnostic/ThirdPersonTemplatePlayerController.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/PrivilegeComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/ThirdPersonTemplatePlayerController.h"
 #include "PVPBattlePlayerController.generated.h"
 
 /**

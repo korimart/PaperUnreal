@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "PaperUnreal/AreaTracer/TracerComponent.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
-#include "PaperUnreal/ModeAgnostic/CharacterMeshFromInventory.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/CharacterMeshFromInventory.h"
 #include "FreePawnComponent.generated.h"
 
 
