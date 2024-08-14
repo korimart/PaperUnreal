@@ -3,8 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "BattleRuleGameStateComponent.h"
-#include "Engine/Texture2DArray.h"
+#include "BattleGameStateComponent.h"
 #include "PaperUnreal/AreaTracer/AreaSlasherComponent.h"
 #include "PaperUnreal/AreaTracer/AreaSpawnerComponent.h"
 #include "PaperUnreal/AreaTracer/ReplicatedTracerPathComponent.h"
@@ -14,13 +13,12 @@
 #include "PaperUnreal/AreaTracer/TracerToAreaConverterComponent.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
 #include "PaperUnreal/ModeAgnostic/CharacterMeshFromInventory.h"
-#include "PaperUnreal/ModeAgnostic/PawnSpawnerComponent.h"
 #include "PaperUnreal/ModeAgnostic/LineMeshComponent.h"
-#include "BattleRulePawnComponent.generated.h"
+#include "BattlePawnComponent.generated.h"
 
 
 UCLASS()
-class UBattleRulePawnComponent : public UComponentGroupComponent
+class UBattlePawnComponent : public UComponentGroupComponent
 {
 	GENERATED_BODY()
 
@@ -37,7 +35,7 @@ public:
 	}
 
 	void SetDependencies(
-		UBattleRuleGameStateComponent* InGameState,
+		UBattleGameStateComponent* InGameState,
 		AAreaActor* InHomeArea)
 	{
 		check(GetNetMode() != NM_Client);
@@ -72,7 +70,7 @@ private:
 	AAreaActor* ServerHomeArea;
 
 	UPROPERTY()
-	UBattleRuleGameStateComponent* ServerGameState;
+	UBattleGameStateComponent* ServerGameState;
 
 	UPROPERTY()
 	UTracerComponent* ServerTracer;
@@ -113,7 +111,7 @@ private:
 
 			auto PawnStream
 				= ServerGameState->ServerPawnSpawner->GetSpawnedPawns().CreateAddStream()
-				| Awaitables::FindComponentByClass<UBattleRulePawnComponent>()
+				| Awaitables::FindComponentByClass<UBattlePawnComponent>()
 				| Awaitables::Filter([this](auto Pawn){ return Pawn->ServerHomeArea != ServerHomeArea; });
 
 			while (true)

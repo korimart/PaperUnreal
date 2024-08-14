@@ -8,11 +8,11 @@
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
 #include "PaperUnreal/ModeAgnostic/PawnSpawnerComponent.h"
 #include "PaperUnreal/ModeAgnostic/WorldTimerComponent.h"
-#include "BattleRuleGameStateComponent.generated.h"
+#include "BattleGameStateComponent.generated.h"
 
 
 UCLASS(Within=GameStateBase)
-class UBattleRuleGameStateComponent : public UComponentGroupComponent
+class UBattleGameStateComponent : public UComponentGroupComponent
 {
 	GENERATED_BODY()
 

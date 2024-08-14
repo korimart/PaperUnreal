@@ -1,21 +1,21 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "BattleRuleConfigComponent.h"
+#include "BattleConfigComponent.h"
 
 #include "PaperUnreal/GameFramework2/Utils.h"
 
-void UBattleRuleConfigComponent::ServerSendConfig_Implementation()
+void UBattleConfigComponent::ServerSendConfig_Implementation()
 {
 	ClientReceiveConfig(CurrentConfig);
 }
 
-void UBattleRuleConfigComponent::ClientReceiveConfig_Implementation(const FBattleRuleConfig& Config)
+void UBattleConfigComponent::ClientReceiveConfig_Implementation(const FBattleConfig& Config)
 {
 	PopFront(ClientPendingConfigs).SetValue(Config);
 }
 
-void UBattleRuleConfigComponent::ServerReceiveConfig_Implementation(const FBattleRuleConfig& Config)
+void UBattleConfigComponent::ServerReceiveConfig_Implementation(const FBattleConfig& Config)
 {
 	if (FMath::IsWithinInclusive(Config.MaxTeamCount, 1, 4)
 		&& FMath::IsWithinInclusive(Config.MaxMemberCount, 1, 4))
@@ -29,7 +29,7 @@ void UBattleRuleConfigComponent::ServerReceiveConfig_Implementation(const FBattl
 	}
 }
 
-void UBattleRuleConfigComponent::ClientReceiveConfirmation_Implementation(bool bSucceeded)
+void UBattleConfigComponent::ClientReceiveConfirmation_Implementation(bool bSucceeded)
 {
 	PopFront(ClientPendingConfirmations).SetValue(bSucceeded);
 }

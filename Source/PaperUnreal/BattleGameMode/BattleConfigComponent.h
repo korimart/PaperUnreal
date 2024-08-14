@@ -5,11 +5,11 @@
 #include "CoreMinimal.h"
 #include "PaperUnreal/GameFramework2/ActorComponent2.h"
 #include "PaperUnreal/WeakCoroutine/CancellableFuture.h"
-#include "BattleRuleConfigComponent.generated.h"
+#include "BattleConfigComponent.generated.h"
 
 
 USTRUCT(Blueprintable)
-struct FBattleRuleConfig
+struct FBattleConfig
 {
 	GENERATED_BODY()
 	
@@ -22,26 +22,26 @@ struct FBattleRuleConfig
 
 
 UCLASS(Within=PlayerController)
-class UBattleRuleConfigComponent : public UActorComponent2
+class UBattleConfigComponent : public UActorComponent2
 {
 	GENERATED_BODY()
 
 public:
-	const FBattleRuleConfig& GetConfig() const
+	const FBattleConfig& GetConfig() const
 	{
 		check(GetNetMode() != NM_Client);
 		return CurrentConfig;
 	}
 	
-	TCancellableFuture<FBattleRuleConfig> FetchConfig()
+	TCancellableFuture<FBattleConfig> FetchConfig()
 	{
-		auto [Promise, Future] = MakePromise<FBattleRuleConfig>();
+		auto [Promise, Future] = MakePromise<FBattleConfig>();
 		ClientPendingConfigs.Add(MoveTemp(Promise));
 		ServerSendConfig();
 		return MoveTemp(Future);
 	}
 
-	TCancellableFuture<bool> SendConfig(const FBattleRuleConfig& Config)
+	TCancellableFuture<bool> SendConfig(const FBattleConfig& Config)
 	{
 		auto [Promise, Future] = MakePromise<bool>();
 		ClientPendingConfirmations.Add(MoveTemp(Promise));
@@ -50,11 +50,11 @@ public:
 	}
 
 private:
-	FBattleRuleConfig CurrentConfig;
-	TArray<TCancellablePromise<FBattleRuleConfig>> ClientPendingConfigs;
+	FBattleConfig CurrentConfig;
+	TArray<TCancellablePromise<FBattleConfig>> ClientPendingConfigs;
 	TArray<TCancellablePromise<bool>> ClientPendingConfirmations;
 	
-	UBattleRuleConfigComponent()
+	UBattleConfigComponent()
 	{
 		SetIsReplicatedByDefault(true);
 	}
@@ -63,10 +63,10 @@ private:
 	void ServerSendConfig();
 	
 	UFUNCTION(Client, Reliable)
-	void ClientReceiveConfig(const FBattleRuleConfig& Config);
+	void ClientReceiveConfig(const FBattleConfig& Config);
 	
 	UFUNCTION(Server, Reliable)
-	void ServerReceiveConfig(const FBattleRuleConfig& Config);
+	void ServerReceiveConfig(const FBattleConfig& Config);
 	
 	UFUNCTION(Client, Reliable)
 	void ClientReceiveConfirmation(bool bSucceeded);

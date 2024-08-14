@@ -5,13 +5,13 @@
 #include "CoreMinimal.h"
 #include "TeamScoresWidget.h"
 #include "Blueprint/UserWidget.h"
-#include "BattleRuleResultWidget.generated.h"
+#include "BattleResultWidget.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class UBattleRuleResultWidget : public UUserWidget
+class UBattleResultWidget : public UUserWidget
 {
 	GENERATED_BODY()
 

@@ -6,7 +6,7 @@
 #include "PVPBattleHUD.h"
 #include "PVPBattlePlayerController.h"
 #include "PVPBattlePlayerState.h"
-#include "PaperUnreal/BattleRule/BattleRuleComponent.h"
+#include "PaperUnreal/BattleGameMode/BattleGameModeComponent.h"
 #include "PaperUnreal/FreeRule/FreeRuleComponent.h"
 #include "PaperUnreal/ModeAgnostic/FixedCameraPawn.h"
 #include "PaperUnreal/ModeAgnostic/GameStarterComponent.h"
@@ -71,7 +71,7 @@ FWeakCoroutine APVPBattleGameMode::InitPrivilegeComponentOfNewPlayers()
 {
 	auto AddPrivilegeComponents = [this](UPrivilegeComponent* Target)
 	{
-		Target->AddComponentForPrivilege(PVPBattlePrivilege::Host, UBattleRuleConfigComponent::StaticClass());
+		Target->AddComponentForPrivilege(PVPBattlePrivilege::Host, UBattleConfigComponent::StaticClass());
 		Target->AddComponentForPrivilege(PVPBattlePrivilege::Host, UGameStarterComponent::StaticClass(),
 			FComponentInitializer::CreateWeakLambda(this, [this](UActorComponent* Component)
 			{
@@ -128,9 +128,9 @@ FWeakCoroutine APVPBattleGameMode::InitiateGameFlow()
 
 	auto ResultComponent = co_await [&]()
 	{
-		auto BattleRule = NewObject<UBattleRuleComponent>(this);
-		BattleRule->RegisterComponent();
-		return BattleRule->Start(DefaultPawnClass, 2, 2);
+		auto BattleGameMode = NewObject<UBattleGameModeComponent>(this);
+		BattleGameMode->RegisterComponent();
+		return BattleGameMode->Start(DefaultPawnClass, 2, 2);
 	}();
 
 	StageComponent->SetCurrentStage(PVPBattleStage::Result);

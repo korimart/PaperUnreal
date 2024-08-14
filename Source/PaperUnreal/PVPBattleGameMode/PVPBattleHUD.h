@@ -7,9 +7,9 @@
 #include "PVPBattleGameState.h"
 #include "Blueprint/UserWidget.h"
 #include "GameFramework/GameStateBase.h"
-#include "PaperUnreal/BattleRule/BattleRuleComponent.h"
-#include "PaperUnreal/BattleRule/BattleRuleConfigComponent.h"
-#include "PaperUnreal/BattleRule/BattleRulePawnComponent.h"
+#include "PaperUnreal/BattleGameMode/BattleGameModeComponent.h"
+#include "PaperUnreal/BattleGameMode/BattleConfigComponent.h"
+#include "PaperUnreal/BattleGameMode/BattlePawnComponent.h"
 #include "PaperUnreal/GameFramework2/HUD2.h"
 #include "PaperUnreal/ModeAgnostic/CharacterSetterComponent.h"
 #include "PaperUnreal/ModeAgnostic/ComponentRegistry.h"
@@ -19,8 +19,8 @@
 #include "PaperUnreal/WeakCoroutine/AnyOfAwaitable.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 #include "PaperUnreal/WeakCoroutine/WhileTrueAwaitable.h"
-#include "PaperUnreal/Widgets/BattleRuleConfigWidget.h"
-#include "PaperUnreal/Widgets/BattleRuleResultWidget.h"
+#include "PaperUnreal/Widgets/BattleConfigWidget.h"
+#include "PaperUnreal/Widgets/BattleResultWidget.h"
 #include "PaperUnreal/Widgets/TeamScoresWidget.h"
 #include "PaperUnreal/Widgets/SelectCharacterWidget.h"
 #include "PaperUnreal/Widgets/ToastWidget.h"
@@ -42,7 +42,7 @@ private:
 	UWorldTimerComponent* WorldTimerComponent;
 
 	UPROPERTY()
-	UBattleRuleGameStateComponent* GameState;
+	UBattleGameStateComponent* GameState;
 
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<UToastWidget> ToastWidgetClass;
@@ -51,7 +51,7 @@ private:
 	UToastWidget* ToastWidget;
 
 	UPROPERTY(EditAnywhere)
-	TSubclassOf<UBattleRuleConfigWidget> ConfigWidgetClass;
+	TSubclassOf<UBattleConfigWidget> ConfigWidgetClass;
 
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<USelectCharacterWidget> SelectCharacterWidgetClass;
@@ -60,7 +60,7 @@ private:
 	TSubclassOf<UTeamScoresWidget> TeamScoresWidgetClass;
 
 	UPROPERTY(EditAnywhere)
-	TSubclassOf<UBattleRuleResultWidget> ResultWidgetClass;
+	TSubclassOf<UBattleResultWidget> ResultWidgetClass;
 
 	UPROPERTY(EditAnywhere)
 	UInputAction* EditConfigAction;
@@ -128,7 +128,7 @@ private:
 			TArray<TAbortableCoroutineHandle<FWeakCoroutine>> Handles;
 
 			Handles << RunWeakCoroutine(this,
-				MakeComponentStream<UBattleRuleConfigComponent>(PC)
+				MakeComponentStream<UBattleConfigComponent>(PC)
 				| Awaitables::IsValid()
 				| Awaitables::WhileTrue([this]() { return ListenToEditConfigActionTrigger(); }));
 
@@ -161,19 +161,19 @@ private:
 			co_await StageComponent->GetCurrentStage().IfNot(PVPBattleStage::WillPlay);
 		}
 
-		GameState = (co_await WaitForComponent<UBattleRuleGameStateComponent>(GetWorld()->GetGameState())).Unsafe();
+		GameState = (co_await WaitForComponent<UBattleGameStateComponent>(GetWorld()->GetGameState())).Unsafe();
 
 		TAbortableCoroutineHandle TeamScores = ShowTeamScores();
 
 		auto PawnStream = GetOwningPawn2().CreateStream()
 			| Awaitables::IfValid()
 			// TODO WaitForComponent가 필요하지 않을지 고민
-			| Awaitables::FindComponentByClass<UBattleRulePawnComponent>();
+			| Awaitables::FindComponentByClass<UBattlePawnComponent>();
 
 		TOptional<FToastHandle> DeadMessage;
 		while (true)
 		{
-			UBattleRulePawnComponent* Pawn = (co_await PawnStream).Unsafe();
+			UBattlePawnComponent* Pawn = (co_await PawnStream).Unsafe();
 			ULifeComponent* PawnLife = (co_await Pawn->GetLife()).Unsafe();
 			DeadMessage.Reset();
 			co_await PawnLife->GetbAlive().If(false);
@@ -244,8 +244,8 @@ private:
 
 	FWeakCoroutine EditConfig()
 	{
-		auto ConfigComponent = co_await GetOwningPlayerController()->FindComponentByClass<UBattleRuleConfigComponent>();
-		auto ConfigWidget = co_await CreateWidget<UBattleRuleConfigWidget>(GetOwningPlayerController(), ConfigWidgetClass);
+		auto ConfigComponent = co_await GetOwningPlayerController()->FindComponentByClass<UBattleConfigComponent>();
+		auto ConfigWidget = co_await CreateWidget<UBattleConfigWidget>(GetOwningPlayerController(), ConfigWidgetClass);
 		auto S = ScopedAddToViewport(ConfigWidget);
 		bDialogOpen = true;
 		auto F = FinallyIfValid(this, [this]() { bDialogOpen = false; });
@@ -312,14 +312,14 @@ private:
 
 	FWeakCoroutine ShowResults()
 	{
-		auto ResultWidget = co_await CreateWidget<UBattleRuleResultWidget>(GetOwningPlayerController(), ResultWidgetClass);
+		auto ResultWidget = co_await CreateWidget<UBattleResultWidget>(GetOwningPlayerController(), ResultWidgetClass);
 		auto S = ScopedAddToViewport(ResultWidget);
 
 		const float ResultStartTime = co_await StageComponent->GetStageWorldStartTime(PVPBattleStage::Result);
 		co_await WorldTimerComponent->At(ResultStartTime + 3.f);
 
-		auto Result = co_await WaitForComponent<UBattleRuleResultComponent>(GetWorld()->GetGameState());
-		for (const FBattleRuleResultEntry& Each : Result->Result.Entries)
+		auto Result = co_await WaitForComponent<UBattleResultComponent>(GetWorld()->GetGameState());
+		for (const FBattleResultItem& Each : Result->Result.Items)
 		{
 			ResultWidget->TeamScoresWidget->FindOrSetTeamScore(Each.TeamIndex, Each.Color, Each.Area);
 		}
