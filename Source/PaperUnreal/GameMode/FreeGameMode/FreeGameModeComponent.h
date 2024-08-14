@@ -20,10 +20,8 @@ class UFreeGameModeComponent : public UGameModeComponent
 	GENERATED_BODY()
 
 public:
-	void Start(UClass* InPawnClass)
+	void Start()
 	{
-		PawnClass = InPawnClass;
-
 		PawnSpawner = NewChildComponent<UPawnSpawnerComponent>(GetOwner());
 		PawnSpawner->DestroyPawnsOnEndPlay();
 		PawnSpawner->RegisterComponent();
@@ -46,9 +44,6 @@ public:
 
 private:
 	UPROPERTY()
-	UClass* PawnClass;
-
-	UPROPERTY()
 	UPawnSpawnerComponent* PawnSpawner;
 
 	virtual void AttachPlayerStateComponents(APlayerState* PS) override
@@ -65,7 +60,7 @@ private:
 		co_await Player->FindComponentByClass<UReadyStateComponent>()->GetbReady().If(true);
 
 		APawn* Pawn = PawnSpawner->SpawnAtLocation(
-			PawnClass,
+			GetDefaultPawnClass(),
 			{1500.f, 1500.f, 100.f},
 			[&](APawn* Spawned) { NewChildComponent<UFreePawnComponent>(Spawned)->RegisterComponent(); });
 

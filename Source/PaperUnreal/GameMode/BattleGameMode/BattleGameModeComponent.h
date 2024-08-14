@@ -104,11 +104,10 @@ class UBattleGameModeComponent : public UGameModeComponent
 	GENERATED_BODY()
 
 public:
-	TWeakCoroutine<UBattleResultComponent*> Start(UClass* InPawnClass, int32 TeamCount, int32 EachTeamMemberCount)
+	TWeakCoroutine<UBattleResultComponent*> Start(int32 TeamCount, int32 EachTeamMemberCount)
 	{
 		check(HasBegunPlay());
 
-		PawnClass = InPawnClass;
 		TeamAllocator.Configure(TeamCount, EachTeamMemberCount);
 
 		GameStateComponent = NewChildComponent<UBattleGameStateComponent>(GetWorld()->GetGameState());
@@ -137,9 +136,6 @@ public:
 	}
 
 private:
-	UPROPERTY()
-	UClass* PawnClass;
-
 	UPROPERTY()
 	UBattleGameStateComponent* GameStateComponent;
 
@@ -200,7 +196,7 @@ private:
 
 		UE_LOG(LogBattleGameMode, Log, TEXT("%p 플레이어 폰을 스폰합니다"), Player);
 		APawn* Pawn = GameStateComponent->ServerPawnSpawner->SpawnAtLocation(
-			PawnClass,
+			GetDefaultPawnClass(),
 			ThisPlayerArea->ServerAreaBoundary->GetRandomPointInside(),
 			[&](APawn* ToInit)
 			{

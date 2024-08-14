@@ -123,7 +123,7 @@ private:
 		{
 			auto FreeGameMode = NewChildComponent<UFreeGameModeComponent>();
 			FreeGameMode->RegisterComponent();
-			FreeGameMode->Start(GetDefaultPawnClass());
+			FreeGameMode->Start();
 			auto F = FinallyIfValid(FreeGameMode, [FreeGameMode]() { FreeGameMode->DestroyComponent(); });
 
 			co_await OnGameStartConditionsMet;
@@ -141,7 +141,7 @@ private:
 		{
 			auto BattleGameMode = NewChildComponent<UBattleGameModeComponent>();
 			BattleGameMode->RegisterComponent();
-			return BattleGameMode->Start(GetDefaultPawnClass(), 2, 2);
+			return BattleGameMode->Start(2, 2);
 		}();
 
 		StageComponent->SetCurrentStage(PVPBattleStage::Result);
