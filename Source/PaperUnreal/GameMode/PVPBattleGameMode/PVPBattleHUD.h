@@ -87,8 +87,12 @@ private:
 		GetEnhancedInputComponent()->BindAction(StartGameAction, ETriggerEvent::Triggered, this, &ThisClass::OnStartGameActionTriggeredFunc);
 		GetEnhancedInputComponent()->BindAction(SelectCharacterAction, ETriggerEvent::Triggered, this, &ThisClass::OnSelectCharacterActionTriggeredFunc);
 
-		StageComponent = GetWorld()->GetGameState<UPVPBattleGameStateComponent>()->StageComponent;
-		WorldTimerComponent = GetWorld()->GetGameState<UPVPBattleGameStateComponent>()->WorldTimerComponent;
+		StageComponent = GetWorld()->GetGameState()->FindComponentByClass<UPVPBattleGameStateComponent>()->StageComponent;
+
+		// TODO worldtimer가 hud보다 오래살 수 있음
+		WorldTimerComponent = NewObject<UWorldTimerComponent>(GetWorld()->GetGameState());
+		WorldTimerComponent->RegisterComponent();
+		
 		ToastWidget = CreateWidget<UToastWidget>(GetOwningPlayerController(), ToastWidgetClass);
 
 		RunWeakCoroutine(this,

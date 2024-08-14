@@ -43,6 +43,9 @@ class UPVPBattleGameModeComponent : public UGameModeComponent
 private:
 	UPROPERTY()
 	UPVPBattleGameStateComponent* GameStateComponent;
+	
+	UPROPERTY()
+	UWorldTimerComponent* WorldTimerComponent;
 
 	UPROPERTY()
 	TArray<UPrivilegeComponent*> _0;
@@ -55,7 +58,8 @@ private:
 
 	virtual void AttachServerMachineComponents() override
 	{
-		GameStateComponent = NewChildComponent<UPVPBattleGameStateComponent>();
+		GameStateComponent = NewChildComponent<UPVPBattleGameStateComponent>(GetGameState());
+		WorldTimerComponent = NewChildComponent<UWorldTimerComponent>(GetGameState());
 	}
 
 	virtual void AttachPlayerControllerComponents(APlayerController* PC) override
@@ -133,7 +137,7 @@ private:
 			const float PlayStartTime = GetWorld()->GetTimeSeconds() + 5.f;
 			StageComponent->SetStageWorldStartTime(PVPBattleStage::Playing, PlayStartTime);
 
-			co_await GameStateComponent->WorldTimerComponent->At(PlayStartTime);
+			co_await WorldTimerComponent->At(PlayStartTime);
 			StageComponent->SetCurrentStage(PVPBattleStage::Playing);
 		}
 

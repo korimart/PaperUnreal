@@ -6,21 +6,17 @@
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/ReadyStateTrackerComponent.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/StageComponent.h"
-#include "PaperUnreal/GameMode/ModeAgnostic/WorldTimerComponent.h"
 #include "PVPBattleGameStateComponent.generated.h"
 
 /**
  * 
  */
-UCLASS()
+UCLASS(Within=GameStateBase2)
 class UPVPBattleGameStateComponent : public UComponentGroupComponent
 {
 	GENERATED_BODY()
 
 public:
-	UPROPERTY()
-	UWorldTimerComponent* WorldTimerComponent;
-	
 	UPROPERTY()
 	UStageComponent* StageComponent;
 	
@@ -30,7 +26,6 @@ public:
 private:
 	UPVPBattleGameStateComponent()
 	{
-		WorldTimerComponent = CreateDefaultSubobject<UWorldTimerComponent>(TEXT("WorldTimerComponent"));
 		StageComponent = CreateDefaultSubobject<UStageComponent>(TEXT("StageComponent"));
 		ReadyStateTrackerComponent = CreateDefaultSubobject<UReadyStateTrackerComponent>(TEXT("ReadyStateTrackerComponent"));
 	}
