@@ -152,4 +152,9 @@ namespace Awaitables
 	{
 		return Filter([](auto* Result) { return ::IsValid(Result); });
 	}
+	
+	inline auto IfNotNull()
+	{
+		return Filter([](const auto& Result) { return !Result.IsNull(); });
+	}
 }

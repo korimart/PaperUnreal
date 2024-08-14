@@ -163,7 +163,7 @@ private:
 		auto ReadyState = Player->PlayerState->FindComponentByClass<UReadyStateComponent>();
 		auto PlayerStateComponent = Player->PlayerState->FindComponentByClass<UBattlePlayerStateComponent>();
 		auto TeamComponent = PlayerStateComponent->ServerTeamComponent;
-		auto Inventory = PlayerStateComponent->ServerInventoryComponent;
+		auto Inventory = PlayerStateComponent->GetInventoryComponent().Get();
 
 		UE_LOG(LogBattleGameMode, Log, TEXT("%p 플레이어의 준비 완료를 기다리는 중"), Player);
 		co_await ReadyState->GetbReady().If(true);

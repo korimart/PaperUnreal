@@ -3,21 +3,19 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Net/UnrealNetwork.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/InventoryComponent.h"
-#include "PaperUnreal/GameMode/ModeAgnostic/TeamComponent.h"
-#include "BattlePlayerStateComponent.generated.h"
+#include "PaperUnreal/WeakCoroutine/LiveData.h"
+#include "FreePlayerStateComponent.generated.h"
 
 
 UCLASS()
-class UBattlePlayerStateComponent : public UComponentGroupComponent
+class UFreePlayerStateComponent : public UComponentGroupComponent
 {
 	GENERATED_BODY()
 
 public:
-	UPROPERTY()
-	UTeamComponent* ServerTeamComponent;
-
 	TLiveDataView<UInventoryComponent*&> GetInventoryComponent() const
 	{
 		return InventoryComponent;
@@ -40,9 +38,6 @@ private:
 
 	virtual void AttachServerMachineComponents() override
 	{
-		ServerTeamComponent = NewChildComponent<UTeamComponent>();
-		ServerTeamComponent->RegisterComponent();
-
 		RepInventoryComponent = NewChildComponent<UInventoryComponent>();
 		RepInventoryComponent->RegisterComponent();
 	}

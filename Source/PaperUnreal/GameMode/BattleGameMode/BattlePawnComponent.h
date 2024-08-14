@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "BattleGameStateComponent.h"
+#include "BattlePlayerStateComponent.h"
 #include "PaperUnreal/AreaTracer/AreaSlasherComponent.h"
 #include "PaperUnreal/AreaTracer/AreaSpawnerComponent.h"
 #include "PaperUnreal/AreaTracer/ReplicatedTracerPathComponent.h"
@@ -12,12 +13,13 @@
 #include "PaperUnreal/AreaTracer/TracerOverlapCheckerComponent.h"
 #include "PaperUnreal/AreaTracer/TracerToAreaConverterComponent.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
-#include "PaperUnreal/GameMode/ModeAgnostic/CharacterMeshFromInventory.h"
+#include "PaperUnreal/GameFramework2/Character2.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/CharacterMeshFeeder.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/LineMeshComponent.h"
 #include "BattlePawnComponent.generated.h"
 
 
-UCLASS()
+UCLASS(Within=Character2)
 class UBattlePawnComponent : public UComponentGroupComponent
 {
 	GENERATED_BODY()
@@ -112,7 +114,7 @@ private:
 			auto PawnStream
 				= ServerGameState->ServerPawnSpawner->GetSpawnedPawns().CreateAddStream()
 				| Awaitables::FindComponentByClass<UBattlePawnComponent>()
-				| Awaitables::Filter([this](auto Pawn){ return Pawn->ServerHomeArea != ServerHomeArea; });
+				| Awaitables::Filter([this](auto Pawn) { return Pawn->ServerHomeArea != ServerHomeArea; });
 
 			while (true)
 			{
@@ -171,7 +173,16 @@ private:
 
 	virtual void AttachPlayerMachineComponents() override
 	{
-		NewChildComponent<UCharacterMeshFromInventory>(GetOwner())->RegisterComponent();
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
+		{
+			auto PlayerState = co_await GetOuterACharacter2()->WaitForPlayerState();
+			auto PlayerStateComponent = co_await WaitForComponent<UBattlePlayerStateComponent>(PlayerState);
+			auto Inventory = co_await PlayerStateComponent->GetInventoryComponent();
+
+			auto MeshFeeder = NewChildComponent<UCharacterMeshFeeder>();
+			MeshFeeder->SetMeshStream(Inventory->GetCharacterMesh().CreateStream());
+			MeshFeeder->RegisterComponent();
+		});
 
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{

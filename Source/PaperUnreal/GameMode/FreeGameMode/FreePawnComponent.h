@@ -3,13 +3,15 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "FreePlayerStateComponent.h"
 #include "PaperUnreal/AreaTracer/TracerComponent.h"
+#include "PaperUnreal/GameFramework2/Character2.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
-#include "PaperUnreal/GameMode/ModeAgnostic/CharacterMeshFromInventory.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/CharacterMeshFeeder.h"
 #include "FreePawnComponent.generated.h"
 
 
-UCLASS()
+UCLASS(Within=Character2)
 class UFreePawnComponent : public UComponentGroupComponent
 {
 	GENERATED_BODY()
@@ -22,6 +24,15 @@ private:
 
 	virtual void AttachPlayerMachineComponents() override
 	{
-		NewChildComponent<UCharacterMeshFromInventory>(GetOwner())->RegisterComponent();
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
+		{
+			auto PlayerState = co_await GetOuterACharacter2()->WaitForPlayerState();
+			auto PlayerStateComponent = co_await WaitForComponent<UFreePlayerStateComponent>(PlayerState);
+			auto Inventory = co_await PlayerStateComponent->GetInventoryComponent();
+
+			auto MeshFeeder = NewChildComponent<UCharacterMeshFeeder>();
+			MeshFeeder->SetMeshStream(Inventory->GetCharacterMesh().CreateStream());
+			MeshFeeder->RegisterComponent();
+		});
 	}
 };
