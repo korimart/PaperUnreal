@@ -90,7 +90,7 @@ private:
 	{
 		Super::BeginPlay();
 
-		InitPrivilegeComponentOfNewPlayers();
+		InitiatePrivilegeGranter();
 		InitiateGameFlow();
 	}
 
@@ -110,7 +110,7 @@ private:
 		return false;
 	}
 
-	FWeakCoroutine InitPrivilegeComponentOfNewPlayers()
+	FWeakCoroutine InitiatePrivilegeGranter()
 	{
 		auto PrivilegeStream = Privileges.CreateAddStream();
 
