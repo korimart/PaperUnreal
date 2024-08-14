@@ -7,7 +7,7 @@
 #include "PVPBattlePlayerController.h"
 #include "PVPBattlePlayerState.h"
 #include "PaperUnreal/BattleGameMode/BattleGameModeComponent.h"
-#include "PaperUnreal/FreeRule/FreeRuleComponent.h"
+#include "PaperUnreal/FreeGameMode/FreeGameModeComponent.h"
 #include "PaperUnreal/ModeAgnostic/FixedCameraPawn.h"
 #include "PaperUnreal/ModeAgnostic/GameStarterComponent.h"
 #include "UObject/ConstructorHelpers.h"
@@ -110,10 +110,10 @@ FWeakCoroutine APVPBattleGameMode::InitiateGameFlow()
 	StageComponent->SetCurrentStage(PVPBattleStage::WaitingForStart);
 
 	{
-		auto FreeRule = NewObject<UFreeRuleComponent>(this);
-		FreeRule->RegisterComponent();
-		FreeRule->Start(DefaultPawnClass);
-		auto F = FinallyIfValid(FreeRule, [FreeRule]() { FreeRule->DestroyComponent(); });
+		auto FreeGameMode = NewObject<UFreeGameModeComponent>(this);
+		FreeGameMode->RegisterComponent();
+		FreeGameMode->Start(DefaultPawnClass);
+		auto F = FinallyIfValid(FreeGameMode, [FreeGameMode]() { FreeGameMode->DestroyComponent(); });
 
 		co_await OnGameStartConditionsMet;
 		

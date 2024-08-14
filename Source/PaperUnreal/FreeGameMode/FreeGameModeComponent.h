@@ -3,18 +3,18 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "FreeRulePawnComponent.h"
+#include "FreePawnComponent.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
 #include "PaperUnreal/GameFramework2/GameStateBase2.h"
 #include "PaperUnreal/ModeAgnostic/CharacterMeshFromInventory.h"
 #include "PaperUnreal/ModeAgnostic/PawnSpawnerComponent.h"
 #include "PaperUnreal/ModeAgnostic/ReadyStateComponent.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
-#include "FreeRuleComponent.generated.h"
+#include "FreeGameModeComponent.generated.h"
 
 
 UCLASS(Within=GameModeBase)
-class UFreeRuleComponent : public UComponentGroupComponent
+class UFreeGameModeComponent : public UComponentGroupComponent
 {
 	GENERATED_BODY()
 
@@ -63,7 +63,7 @@ private:
 			APawn* Pawn = PawnSpawner->SpawnAtLocation(
 				PawnClass,
 				{1500.f, 1500.f, 100.f},
-				[&](APawn* Spawned) { NewChildComponent<UFreeRulePawnComponent>(Spawned)->RegisterComponent(); });
+				[&](APawn* Spawned) { NewChildComponent<UFreePawnComponent>(Spawned)->RegisterComponent(); });
 
 			Player->GetOwningController()->Possess(Pawn);
 		});

@@ -6,11 +6,11 @@
 #include "PaperUnreal/AreaTracer/TracerComponent.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
 #include "PaperUnreal/ModeAgnostic/CharacterMeshFromInventory.h"
-#include "FreeRulePawnComponent.generated.h"
+#include "FreePawnComponent.generated.h"
 
 
 UCLASS()
-class UFreeRulePawnComponent : public UComponentGroupComponent
+class UFreePawnComponent : public UComponentGroupComponent
 {
 	GENERATED_BODY()
 
