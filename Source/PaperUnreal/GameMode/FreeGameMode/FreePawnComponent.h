@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "FreePlayerStateComponent.h"
+#include "GameFramework/PlayerState.h"
 #include "PaperUnreal/AreaTracer/TracerComponent.h"
 #include "PaperUnreal/GameFramework2/Character2.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
@@ -17,9 +18,23 @@ class UFreePawnComponent : public UComponentGroupComponent
 	GENERATED_BODY()
 
 private:
+	UPROPERTY(ReplicatedUsing=OnRep_Tracer)
+	UTracerComponent* RepTracer;
+	TLiveData<UTracerComponent*&> Tracer{RepTracer};
+
+	UFUNCTION()
+	void OnRep_Tracer() { Tracer.Notify(); }
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
+	{
+		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+		DOREPLIFETIME_CONDITION(ThisClass, RepTracer, COND_InitialOnly);
+	}
+
 	virtual void AttachServerMachineComponents() override
 	{
-		NewChildComponent<UTracerComponent>(GetOwner())->RegisterComponent();
+		Tracer = NewChildComponent<UTracerComponent>();
+		Tracer.Get()->RegisterComponent();
 	}
 
 	virtual void AttachPlayerMachineComponents() override
@@ -33,6 +48,9 @@ private:
 			auto MeshFeeder = NewChildComponent<UCharacterMeshFeeder>();
 			MeshFeeder->SetMeshStream(Inventory->GetCharacterMesh().CreateStream());
 			MeshFeeder->RegisterComponent();
+
+			co_await Tracer;
+			Tracer.Get()->SetTracerColorStream(Inventory->GetTracerBaseColor().CreateStream());
 		});
 	}
 };

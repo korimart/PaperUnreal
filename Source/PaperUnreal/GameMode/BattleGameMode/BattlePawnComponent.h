@@ -41,16 +41,23 @@ public:
 	}
 
 private:
+	UPROPERTY(ReplicatedUsing=OnRep_Tracer)
+	UTracerComponent* RepTracer;
+	TLiveData<UTracerComponent*&> Tracer{RepTracer};
+	
+	UFUNCTION()
+	void OnRep_Tracer() { Tracer.Notify(); }
+
 	UPROPERTY(ReplicatedUsing=OnRep_TracerPathProvider)
 	TScriptInterface<ITracerPathProvider> RepTracerPathProvider;
 	TLiveData<TScriptInterface<ITracerPathProvider>&> TracerPathProvider{RepTracerPathProvider};
+	
+	UFUNCTION()
+	void OnRep_TracerPathProvider() { TracerPathProvider.Notify(); }
 
 	UPROPERTY(ReplicatedUsing=OnRep_Life)
 	ULifeComponent* RepLife;
 	mutable TLiveData<ULifeComponent*&> Life{RepLife};
-
-	UFUNCTION()
-	void OnRep_TracerPathProvider() { TracerPathProvider.Notify(); }
 
 	UFUNCTION()
 	void OnRep_Life() { Life.Notify(); }
@@ -58,6 +65,7 @@ private:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+		DOREPLIFETIME_CONDITION(ThisClass, RepTracer, COND_InitialOnly);
 		DOREPLIFETIME_CONDITION(ThisClass, RepTracerPathProvider, COND_InitialOnly);
 		DOREPLIFETIME_CONDITION(ThisClass, RepLife, COND_InitialOnly);
 	}
@@ -67,9 +75,6 @@ private:
 
 	UPROPERTY()
 	UBattleGameStateComponent* ServerGameState;
-
-	UPROPERTY()
-	UTracerComponent* ServerTracer;
 
 	UPROPERTY()
 	UTracerOverlapCheckerComponent* ServerOverlapChecker;
@@ -92,12 +97,12 @@ private:
 
 	virtual void AttachServerMachineComponents() override
 	{
-		ServerTracer = NewChildComponent<UTracerComponent>(GetOwner());
-		ServerTracer->RegisterComponent();
-		ServerTracer->ServerTracerPath->SetNoPathArea(ServerHomeArea->ServerAreaBoundary);
+		Tracer = NewChildComponent<UTracerComponent>(GetOwner());
+		Tracer.Get()->RegisterComponent();
+		Tracer.Get()->ServerTracerPath->SetNoPathArea(ServerHomeArea->ServerAreaBoundary);
 
 		ServerOverlapChecker = NewChildComponent<UTracerOverlapCheckerComponent>(GetOwner());
-		ServerOverlapChecker->SetTracer(ServerTracer->ServerTracerPath);
+		ServerOverlapChecker->SetTracer(Tracer.Get()->ServerTracerPath);
 		ServerOverlapChecker->RegisterComponent();
 
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
@@ -113,12 +118,12 @@ private:
 			while (true)
 			{
 				auto NewPawn = co_await PawnStream;
-				ServerOverlapChecker->AddOverlapTarget(NewPawn->ServerTracer->ServerTracerPath);
+				ServerOverlapChecker->AddOverlapTarget(NewPawn->Tracer.Get()->ServerTracerPath);
 			}
 		});
 
 		ServerTracerToAreaConverter = NewChildComponent<UTracerToAreaConverterComponent>(GetOwner());
-		ServerTracerToAreaConverter->SetTracer(ServerTracer->ServerTracerPath);
+		ServerTracerToAreaConverter->SetTracer(Tracer.Get()->ServerTracerPath);
 		ServerTracerToAreaConverter->SetConversionDestination(ServerHomeArea->ServerAreaBoundary);
 		ServerTracerToAreaConverter->RegisterComponent();
 
@@ -142,7 +147,7 @@ private:
 		});
 
 		auto Killer = NewChildComponent<UTracerKillerComponent>(GetOwner());
-		Killer->SetTracer(ServerTracer->ServerTracerPath);
+		Killer->SetTracer(Tracer.Get()->ServerTracerPath);
 		Killer->SetArea(ServerHomeArea->ServerAreaBoundary);
 		Killer->SetOverlapChecker(ServerOverlapChecker);
 		Killer->RegisterComponent();
@@ -176,6 +181,9 @@ private:
 			auto MeshFeeder = NewChildComponent<UCharacterMeshFeeder>();
 			MeshFeeder->SetMeshStream(Inventory->GetCharacterMesh().CreateStream());
 			MeshFeeder->RegisterComponent();
+
+			co_await Tracer;
+			Tracer.Get()->SetTracerColorStream(Inventory->GetTracerBaseColor().CreateStream());
 		});
 
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine

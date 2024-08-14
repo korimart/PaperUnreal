@@ -6,12 +6,9 @@
 #include "ReplicatedTracerPathComponent.h"
 #include "TracerPathComponent.h"
 #include "TracerPointEventComponent.h"
-#include "GameFramework/PlayerState.h"
 #include "Net/UnrealNetwork.h"
-#include "PaperUnreal/GameFramework2/Character2.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/ComponentRegistry.h"
-#include "PaperUnreal/GameMode/ModeAgnostic/InventoryComponent.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/LineMeshComponent.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/SolidColorMaterial.h"
 #include "PaperUnreal/WeakCoroutine/LiveData.h"
@@ -26,6 +23,12 @@ class UTracerComponent : public UComponentGroupComponent
 public:
 	UPROPERTY()
 	UTracerPathComponent* ServerTracerPath;
+
+	void SetTracerColorStream(TValueStream<FLinearColor>&& Stream)
+	{
+		check(GetNetMode() != NM_DedicatedServer);
+		ColorFeeder = InitiateColorFeeder(MoveTemp(Stream));
+	}
 
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_TracerPathProvider)
@@ -43,6 +46,9 @@ private:
 
 	UPROPERTY()
 	ULineMeshComponent* ClientTracerMesh;
+
+	TLiveData<bool> bClientComponentsAttached;
+	TAbortableCoroutineHandle<FWeakCoroutine> ColorFeeder;
 
 	virtual void AttachServerMachineComponents() override
 	{
@@ -73,23 +79,22 @@ private:
 			TracerPointEvent->RegisterComponent();
 			TracerPointEvent->AddEventListener(ClientTracerMesh);
 
-			// 일단 위에까지 완료했으면 플레이는 가능한 거임 여기부터는 미적인 요소들을 준비한다
-			auto PlayerState = co_await GetOuterACharacter2()->WaitForPlayerState();
-			auto Inventory = co_await WaitForComponent<UInventoryComponent>(PlayerState);
-
-			RunWeakCoroutine(this, [this, &Inventory]() -> FWeakCoroutine
-			{
-				auto ColorStream = Inventory->GetTracerBaseColor().CreateStream();
-				auto FirstColor = co_await ColorStream;
-				auto Material = co_await FSolidColorMaterial::Create(FirstColor);
-				
-				ClientTracerMesh->ConfigureMaterialSet({Material.Get()});
-
-				while (true)
-				{
-					Material.SetColor(co_await ColorStream);
-				}
-			});
+			bClientComponentsAttached = true;
 		});
+	}
+
+	FWeakCoroutine InitiateColorFeeder(TValueStream<FLinearColor> ColorStream)
+	{
+		co_await (bClientComponentsAttached.CreateStream() | Awaitables::If(true));
+		
+		auto FirstColor = co_await ColorStream;
+		auto Material = co_await FSolidColorMaterial::Create(FirstColor);
+
+		ClientTracerMesh->ConfigureMaterialSet({Material.Get()});
+
+		while (true)
+		{
+			Material.SetColor(co_await ColorStream);
+		}
 	}
 };
