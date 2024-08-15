@@ -92,11 +92,10 @@ private:
 		WorldTimerComponent->RegisterComponent();
 		
 		ToastWidget = CreateWidget<UToastWidget>(GetOwningPlayerController(), ToastWidgetClass);
-
-		RunWeakCoroutine(this,
-			bDialogOpen.CreateStream()
-			| Awaitables::Negate()
-			| Awaitables::WhileTrue([this]() { return ShowToastWidget(); }));
+		bDialogOpen.Observe(this, [this](bool bOpen)
+		{
+			bOpen ? RemoveFromParentIfHasParent(ToastWidget) : ToastWidget->AddToViewport();
+		});
 
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
@@ -115,12 +114,6 @@ private:
 				co_await ShowResults();
 			}
 		});
-	}
-
-	FWeakCoroutine ShowToastWidget() const
-	{
-		FScopedAddToViewport S = ScopedAddToViewport(ToastWidget);
-		co_await Awaitables::Forever();
 	}
 
 	FWeakCoroutine SelectCharacterAndShowHUD()

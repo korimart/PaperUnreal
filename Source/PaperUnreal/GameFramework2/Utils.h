@@ -345,4 +345,13 @@ inline FLinearColor ALittleBrighter(const FLinearColor& Color)
 }
 
 
+inline void RemoveFromParentIfHasParent(UUserWidget* Widget)
+{
+	if (Widget->GetParent())
+	{
+		Widget->RemoveFromParent();
+	}
+}
+
+
 #define RETURN_IF_FALSE(boolean) if (!boolean) return true;
