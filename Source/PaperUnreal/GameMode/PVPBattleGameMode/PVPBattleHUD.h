@@ -42,7 +42,7 @@ private:
 	UWorldTimerComponent* WorldTimerComponent;
 
 	UPROPERTY()
-	UBattleGameStateComponent* GameState;
+	UBattleGameStateComponent* BattleGameStateComponent;
 
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<UToastWidget> ToastWidgetClass;
@@ -167,7 +167,7 @@ private:
 			co_await StageComponent->GetCurrentStage().IfNot(PVPBattleStage::WillPlay);
 		}
 
-		GameState = (co_await WaitForComponent<UBattleGameStateComponent>(GetWorld()->GetGameState())).Unsafe();
+		BattleGameStateComponent = (co_await WaitForComponent<UBattleGameStateComponent>(GetWorld()->GetGameState())).Unsafe();
 
 		TAbortableCoroutineHandle TeamScores = ShowTeamScores();
 
@@ -289,7 +289,7 @@ private:
 		auto TeamScoresWidget = co_await CreateWidget<UTeamScoresWidget>(GetOwningPlayerController(), TeamScoresWidgetClass);
 		auto S = ScopedAddToViewport(TeamScoresWidget);
 
-		TAbortPtr<UAreaSpawnerComponent> AreaSpawner = co_await GameState->GetAreaSpawner();
+		TAbortPtr<UAreaSpawnerComponent> AreaSpawner = co_await BattleGameStateComponent->GetAreaSpawner();
 		auto AreaStream = AreaSpawner->GetSpawnedAreas().CreateAddStream() | Awaitables::IfValid();
 
 		while (true)
@@ -324,8 +324,9 @@ private:
 		const float ResultStartTime = co_await StageComponent->GetStageWorldStartTime(PVPBattleStage::Result);
 		co_await WorldTimerComponent->At(ResultStartTime + 3.f);
 
-		auto Result = co_await WaitForComponent<UBattleResultComponent>(GetWorld()->GetGameState());
-		for (const FBattleResultItem& Each : Result->Result.Items)
+		auto Result = co_await BattleGameStateComponent->GetBattleResult();
+		
+		for (const FBattleResultItem& Each : Result.Items)
 		{
 			ResultWidget->TeamScoresWidget->FindOrSetTeamScore(Each.TeamIndex, Each.Color, Each.Area);
 		}

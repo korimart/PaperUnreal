@@ -49,57 +49,8 @@ private:
 };
 
 
-USTRUCT()
-struct FBattleResultItem
-{
-	GENERATED_BODY()
-
-	UPROPERTY()
-	int32 TeamIndex;
-
-	UPROPERTY()
-	FLinearColor Color;
-
-	UPROPERTY()
-	float Area;
-};
-
-
-USTRUCT()
-struct FBattleResult
-{
-	GENERATED_BODY()
-
-	UPROPERTY()
-	TArray<FBattleResultItem> Items;
-};
-
-
-UCLASS()
-class UBattleResultComponent : public UActorComponent2
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY(Replicated)
-	FBattleResult Result;
-
-private:
-	UBattleResultComponent()
-	{
-		SetIsReplicatedByDefault(true);
-	}
-
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
-	{
-		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-		DOREPLIFETIME_CONDITION(ThisClass, Result, COND_InitialOnly);
-	}
-};
-
-
 UCLASS(Within=GameModeBase)
-class UBattleGameModeComponent : public UGameModeComponent
+class UBattleGameModeComponentImpl : public UGameModeComponent
 {
 	GENERATED_BODY()
 
@@ -107,18 +58,14 @@ public:
 	void Configure(int32 TeamCount, int32 EachTeamMemberCount)
 	{
 		check(!bConfigured.Get());
-		
 		TeamAllocator.Configure(TeamCount, EachTeamMemberCount);
 		bConfigured = true;
 	}
 
-	TWeakCoroutine<UBattleResultComponent*> Start()
+	FWeakCoroutine Start(UBattleGameStateComponent* InGameStateComponent)
 	{
 		check(HasBegunPlay());
-
-		GameStateComponent = NewChildComponent<UBattleGameStateComponent>(GetWorld()->GetGameState());
-		GameStateComponent->RegisterComponent();
-
+		GameStateComponent = InGameStateComponent;
 		return InitiateGameFlow();
 	}
 
@@ -156,7 +103,7 @@ private:
 	FWeakCoroutine InitiatePlayerSequence(APlayerController* Player)
 	{
 		co_await AddToWeakList(Player);
-		
+
 		UE_LOG(LogBattleGameMode, Log, TEXT("%p 플레이어 입장 게임설정을 기다리는 중"), Player);
 		co_await (bConfigured.CreateStream() | Awaitables::If(true));
 
@@ -189,7 +136,7 @@ private:
 
 		UE_LOG(LogBattleGameMode, Log, TEXT("%p 플레이어 팀 세팅 완료 게임 시작을 기다리는 중"), Player);
 		co_await (bGameStarted.CreateStream() | Awaitables::If(true));
-		
+
 		InitiatePawnSpawnSequence(Player, ThisPlayerTeamIndex);
 	}
 
@@ -245,7 +192,7 @@ private:
 		}
 	}
 
-	TWeakCoroutine<UBattleResultComponent*> InitiateGameFlow()
+	FWeakCoroutine InitiateGameFlow()
 	{
 		UE_LOG(LogBattleGameMode, Log, TEXT("게임을 시작합니다"));
 		bGameStarted = true;
@@ -284,14 +231,12 @@ private:
 			UE_LOG(LogBattleGameMode, Log, TEXT("팀의 수가 1이하이므로 게임을 종료합니다"));
 		}
 
-		auto Ret = NewObject<UBattleResultComponent>(GetWorld()->GetGameState());
-		Ret->RegisterComponent();
-
+		FBattleResult Result;
 		for (const auto& [TeamIndex, Color] : TeamColors)
 		{
 			AAreaActor* Area = GameStateComponent->FindLivingAreaOfTeam(TeamIndex);
 			const float AreaArea = Area ? Area->GetServerCalculatedArea().Get() : 0.f;
-			Ret->Result.Items.Add({
+			Result.Items.Add({
 				.TeamIndex = TeamIndex,
 				.Color = Color,
 				.Area = AreaArea,
@@ -299,9 +244,9 @@ private:
 		}
 
 		// TODO 두 에리어가 동시에 파괴되면 무승부가 발생할 수 있음
-		Algo::SortBy(Ret->Result.Items, &FBattleResultItem::Area, TGreater{});
-
-		co_return Ret;
+		Algo::SortBy(Result.Items, &FBattleResultItem::Area, TGreater{});
+		
+		GameStateComponent->SetBattleResult(Result);
 	}
 
 	AAreaActor* InitializeNewAreaActor(int32 TeamIndex)
@@ -326,4 +271,35 @@ private:
 			});
 		});
 	}
+};
+
+
+UCLASS(Within=GameModeBase)
+class UBattleGameModeComponent : public UGameModeComponent
+{
+	GENERATED_BODY()
+
+public:
+	void Configure(int32 TeamCount, int32 EachTeamMemberCount)
+	{
+		check(!IsValid(Impl));
+		Impl = NewChildComponent<UBattleGameModeComponentImpl>();
+		Impl->RegisterComponent();
+		Impl->Configure(TeamCount, EachTeamMemberCount);
+	}
+
+	TCancellableFuture<void> Start()
+	{
+		auto GameStateComponent = NewChildComponent<UBattleGameStateComponent>(GetWorld()->GetGameState());
+		GameStateComponent->RegisterComponent();
+
+		// Caller가 Impl이 반환하는 FWeakCoroutine으로 게임을 주물럭거리지 않게 하기 위해 Future로 변환
+		auto [Promise, Future] = MakePromise<void>();
+		Impl->Start(GameStateComponent).Then([Promise = MoveTemp(Promise)](const auto&) mutable { Promise.SetValue(); });
+		return MoveTemp(Future);
+	}
+
+private:
+	UPROPERTY()
+	UBattleGameModeComponentImpl* Impl;
 };

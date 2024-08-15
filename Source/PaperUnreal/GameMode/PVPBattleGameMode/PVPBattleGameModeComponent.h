@@ -165,6 +165,7 @@ private:
 		}
 
 		// TODO 클라이언트들이 result를 보기에 충분한 시간을 준다
-		// ResultComponent->DestroyComponent();
+		co_await WaitForSeconds(GetWorld(), 5.f);
+		BattleGameMode->DestroyComponent();
 	}
 };

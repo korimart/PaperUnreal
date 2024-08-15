@@ -11,6 +11,32 @@
 #include "BattleGameStateComponent.generated.h"
 
 
+USTRUCT()
+struct FBattleResultItem
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	int32 TeamIndex;
+
+	UPROPERTY()
+	FLinearColor Color;
+
+	UPROPERTY()
+	float Area;
+};
+
+
+USTRUCT()
+struct FBattleResult
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TArray<FBattleResultItem> Items;
+};
+
+
 UCLASS(Within=GameStateBase)
 class UBattleGameStateComponent : public UComponentGroupComponent
 {
@@ -24,6 +50,23 @@ public:
 	UPawnSpawnerComponent* ServerPawnSpawner;
 
 	DECLARE_LIVE_DATA_GETTER_SETTER(AreaSpawner);
+
+	TLiveDataView<TOptional<FBattleResult>> GetBattleResult() const
+	{
+		return BattleResult;
+	}
+
+	void SetBattleResult(const FBattleResult& Result)
+	{
+		check(GetOwner()->HasAuthority());
+		
+		RepBattleResult = Result;
+		
+		if (GetNetMode() != NM_DedicatedServer)
+		{
+			OnRep_BattleResult();
+		}
+	}
 
 	void KillPawnsOfTeam(int32 TeamIndex)
 	{
@@ -89,16 +132,36 @@ public:
 
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_AreaSpawner)
-	UAreaSpawnerComponent* _;
-	mutable TLiveData<UAreaSpawnerComponent*&> AreaSpawner{_};
+	UAreaSpawnerComponent* RepAreaSpawner;
+	mutable TLiveData<UAreaSpawnerComponent*&> AreaSpawner{RepAreaSpawner};
 
 	UFUNCTION()
 	void OnRep_AreaSpawner() { AreaSpawner.Notify(); }
 
+	// TODO 이거 FOptionalBattleResult 만들면 단순화 가능
+	// FOptionalBattleResult는 TOptionalFromThis<FBattleResult> 상속
+	UPROPERTY(ReplicatedUsing=OnRep_BattleResult)
+	FBattleResult RepBattleResult;
+	mutable TLiveData<TOptional<FBattleResult>> BattleResult;
+
+	UFUNCTION()
+	void OnRep_BattleResult()
+	{
+		if (RepBattleResult.Items.Num() > 0)
+		{
+			BattleResult.SetValueNoComparison(RepBattleResult);
+		}
+		else
+		{
+			BattleResult.SetValueNoComparison(TOptional<FBattleResult>{});
+		}
+	}
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-		DOREPLIFETIME_CONDITION(ThisClass, _, COND_InitialOnly);
+		DOREPLIFETIME_CONDITION(ThisClass, RepAreaSpawner, COND_InitialOnly);
+		DOREPLIFETIME(ThisClass, RepBattleResult);
 	}
 
 	virtual void AttachServerMachineComponents() override
