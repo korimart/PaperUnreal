@@ -139,7 +139,7 @@ public:
 		check(GetNetMode() != NM_Client);
 
 		const TOptional<FBox2D> CellToSpawnAreaIn = FindEmptyCell();
-		
+
 		if (!CellToSpawnAreaIn)
 		{
 			return nullptr;
@@ -155,13 +155,13 @@ public:
 		NewComponent->OnEndPlay.AddWeakLambda(this, [this, Ret]() { SpawnedAreas.Remove(Ret); });
 
 		SpawnedAreas.Add(Ret);
-		
+
 		return Ret;
 	}
 
 private:
 	static constexpr float AreaHeight = 1.f;
-	
+
 	UPROPERTY(ReplicatedUsing=OnRep_SpawnedAreas)
 	TArray<AAreaActor*> RepSpawnedAreas;
 	TLiveData<TArray<AAreaActor*>&> SpawnedAreas{RepSpawnedAreas};
@@ -176,7 +176,7 @@ private:
 	}
 
 	FAreaSpawnLocationCalculator SpawnLocationCalculator;
-	
+
 	UAreaSpawnerComponent()
 	{
 		bWantsInitializeComponent = true;
@@ -191,7 +191,25 @@ private:
 		SpawnLocationCalculator.Configure(
 			{FVector2D::Zero(), {3000.f, 3000.f}}, 300.f);
 	}
-	
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override
+	{
+		Super::EndPlay(EndPlayReason);
+
+		if (GetOwner()->HasAuthority())
+		{
+			// Actor의 Destroy가 콜백으로 이 클래스를 다시 호출할 수 있으므로 비우고 파괴
+			TArray<AAreaActor*> ToDestroy = MoveTemp(SpawnedAreas.Get());
+			for (AAreaActor* Each : ToDestroy)
+			{
+				if (IsValid(Each))
+				{
+					Each->Destroy();
+				}
+			}
+		}
+	}
+
 	TOptional<FBox2D> FindEmptyCell()
 	{
 		SpawnLocationCalculator.ClearGrid();

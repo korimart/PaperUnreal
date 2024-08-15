@@ -16,39 +16,36 @@ class UPawnSpawnerComponent : public UActorComponent2
 
 public:
 	TLiveDataView<TArray<APawn*>&> GetSpawnedPawns() { return Pawns; }
-	
+
 	APawn* SpawnAtLocation(UClass* Class, const FVector& Location)
 	{
-		return SpawnAtLocation(Class, Location, [](auto){});
+		return SpawnAtLocation(Class, Location, [](auto)
+		{
+		});
 	}
 
 	APawn* SpawnAtLocation(UClass* Class, const FVector& Location, const auto& Initializer)
 	{
 		check(GetNetMode() != NM_Client);
-		
+
 		APawn* Spawned = CastChecked<APawn>(GetWorld()->SpawnActor(Class, &Location));
-		
+
 		Initializer(Spawned);
-		
+
 		auto NewComponent = NewObject<UActorComponent2>(Spawned);
 		NewComponent->RegisterComponent();
 		NewComponent->OnEndPlay.AddWeakLambda(this, [this, Spawned]() { Pawns.Remove(Spawned); });
-		
-		Pawns.Add(Spawned);
-		
-		return Spawned;
-	}
 
-	void DestroyPawnsOnEndPlay()
-	{
-		bDestroyPawnsOnEndPlay = true;
+		Pawns.Add(Spawned);
+
+		return Spawned;
 	}
 
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_SpawnedPawns)
 	TArray<APawn*> RepPawns;
 	TLiveData<TArray<APawn*>&> Pawns{RepPawns};
-	
+
 	UFUNCTION()
 	void OnRep_SpawnedPawns(const TArray<APawn*>& Prev) { Pawns.NotifyDiff(Prev); }
 
@@ -58,8 +55,6 @@ private:
 		DOREPLIFETIME(ThisClass, RepPawns);
 	}
 
-	bool bDestroyPawnsOnEndPlay = false;
-	
 	UPawnSpawnerComponent()
 	{
 		SetIsReplicatedByDefault(true);
@@ -69,8 +64,9 @@ private:
 	{
 		Super::EndPlay(EndPlayReason);
 
-		if (bDestroyPawnsOnEndPlay)
+		if (GetOwner()->HasAuthority())
 		{
+			// Actor의 Destroy가 콜백으로 이 클래스를 다시 호출할 수 있으므로 비우고 파괴
 			TArray<APawn*> ToDestroy = MoveTemp(Pawns.Get());
 			for (APawn* Each : ToDestroy)
 			{

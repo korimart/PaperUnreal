@@ -331,6 +331,16 @@ inline bool IsOfClass(UObject* Object, const TArray<UClass*>& Classes)
 }
 
 
+void DestroyComponentIfValid(auto& Component)
+{
+	if (IsValid(Component))
+	{
+		Component->DestroyComponent();
+		Component = nullptr;
+	}
+}
+
+
 inline FLinearColor NonEyeSoaringRandomColor()
 {
 	return FLinearColor::MakeFromHSV8(FMath::RandRange(0, 255), 220, 100);

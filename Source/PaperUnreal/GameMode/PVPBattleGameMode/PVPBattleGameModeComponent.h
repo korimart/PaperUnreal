@@ -126,11 +126,14 @@ private:
 
 	FWeakCoroutine InitiateGameFlow()
 	{
+		UBattleGameModeComponent* PrevBattleGameModeComponent = nullptr;
+		UPVPBattleGameStateComponent* PrevGameStateComponent = nullptr;
+
 		while (true)
 		{
 			GameStateComponent = NewChildComponent<UPVPBattleGameStateComponent>(GetGameState());
 			GameStateComponent->RegisterComponent();
-			
+
 			UStageComponent* StageComponent = GameStateComponent->GetStageComponent().Get();
 			StageComponent->SetCurrentStage(PVPBattleStage::WaitingForStart);
 
@@ -139,6 +142,10 @@ private:
 			FreeGameMode->Start();
 
 			co_await OnGameStartConditionsMet;
+
+			// 지난 매치의 소품들 관상용으로 지금까지 살려둔 것 제거
+			DestroyComponentIfValid(PrevBattleGameModeComponent);
+			DestroyComponentIfValid(PrevGameStateComponent);
 
 			StageComponent->SetCurrentStage(PVPBattleStage::WillPlay);
 
@@ -168,12 +175,8 @@ private:
 				Each->GetPlayerController()->ClientGotoState(NAME_Spectating);
 			}
 
-			RunWeakCoroutine(GameStateComponent, [GameStateComponent = GameStateComponent]() -> FWeakCoroutine
-			{
-				// 클라이언트들이 결과를 Replicate 받고 표시하기에 충분한 시간을 준다
-				co_await WaitForSeconds(GameStateComponent->GetWorld(), 30.f);
-				GameStateComponent->DestroyComponent();
-			});
+			PrevBattleGameModeComponent = BattleGameMode;
+			PrevGameStateComponent = GameStateComponent;
 		}
 	}
 };

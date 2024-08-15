@@ -23,7 +23,6 @@ public:
 	{
 		check(!bStarted.Get());
 		PawnSpawner = NewChildComponent<UPawnSpawnerComponent>(GetOwner());
-		PawnSpawner->DestroyPawnsOnEndPlay();
 		PawnSpawner->RegisterComponent();
 		bStarted = true;
 	}
