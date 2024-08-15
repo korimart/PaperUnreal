@@ -91,7 +91,6 @@ private:
 		GetEnhancedInputComponent()->BindAction(StartGameAction, ETriggerEvent::Triggered, this, &ThisClass::OnStartGameActionTriggeredFunc);
 		GetEnhancedInputComponent()->BindAction(SelectCharacterAction, ETriggerEvent::Triggered, this, &ThisClass::OnSelectCharacterActionTriggeredFunc);
 
-		// TODO worldtimer가 hud보다 오래살 수 있음
 		WorldTimerComponent = NewObject<UWorldTimerComponent>(GetWorld()->GetGameState());
 		WorldTimerComponent->RegisterComponent();
 
@@ -127,6 +126,12 @@ private:
 				co_await ShowResults();
 			}
 		});
+	}
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override
+	{
+		Super::EndPlay(EndPlayReason);
+		WorldTimerComponent->DestroyComponent();
 	}
 
 	FWeakCoroutine SelectCharacterAndShowHUD()
