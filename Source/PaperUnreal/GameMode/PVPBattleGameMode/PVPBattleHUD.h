@@ -168,22 +168,22 @@ private:
 		TAbortableCoroutineHandle TeamScores = ShowTeamScores();
 		TAbortableCoroutineHandle Time = ShowTime();
 
-		auto PawnStream = GetOwningPawn2().CreateStream()
-			| Awaitables::IfValid()
-			// TODO WaitForComponent가 필요하지 않을지 고민
-			| Awaitables::FindComponentByClass<UBattlePawnComponent>();
-
-		TOptional<FToastHandle> DeadMessage;
+		TAbortableCoroutineHandle<FWeakCoroutine> PawnSequence;
+		auto PawnStream = GetOwningPawn2().CreateStream() | Awaitables::IfValid();
 		while (true)
 		{
-			UBattlePawnComponent* Pawn = (co_await PawnStream).Unsafe();
-			check(IsValid(Pawn));
-			
-			ULifeComponent* PawnLife = (co_await Pawn->GetLife()).Unsafe();
-			DeadMessage.Reset();
-			co_await PawnLife->GetbAlive().If(false);
-			DeadMessage = ToastWidget->Toast(FText::FromString(TEXT("부활 대기 중...")));
+			APawn* Pawn = (co_await PawnStream).Unsafe();
+			PawnSequence = InitiateBattlePawnSequence(Pawn);
 		}
+	}
+
+	FWeakCoroutine InitiateBattlePawnSequence(APawn* BattlePawn)
+	{
+		auto PawnComponent = co_await WaitForComponent<UBattlePawnComponent>(BattlePawn);
+		auto PawnLife = co_await PawnComponent->GetLife();
+		co_await PawnLife->GetbAlive().If(false);
+		FToastHandle H = ToastWidget->Toast(FText::FromString(TEXT("부활 대기 중...")));
+		co_await Awaitables::Forever();
 	}
 
 	FWeakCoroutine ListenToEditConfigActionTrigger()
