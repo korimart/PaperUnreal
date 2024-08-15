@@ -106,7 +106,7 @@ private:
 			// 그것들은 무시하고 항상 가장 최신의 Component를 받는다
 			auto GameStateComponentStream
 				= MakeComponentStream<UPVPBattleGameStateComponent>(GameState)
-				// TODO | Awaitables::Latest()
+				// TODO | Awaitables::Latest() 네트워크와 관련된 모종의 이유로 Valid인 StateComponent가 한 번에 여러개 존재할 수 있음
 				| Awaitables::IfValid();
 
 			while (true)
