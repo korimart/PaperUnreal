@@ -55,6 +55,7 @@ private:
 	UPROPERTY()
 	TArray<UReadyStateComponent*> ReadyStates;
 
+	friend class UInGameCheats;
 	FSimpleMulticastDelegate OnGameStartConditionsMet;
 
 	virtual void AttachServerMachineComponents() override

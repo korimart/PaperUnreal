@@ -58,10 +58,17 @@ struct FOptionalVector2D
 	GENERATED_BODY()
 
 	UPROPERTY()
-	bool bSet;
+	bool bSet = false;
 
 	UPROPERTY()
 	FVector2D Vector2D;
+
+	FOptionalVector2D() = default;
+
+	FOptionalVector2D(FVector2D Other)
+		: bSet(true), Vector2D(Other)
+	{
+	}
 
 	FOptionalVector2D& operator=(const TOptional<FVector2D>& Other)
 	{
@@ -90,7 +97,7 @@ struct FNumberedVector2DArray
 	int32 Number = 0;
 
 	UPROPERTY()
-	TArray<FVector2D> PathTail;
+	TArray<FOptionalVector2D> PathTail;
 };
 
 
@@ -135,17 +142,33 @@ private:
 	UFUNCTION()
 	void OnRep_PathTail(const FNumberedVector2DArray& Old)
 	{
+		// 여기 코드에 대한 설명
+		// TArray는 Replication 시 각 Element가 다른 UPROPERTY라고 생각하면 됨
+		// 즉 서버에서 0번 인덱스 업데이트 -> 다음 network frequency에서 1번 업데이트 했는데
+		// 0번 인덱스 업데이트 한 패킷이 소실되고 경우 1번만 클라이언트에 도착하면 array size는 1로 늘어남
+		// 하지만 0번 위치의 원소 값이 없기 때문에 그냥 default initialize처리하고 나중에 세팅함
+		// Path의 경우에는 1번이 있기 전에 0번이 반드시 있어야 하므로 default initialize된 것을 만나면 일단 중단한다
 		if (RepPathTail.Number == Old.Number)
 		{
-			for (int32 i = Old.PathTail.Num(); i < RepPathTail.PathTail.Num(); i++)
+			for (int32 i = PathTail.Get().Num(); i < RepPathTail.PathTail.Num(); i++)
 			{
-				PathTail.Add(RepPathTail.PathTail[i]);
+				if (!RepPathTail.PathTail[i].bSet)
+				{
+					break;
+				}
+
+				PathTail.Add(RepPathTail.PathTail[i].Vector2D);
 			}
 		}
+		// 넘버가 바뀌는 경우에는 같은 틱에서 모든 원소를 세팅하므로 클라이언트에 항상 같이 옴
+		// 그러므로 위와 같은 처리가 필요하지 않음 (이해 안 되면 파일 최상단의 설명 참고)
 		else
 		{
-			PathTail.SetValueSilent(RepPathTail.PathTail);
-			PathTail.NotifyDiff(Old.PathTail);
+			PathTail.Empty();
+			for (const FOptionalVector2D& Each : RepPathTail.PathTail)
+			{
+				PathTail.Add(Each.Vector2D);
+			}
 		}
 	}
 

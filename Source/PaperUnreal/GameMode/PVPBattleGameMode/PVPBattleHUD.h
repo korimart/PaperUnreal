@@ -177,6 +177,8 @@ private:
 		while (true)
 		{
 			UBattlePawnComponent* Pawn = (co_await PawnStream).Unsafe();
+			check(IsValid(Pawn));
+			
 			ULifeComponent* PawnLife = (co_await Pawn->GetLife()).Unsafe();
 			DeadMessage.Reset();
 			co_await PawnLife->GetbAlive().If(false);
