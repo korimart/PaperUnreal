@@ -21,15 +21,18 @@ class UFreeGameModeComponent : public UGameModeComponent
 public:
 	void Start()
 	{
-		check(HasBegunPlay());
+		check(!bStarted.Get());
 		PawnSpawner = NewChildComponent<UPawnSpawnerComponent>(GetOwner());
 		PawnSpawner->DestroyPawnsOnEndPlay();
 		PawnSpawner->RegisterComponent();
+		bStarted = true;
 	}
 
 private:
 	UPROPERTY()
 	UPawnSpawnerComponent* PawnSpawner;
+
+	TLiveData<bool> bStarted;
 
 	virtual void OnPostLogin(APlayerController* PC) override
 	{
@@ -52,6 +55,7 @@ private:
 	FWeakCoroutine InitiatePawnSpawnSequence(APlayerController* Player)
 	{
 		co_await AddToWeakList(Player);
+		co_await (bStarted.CreateStream() | Awaitables::If(true));
 
 		Player
 			->PlayerState

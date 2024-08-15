@@ -59,9 +59,6 @@ private:
 
 	virtual void AttachServerMachineComponents() override
 	{
-		GameStateComponent = NewChildComponent<UPVPBattleGameStateComponent>(GetGameState());
-		GameStateComponent->RegisterComponent();
-
 		WorldTimerComponent = NewChildComponent<UWorldTimerComponent>(GetGameState());
 		WorldTimerComponent->RegisterComponent();
 	}
@@ -129,43 +126,54 @@ private:
 
 	FWeakCoroutine InitiateGameFlow()
 	{
-		auto StageComponent = co_await GameStateComponent->GetStageComponent();
-
-		StageComponent->SetCurrentStage(PVPBattleStage::WaitingForStart);
-
-		auto FreeGameMode = NewChildComponent<UFreeGameModeComponent>();
-		FreeGameMode->RegisterComponent();
-		FreeGameMode->Start();
-
-		co_await OnGameStartConditionsMet;
-
-		StageComponent->SetCurrentStage(PVPBattleStage::WillPlay);
-
-		auto BattleGameMode = NewChildComponent<UBattleGameModeComponent>();
-		BattleGameMode->RegisterComponent();
-		// TODO real numbers
-		BattleGameMode->Configure(2, 2);
-
-		const float PlayStartTime = GetWorld()->GetTimeSeconds() + 5.f;
-		StageComponent->SetStageWorldStartTime(PVPBattleStage::Playing, PlayStartTime);
-
-		co_await WorldTimerComponent->At(PlayStartTime);
-		StageComponent->SetCurrentStage(PVPBattleStage::Playing);
-
-		FreeGameMode->DestroyComponent();
-		co_await BattleGameMode->Start();
-
-		StageComponent->SetCurrentStage(PVPBattleStage::Result);
-		StageComponent->SetStageWorldStartTime(PVPBattleStage::Result, GetWorld()->GetTimeSeconds());
-
-		for (APlayerState* Each : GetWorld()->GetGameState()->PlayerArray)
+		while (true)
 		{
-			Each->GetPlayerController()->ChangeState(NAME_Spectating);
-			Each->GetPlayerController()->ClientGotoState(NAME_Spectating);
-		}
+			GameStateComponent = NewChildComponent<UPVPBattleGameStateComponent>(GetGameState());
+			GameStateComponent->RegisterComponent();
+			
+			UStageComponent* StageComponent = GameStateComponent->GetStageComponent().Get();
+			StageComponent->SetCurrentStage(PVPBattleStage::WaitingForStart);
 
-		// TODO 클라이언트들이 result를 보기에 충분한 시간을 준다
-		co_await WaitForSeconds(GetWorld(), 5.f);
-		BattleGameMode->DestroyComponent();
+			auto FreeGameMode = NewChildComponent<UFreeGameModeComponent>();
+			FreeGameMode->RegisterComponent();
+			FreeGameMode->Start();
+
+			co_await OnGameStartConditionsMet;
+
+			StageComponent->SetCurrentStage(PVPBattleStage::WillPlay);
+
+			auto BattleGameMode = NewChildComponent<UBattleGameModeComponent>();
+			BattleGameMode->RegisterComponent();
+			// TODO real numbers
+			BattleGameMode->Configure(2, 2);
+
+			const float PlayStartTime = GetWorld()->GetTimeSeconds() + 5.f;
+			StageComponent->SetStageWorldStartTime(PVPBattleStage::Playing, PlayStartTime);
+
+			co_await WorldTimerComponent->At(PlayStartTime);
+			StageComponent->SetCurrentStage(PVPBattleStage::Playing);
+
+			FreeGameMode->DestroyComponent();
+			auto BattleEnd = BattleGameMode->Start();
+			GameStateComponent->SetBattleGameStateComponent(BattleGameMode->GetGameStateComponent());
+			co_await BattleEnd;
+
+			StageComponent->SetCurrentStage(PVPBattleStage::Result);
+			StageComponent->SetStageWorldStartTime(PVPBattleStage::Result, GetWorld()->GetTimeSeconds());
+
+			for (APlayerState* Each : GetWorld()->GetGameState()->PlayerArray)
+			{
+				Each->FindComponentByClass<UReadyStateComponent>()->SetbReady(false);
+				Each->GetPlayerController()->ChangeState(NAME_Spectating);
+				Each->GetPlayerController()->ClientGotoState(NAME_Spectating);
+			}
+
+			RunWeakCoroutine(GameStateComponent, [GameStateComponent = GameStateComponent]() -> FWeakCoroutine
+			{
+				// 클라이언트들이 결과를 Replicate 받고 표시하기에 충분한 시간을 준다
+				co_await WaitForSeconds(GameStateComponent->GetWorld(), 30.f);
+				GameStateComponent->DestroyComponent();
+			});
+		}
 	}
 };

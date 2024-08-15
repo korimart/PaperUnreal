@@ -152,9 +152,15 @@ namespace Awaitables
 	{
 		return Filter([](auto* Result) { return ::IsValid(Result); });
 	}
-	
+
 	inline auto IfNotNull()
 	{
 		return Filter([](const auto& Result) { return !Result.IsNull(); });
+	}
+
+	template <typename... ErrorTypes>
+	auto IgnoreError()
+	{
+		return FilterWithError([](const auto& Result) { return Result.template OnlyContains<ErrorTypes...>(); });
 	}
 }

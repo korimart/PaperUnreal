@@ -290,7 +290,7 @@ public:
 
 	TCancellableFuture<void> Start()
 	{
-		auto GameStateComponent = NewChildComponent<UBattleGameStateComponent>(GetWorld()->GetGameState());
+		GameStateComponent = NewChildComponent<UBattleGameStateComponent>(GetWorld()->GetGameState());
 		GameStateComponent->RegisterComponent();
 
 		// Caller가 Impl이 반환하는 FWeakCoroutine으로 게임을 주물럭거리지 않게 하기 위해 Future로 변환
@@ -298,8 +298,16 @@ public:
 		Impl->Start(GameStateComponent).Then([Promise = MoveTemp(Promise)](const auto&) mutable { Promise.SetValue(); });
 		return MoveTemp(Future);
 	}
+	
+	UBattleGameStateComponent* GetGameStateComponent() const
+	{
+		return GameStateComponent;
+	}
 
 private:
 	UPROPERTY()
 	UBattleGameModeComponentImpl* Impl;
+	
+	UPROPERTY()
+	UBattleGameStateComponent* GameStateComponent;
 };

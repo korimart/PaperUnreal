@@ -20,7 +20,17 @@ public:
 	
 	UPROPERTY(meta=(BindWidget))
 	UTeamScoresWidget* TeamScoresWidget;
+	
+	UFUNCTION(BlueprintImplementableEvent)
+	void ShowScores();
 
 	UFUNCTION(BlueprintImplementableEvent)
 	void OnScoresSet();
+
+private:
+	UFUNCTION(BlueprintCallable)
+	void Confirm()
+	{
+		OnConfirmed.Broadcast();
+	}
 };

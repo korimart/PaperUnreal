@@ -31,14 +31,14 @@ ErrorType* NewError(const FString& What = TEXT("No error message was given"))
 
 
 UCLASS()
-class UErrorReportingError : public UFailableResultError
+class UInvalidObjectError : public UFailableResultError
 {
 	GENERATED_BODY()
 
 public:
-	static UErrorReportingError* InvalidObject()
+	static UInvalidObjectError* InvalidObject()
 	{
-		return NewError<UErrorReportingError>(TEXT("TFailable에 저장된 UObject가 Garbage임"
+		return NewError<UInvalidObjectError>(TEXT("TFailable에 저장된 UObject가 Garbage임"
 			"(애초에 쓰레기로 초기화 되었을 수도 있고 도중에 쓰레기가 되었을 수도 있음. "
 			"하지만 TFailable이 Strong Object Pointer를 유지하기 때문에 레퍼런스 소실에 의한 것이 아니라 "
 			"누군가가 명시적으로 쓰레기로 만든 것임)"));
@@ -200,7 +200,7 @@ public:
 		TArray<UFailableResultError*> Ret;
 		if (Result.IsSet() && Result->Expired())
 		{
-			Ret.Add(UErrorReportingError::InvalidObject());
+			Ret.Add(UInvalidObjectError::InvalidObject());
 		}
 		Algo::Transform(Errors, Ret, [](auto& Each) { return Each.Get(); });
 		return Ret;
