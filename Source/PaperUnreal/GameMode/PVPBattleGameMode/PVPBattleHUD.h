@@ -98,7 +98,7 @@ private:
 		ToastWidget = CreateWidget<UToastWidget>(GetOwningPlayerController(), ToastWidgetClass);
 		bDialogOpen.Observe(this, [this](bool bOpen)
 		{
-			bOpen ? RemoveFromParentIfHasParent(ToastWidget) : ToastWidget->AddToViewport();
+			bOpen ? RemoveFromParentIfHasParent(ToastWidget) : AddToViewportIfNotAdded(ToastWidget);
 		});
 
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine

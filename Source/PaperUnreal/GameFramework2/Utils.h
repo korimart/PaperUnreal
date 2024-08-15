@@ -355,9 +355,18 @@ inline FLinearColor ALittleBrighter(const FLinearColor& Color)
 }
 
 
+inline void AddToViewportIfNotAdded(UUserWidget* Widget)
+{
+	if (!Widget->IsInViewport())
+	{
+		Widget->AddToViewport();
+	}
+}
+
+
 inline void RemoveFromParentIfHasParent(UUserWidget* Widget)
 {
-	if (Widget->GetParent())
+	if (Widget->IsInViewport() || Widget->GetParent())
 	{
 		Widget->RemoveFromParent();
 	}
