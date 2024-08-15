@@ -38,10 +38,10 @@ class APVPBattleHUD : public AHUD2
 private:
 	UPROPERTY()
 	UWorldTimerComponent* WorldTimerComponent;
-	
+
 	UPROPERTY()
 	UPVPBattleGameStateComponent* GameStateComponent;
-	
+
 	UPROPERTY()
 	UStageComponent* StageComponent;
 
@@ -59,7 +59,7 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<UTeamScoresWidget> TeamScoresWidgetClass;
-	
+
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<UTimeWidget> TimeWidgetClass;
 
@@ -140,27 +140,13 @@ private:
 
 		if (StageComponent->GetCurrentStage().Get() == PVPBattleStage::WaitingForStart)
 		{
-			APlayerController* PC = GetOwningPlayerController();
-
-			TArray<TAbortableCoroutineHandle<FWeakCoroutine>> Handles;
-
-			Handles << RunWeakCoroutine(this,
-				MakeComponentStream<UBattleConfigComponent>(PC)
-				| Awaitables::IsValid()
-				| Awaitables::WhileTrue([this]() { return ListenToEditConfigActionTrigger(); }));
-
-			Handles << RunWeakCoroutine(this,
-				MakeComponentStream<UGameStarterComponent>(PC)
-				| Awaitables::IsValid()
-				| Awaitables::WhileTrue([this]() { return ListenToStartGameActionTrigger(); }));
-
-			Handles << RunWeakCoroutine(this,
-				MakeComponentStream<UCharacterSetterComponent>(PC)
-				| Awaitables::IsValid()
-				| Awaitables::WhileTrue([this]() { return ListenToSelectCharacterActionTrigger(); }));
-
 			FToastHandle ToastHandle = ToastWidget->Toast(FText::FromString(TEXT("방장이 게임을 시작하길 기다리는 중...")));
-
+			
+			TArray<TAbortableCoroutineHandle<FWeakCoroutine>> Handles;
+			Handles << IfComponentValid<UBattleConfigComponent>(&ThisClass::ListenToEditConfigActionTrigger);
+			Handles << IfComponentValid<UGameStarterComponent>(&ThisClass::ListenToStartGameActionTrigger);
+			Handles << IfComponentValid<UCharacterSetterComponent>(&ThisClass::ListenToSelectCharacterActionTrigger);
+			
 			co_await StageComponent->GetCurrentStage().IfNot(PVPBattleStage::WaitingForStart);
 		}
 
@@ -175,6 +161,7 @@ private:
 			CountDownToast = ToastWidget->Toast(FText::FromString(TEXT("2초 뒤에 게임이 시작됩니다.")));
 			co_await WorldTimerComponent->At(StartTime - 1);
 			CountDownToast = ToastWidget->Toast(FText::FromString(TEXT("1초 뒤에 게임이 시작됩니다.")));
+			
 			co_await StageComponent->GetCurrentStage().IfNot(PVPBattleStage::WillPlay);
 		}
 
@@ -335,7 +322,7 @@ private:
 
 		const float EndTime = BattleGameStateComponent->GameEndWorldTime;
 		const float CurrentTime = GetWorld()->GetGameState<AGameStateBase2>()->GetLatestServerWorldTimeSeconds();
-		
+
 		for (int32 RemainingSeconds = (EndTime - CurrentTime + 1.f); RemainingSeconds >= 0; RemainingSeconds--)
 		{
 			co_await WorldTimerComponent->At(EndTime - RemainingSeconds);
@@ -366,5 +353,14 @@ private:
 		});
 
 		co_await ResultWidget->OnConfirmed;
+	}
+
+	template <typename ComponentType>
+	FWeakCoroutine IfComponentValid(auto FuncPtr)
+	{
+		return RunWeakCoroutine(this,
+			MakeComponentStream<ComponentType>(GetOwningPlayerController())
+			| Awaitables::IsValid()
+			| Awaitables::WhileTrue([this, FuncPtr]() { return std::invoke(FuncPtr, this); }));
 	}
 };
