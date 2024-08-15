@@ -186,3 +186,5 @@ PVPBattle도 액터가 아닌 ComponentGroupComponent로 볼 수 있음 (free ga
 StageComponent는 PVP도 필요하고 Battle도 필요한데 어떻게 할 것인가 PVP가 Battle한테 넘길까 생각해보니까 Battle은 필요 없음
 
 16. 프로그램 종료할 때 newobject 실패하는 거 수정
+17. packet loss가 높을 때 pawn -> pawn으로 이동 시 new pawn이 늦게 도착하면서 player controller에 set pawn nullptr이 됨
+그러면 new pawn이 도착할 때까지 unpossess 먼산을 바라보고 있게 됨 이거 해결
