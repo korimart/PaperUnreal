@@ -37,6 +37,19 @@ public:
 	{
 		if (FComponentEvent* Found = MulticastDelegateMap.Find({Component->GetClass(), Component->GetOwner()}))
 		{
+			// Component Stream은 해당 클래스의 컴포넌트 중에서 가장 최신의 것을 뱉는 Stream이므로
+			// Stream이 nullptr를 받는 경우는 해당 클래스의 컴포넌트가 하나도 없을 때 뿐임
+			// 하나라도 있으면 이벤트를 발생시키지 않는다
+			TArray<UActorComponent*> Components;
+			Component->GetOwner()->GetComponents(Component->GetClass(), Components);
+			for (UActorComponent* Each : Components)
+			{
+				if (Each->HasBegunPlay())
+				{
+					return;
+				}
+			}
+
 			Found->Broadcast(nullptr);
 		}
 	}
@@ -76,7 +89,10 @@ TCancellableFuture<ComponentType*> WaitForComponent(AActor* Owner)
 
 	if (ComponentType* Found = ValidOrNull(Owner->FindComponentByClass<ComponentType>()))
 	{
-		return Found;
+		if (Found->HasBegunPlay())
+		{
+			return Found;
+		}
 	}
 
 	UComponentRegistry* Registry = Owner->GetWorld()->GetSubsystem<UComponentRegistry>();
@@ -87,7 +103,6 @@ TCancellableFuture<ComponentType*> WaitForComponent(AActor* Owner)
 }
 
 
-// TODO 같은 타입의 컴포넌트가 여러개 들어오는 경우에 대해 대응되어 있지 않음
 template <typename ComponentType>
 // 현재 UActorComponentEx만 Registry를 사용하므로 실수 다른 컴포넌트를 넣지 않도록 체크
 	requires std::is_base_of_v<UActorComponent2, ComponentType>
@@ -99,11 +114,10 @@ TValueStream<ComponentType*> MakeComponentStream(AActor* Owner)
 		return {};
 	}
 
+	// TODO 같은 클래스의 컴포넌트가 여러 개 존재하는 경우 stream에 컴포넌트의 생성 순서대로 들어감이
 	TArray<ComponentType*> Initial;
-	if (ComponentType* Found = ValidOrNull(Owner->FindComponentByClass<ComponentType>()))
-	{
-		Initial.Add(Found);
-	}
+	Owner->GetComponents<ComponentType>(Initial);
+	Initial.RemoveAll([](ComponentType* Each) { return !Each->HasBegunPlay(); });
 
 	UComponentRegistry* Registry = Owner->GetWorld()->GetSubsystem<UComponentRegistry>();
 	return MakeStreamFromDelegate<ComponentType*>(
