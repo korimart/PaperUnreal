@@ -22,7 +22,7 @@ class UInGameCheats : public UCheatManagerExtension
 	GENERATED_BODY()
 
 public:
-	inline static bool bDoNotEndGameUntilCheat{true};
+	inline static bool bDoNotEndGameUntilCheat{false};
 	inline static FSimpleMulticastDelegate OnEndGameByCheat{};
 
 private:

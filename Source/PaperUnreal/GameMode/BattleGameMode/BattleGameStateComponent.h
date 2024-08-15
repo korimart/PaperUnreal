@@ -51,6 +51,9 @@ public:
 
 	DECLARE_LIVE_DATA_GETTER_SETTER(AreaSpawner);
 
+	UPROPERTY(Replicated)
+	float GameEndWorldTime;
+
 	TLiveDataView<TOptional<FBattleResult>> GetBattleResult() const
 	{
 		return BattleResult;
@@ -160,6 +163,7 @@ private:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+		DOREPLIFETIME_CONDITION(ThisClass, GameEndWorldTime, COND_InitialOnly);
 		DOREPLIFETIME_CONDITION(ThisClass, RepAreaSpawner, COND_InitialOnly);
 		DOREPLIFETIME(ThisClass, RepBattleResult);
 	}

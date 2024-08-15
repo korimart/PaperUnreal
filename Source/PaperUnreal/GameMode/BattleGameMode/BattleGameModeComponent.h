@@ -201,7 +201,9 @@ private:
 
 		auto Timeout = RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
-			co_await GameStateComponent->ServerWorldTimer->At(GetWorld()->GetTimeSeconds() + 60.f);
+			const float GameEndWorldTime = GetWorld()->GetTimeSeconds() + 60.f;
+			GameStateComponent->GameEndWorldTime = GameEndWorldTime;
+			co_await GameStateComponent->ServerWorldTimer->At(GameEndWorldTime);
 		});
 
 		auto LastManStanding = RunWeakCoroutine(this, [this]() -> FWeakCoroutine

@@ -22,6 +22,7 @@
 #include "PaperUnreal/Widgets/BattleResultWidget.h"
 #include "PaperUnreal/Widgets/TeamScoresWidget.h"
 #include "PaperUnreal/Widgets/SelectCharacterWidget.h"
+#include "PaperUnreal/Widgets/TimeWidget.h"
 #include "PaperUnreal/Widgets/ToastWidget.h"
 #include "PVPBattleHUD.generated.h"
 
@@ -58,6 +59,9 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<UTeamScoresWidget> TeamScoresWidgetClass;
+	
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<UTimeWidget> TimeWidgetClass;
 
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<UBattleResultWidget> ResultWidgetClass;
@@ -170,6 +174,7 @@ private:
 		}
 
 		TAbortableCoroutineHandle TeamScores = ShowTeamScores();
+		TAbortableCoroutineHandle Time = ShowTime();
 
 		auto PawnStream = GetOwningPawn2().CreateStream()
 			| Awaitables::IfValid()
@@ -315,6 +320,24 @@ private:
 				}
 			});
 		}
+	}
+
+	FWeakCoroutine ShowTime()
+	{
+		auto BattleGameStateComponent = co_await GameStateComponent->GetBattleGameStateComponent();
+		auto TimeWidget = co_await CreateWidget<UTimeWidget>(GetOwningPlayerController(), TimeWidgetClass);
+		auto S = ScopedAddToViewport(TimeWidget);
+
+		const float EndTime = BattleGameStateComponent->GameEndWorldTime;
+		const float CurrentTime = GetWorld()->GetGameState<AGameStateBase2>()->GetLatestServerWorldTimeSeconds();
+		
+		for (int32 RemainingSeconds = (EndTime - CurrentTime + 1.f); RemainingSeconds >= 0; RemainingSeconds--)
+		{
+			co_await WorldTimerComponent->At(EndTime - RemainingSeconds);
+			TimeWidget->SetSeconds(RemainingSeconds);
+		}
+
+		co_await Awaitables::Forever();
 	}
 
 	FWeakCoroutine ShowResults()
