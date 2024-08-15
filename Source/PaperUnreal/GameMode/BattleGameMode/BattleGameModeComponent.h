@@ -197,7 +197,7 @@ private:
 	{
 		co_await AddToWeakList(Player);
 
-		AAreaActor* ThisPlayerArea = FindLivingAreaOfTeam(TeamIndex);
+		AAreaActor* ThisPlayerArea = GameStateComponent->FindLivingAreaOfTeam(TeamIndex);
 		if (!ThisPlayerArea)
 		{
 			ThisPlayerArea = InitializeNewAreaActor(TeamIndex);
@@ -239,7 +239,10 @@ private:
 		co_await Pawn->GetLife().Get()->GetbAlive().If(false);
 
 		UE_LOG(LogBattleGameMode, Log, TEXT("%p 폰이 사망함에 따라 영역 파괴를 검토하는 중"), Pawn);
-		KillAreaIfNobodyAlive(TeamIndex);
+		if (GameStateComponent->KillAreaIfNobodyAlive(TeamIndex))
+		{
+			UE_LOG(LogBattleGameMode, Log, TEXT("팀 %d에 살아있는 유저가 없어 파괴합니다"), TeamIndex);
+		}
 	}
 
 	TWeakCoroutine<UBattleResultComponent*> InitiateGameFlow()
@@ -286,7 +289,7 @@ private:
 
 		for (const auto& [TeamIndex, Color] : TeamColors)
 		{
-			AAreaActor* Area = FindLivingAreaOfTeam(TeamIndex);
+			AAreaActor* Area = GameStateComponent->FindLivingAreaOfTeam(TeamIndex);
 			const float AreaArea = Area ? Area->GetServerCalculatedArea().Get() : 0.f;
 			Ret->Result.Items.Add({
 				.TeamIndex = TeamIndex,
@@ -315,65 +318,12 @@ private:
 				co_await Area->LifeComponent->GetbAlive().If(false);
 
 				UE_LOG(LogBattleGameMode, Log, TEXT("영역이 파괴됨에 따라 팀 %d의 모든 유저를 죽입니다."), TeamIndex);
-				for (ULifeComponent* Each : GetPawnLivesOfTeam(TeamIndex))
-				{
-					Each->SetbAlive(false);
-				}
+				GameStateComponent->KillPawnsOfTeam(TeamIndex);
 
 				// 영역이 데스 애니메이션 등을 플레이하는데 충분한 시간을 준다
 				co_await WaitForSeconds(GetWorld(), 10.f);
 				Area->Destroy();
 			});
 		});
-	}
-
-	void KillAreaIfNobodyAlive(int32 TeamIndex) const
-	{
-		for (ULifeComponent* Each : GetPawnLivesOfTeam(TeamIndex))
-		{
-			if (Each->GetbAlive().Get())
-			{
-				// 살아있는 팀원이 한 명이라도 있으면 영역 파괴하지 않음
-				return;
-			}
-		}
-
-		if (AAreaActor* ThisManArea = FindLivingAreaOfTeam(TeamIndex))
-		{
-			UE_LOG(LogBattleGameMode, Log, TEXT("팀 %d에 살아있는 유저가 없어 파괴합니다"), TeamIndex);
-			ThisManArea->LifeComponent->SetbAlive(false);
-		}
-	}
-
-	// TODO move to game state
-	AAreaActor* FindLivingAreaOfTeam(int32 TeamIndex) const
-	{
-		return ValidOrNull(GameStateComponent->GetAreaSpawner().Get()->GetSpawnedAreas().Get().FindByPredicate([&](AAreaActor* Each)
-		{
-			return IsValid(Each)
-				&& Each->LifeComponent->GetbAlive().Get()
-				&& Each->TeamComponent->GetTeamIndex().Get() == TeamIndex;
-		}));
-	}
-
-	// TODO move to game state
-	TArray<ULifeComponent*> GetPawnLivesOfTeam(int32 TeamIndex) const
-	{
-		TArray<ULifeComponent*> Ret;
-		for (APawn* Each : GameStateComponent->ServerPawnSpawner->GetSpawnedPawns().Get())
-		{
-			if (!IsValid(Each) || !Each->GetPlayerState())
-			{
-				continue;
-			}
-
-			auto TeamComponent = Each->GetPlayerState()->FindComponentByClass<UTeamComponent>();
-
-			if (TeamComponent->GetTeamIndex().Get() == TeamIndex)
-			{
-				Ret.Add(Each->FindComponentByClass<ULifeComponent>());
-			}
-		}
-		return Ret;
 	}
 };
