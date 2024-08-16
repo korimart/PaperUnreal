@@ -15,6 +15,7 @@
 #include "PaperUnreal/AreaTracer/TracerToAreaConverterComponent.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
 #include "PaperUnreal/GameFramework2/Character2.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/AssetPaths.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/CharacterMeshFeeder.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/LineMeshComponent.h"
 #include "BattlePawnComponent.generated.h"
@@ -191,12 +192,7 @@ private:
 
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
-			const TSoftClassPtr<AActor> SoftExplosionActorClass
-			{
-				FSoftObjectPath{TEXT("/Script/Engine.Blueprint'/Game/ExplostionFromStarterContent/Blueprint_Effect_Explosion.Blueprint_Effect_Explosion_C'")}
-			};
-			
-			TStrongObjectPtr ExplosionActorClass{(co_await RequestAsyncLoad(SoftExplosionActorClass)).Unsafe()};
+			TStrongObjectPtr ExplosionActorClass{(co_await RequestAsyncLoad(FAssetPaths::SoftExplosionActor())).Unsafe()};
 
 			co_await Life;
 			co_await Life.Get()->GetbAlive().If(false);

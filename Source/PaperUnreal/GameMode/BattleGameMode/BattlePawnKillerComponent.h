@@ -7,13 +7,15 @@
 #include "PaperUnreal/AreaTracer/SegmentArray.h"
 #include "PaperUnreal/AreaTracer/TracerOverlapCheckerComponent.h"
 #include "PaperUnreal/AreaTracer/TracerPathComponent.h"
-#include "PaperUnreal/GameFramework2/ActorComponent2.h"
+#include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/KillZComponent.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/LifeComponent.h"
+#include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 #include "BattlePawnKillerComponent.generated.h"
 
 
 UCLASS()
-class UBattlePawnKillerComponent : public UActorComponent2
+class UBattlePawnKillerComponent : public UComponentGroupComponent
 {
 	GENERATED_BODY()
 
@@ -49,7 +51,7 @@ private:
 	UBattlePawnKillerComponent()
 	{
 		bWantsInitializeComponent = true;
-		PrimaryComponentTick.bCanEverTick = true;
+		SetIsReplicatedByDefault(false);
 	}
 
 	virtual void InitializeComponent() override
@@ -89,18 +91,17 @@ private:
 			UE_LOG(LogBattleGameMode, Log, TEXT("%p -> %p 트레이서 충돌로 인한 킬"), this, Bumpee);
 			KillPlayer(Bumpee->GetOwner());
 		});
-	}
 
-	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override
-	{
-		Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
-		if (GetOwner()->GetActorLocation().Z < -500.f)
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
+			auto KillZComponent = NewChildComponent<UKillZComponent>();
+			KillZComponent->RegisterComponent();
+			
+			co_await KillZComponent->OnKillZ;
+			
 			UE_LOG(LogBattleGameMode, Log, TEXT("%p KillZ로 인해 사망합니다"), this);
 			KillPlayer(GetOwner());
-			SetComponentTickEnabled(false);
-		}
+		});
 	}
 
 	static void KillPlayer(AActor* Player)
