@@ -1,6 +1,7 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "TracerKillerComponent.h"
+#include "LogBattleGameMode.h"
 
-DEFINE_LOG_CATEGORY(LogTracerKiller);
+
+DEFINE_LOG_CATEGORY(LogBattleGameMode);

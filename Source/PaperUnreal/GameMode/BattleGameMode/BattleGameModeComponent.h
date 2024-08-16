@@ -6,6 +6,7 @@
 #include "BattleGameStateComponent.h"
 #include "BattlePawnComponent.h"
 #include "BattlePlayerStateComponent.h"
+#include "LogBattleGameMode.h"
 #include "GameFramework/PlayerState.h"
 #include "PaperUnreal/AreaTracer/AreaSpawnerComponent.h"
 #include "PaperUnreal/AreaTracer/AreaStateTrackerComponent.h"
@@ -20,9 +21,6 @@
 #include "PaperUnreal/WeakCoroutine/AnyOfAwaitable.h"
 #include "PaperUnreal/WeakCoroutine/CancellableFuture.h"
 #include "BattleGameModeComponent.generated.h"
-
-
-DECLARE_LOG_CATEGORY_EXTERN(LogBattleGameMode, Log, All);
 
 
 class FTeamAllocator

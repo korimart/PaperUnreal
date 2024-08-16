@@ -3,18 +3,17 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "TracerOverlapCheckerComponent.h"
-#include "TracerPathComponent.h"
+#include "LogBattleGameMode.h"
+#include "PaperUnreal/AreaTracer/SegmentArray.h"
+#include "PaperUnreal/AreaTracer/TracerOverlapCheckerComponent.h"
+#include "PaperUnreal/AreaTracer/TracerPathComponent.h"
 #include "PaperUnreal/GameFramework2/ActorComponent2.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/LifeComponent.h"
-#include "TracerKillerComponent.generated.h"
-
-
-DECLARE_LOG_CATEGORY_EXTERN(LogTracerKiller, Log, All);
+#include "BattlePawnKillerComponent.generated.h"
 
 
 UCLASS()
-class UTracerKillerComponent : public UActorComponent2
+class UBattlePawnKillerComponent : public UActorComponent2
 {
 	GENERATED_BODY()
 
@@ -47,9 +46,10 @@ private:
 	UPROPERTY()
 	UTracerOverlapCheckerComponent* OverlapChecker;
 
-	UTracerKillerComponent()
+	UBattlePawnKillerComponent()
 	{
 		bWantsInitializeComponent = true;
+		PrimaryComponentTick.bCanEverTick = true;
 	}
 
 	virtual void InitializeComponent() override
@@ -72,23 +72,35 @@ private:
 
 				if (!Boundary.IsInside(TracerOrigin))
 				{
-					UE_LOG(LogTracerKiller, Log, TEXT("%p 내 트레이서의 시작점이 위치하던 영역이 없어져 사망합니다."), this);
+					UE_LOG(LogBattleGameMode, Log, TEXT("%p 내 트레이서의 시작점이 위치하던 영역이 없어져 사망합니다."), this);
 					KillPlayer(GetOwner());
 				}
 			}
 
 			if (!RunningTracerPath.IsValid() && !Boundary.IsInside(FVector2D{GetOwner()->GetActorLocation()}))
 			{
-				UE_LOG(LogTracerKiller, Log, TEXT("%p 내가 서 있던 영역이 없어져 사망합니다"), this);
+				UE_LOG(LogBattleGameMode, Log, TEXT("%p 내가 서 있던 영역이 없어져 사망합니다"), this);
 				KillPlayer(GetOwner());
 			}
 		});
 
 		OverlapChecker->OnTracerBumpedInto.AddWeakLambda(this, [this](UTracerPathComponent* Bumpee)
 		{
-			UE_LOG(LogTracerKiller, Log, TEXT("%p -> %p 트레이서 충돌로 인한 킬"), this, Bumpee);
+			UE_LOG(LogBattleGameMode, Log, TEXT("%p -> %p 트레이서 충돌로 인한 킬"), this, Bumpee);
 			KillPlayer(Bumpee->GetOwner());
 		});
+	}
+
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override
+	{
+		Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+		if (GetOwner()->GetActorLocation().Z < -500.f)
+		{
+			UE_LOG(LogBattleGameMode, Log, TEXT("%p KillZ로 인해 사망합니다"), this);
+			KillPlayer(GetOwner());
+			SetComponentTickEnabled(false);
+		}
 	}
 
 	static void KillPlayer(AActor* Player)

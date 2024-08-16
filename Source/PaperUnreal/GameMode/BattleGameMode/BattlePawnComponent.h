@@ -4,12 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "BattleGameStateComponent.h"
+#include "BattlePawnKillerComponent.h"
 #include "BattlePlayerStateComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "PaperUnreal/AreaTracer/AreaSlasherComponent.h"
 #include "PaperUnreal/AreaTracer/AreaSpawnerComponent.h"
 #include "PaperUnreal/AreaTracer/ReplicatedTracerPathComponent.h"
 #include "PaperUnreal/AreaTracer/TracerComponent.h"
-#include "PaperUnreal/AreaTracer/TracerKillerComponent.h"
 #include "PaperUnreal/AreaTracer/TracerOverlapCheckerComponent.h"
 #include "PaperUnreal/AreaTracer/TracerToAreaConverterComponent.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
@@ -146,7 +147,7 @@ private:
 			}
 		});
 
-		auto Killer = NewChildComponent<UTracerKillerComponent>(GetOwner());
+		auto Killer = NewChildComponent<UBattlePawnKillerComponent>(GetOwner());
 		Killer->SetTracer(Tracer.Get()->ServerTracerPath);
 		Killer->SetArea(ServerHomeArea->ServerAreaBoundary);
 		Killer->SetOverlapChecker(ServerOverlapChecker);
@@ -158,6 +159,8 @@ private:
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
 			co_await Life.Get()->GetbAlive().If(false);
+
+			GetOuterACharacter2()->GetCharacterMovement()->DisableMovement();
 
 			// 현재 얘만 파괴해주면 나머지 컴포넌트는 디펜던시가 사라짐에 따라 알아서 사라짐
 			// Path를 파괴해서 상호작용을 없애 게임에 영향을 미치지 않게 한다
