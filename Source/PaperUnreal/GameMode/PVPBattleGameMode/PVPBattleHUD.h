@@ -122,7 +122,7 @@ private:
 
 				if (StageComponent->GetCurrentStage().Get() != PVPBattleStage::Result)
 				{
-					TAbortableCoroutineHandle S = InitiatePreResultSequence();
+					TAbortableCoroutineHandle S = InitiateMatchSequence();
 
 					// 렉이 심하게 걸렸다가 회복된 경우 StageComponent는 이미 파괴되어
 					// PVPBattleStage::Result의 Replication이 누락될 수 있음
@@ -155,7 +155,7 @@ private:
 	 * 이 함수는 코루틴이 살아있는 동안에 GameStateComponent와 StageComponent 멤버가 살아있다고 가정함
 	 * 이 함수의 Caller가 두 컴포넌트의 Valid 함을 보장해야 함
 	 */
-	FWeakCoroutine InitiatePreResultSequence()
+	FWeakCoroutine InitiateMatchSequence()
 	{
 		co_await SelectCharacter();
 
