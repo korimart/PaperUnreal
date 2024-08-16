@@ -18,7 +18,7 @@ struct FReplicatedStageInfo
 	FName Stage;
 
 	UPROPERTY()
-	float WorldStartTime;
+	float WorldStartTime = 0.f;
 };
 
 

@@ -17,13 +17,13 @@ struct FBattleResultItem
 	GENERATED_BODY()
 
 	UPROPERTY()
-	int32 TeamIndex;
+	int32 TeamIndex = -1;
 
 	UPROPERTY()
-	FLinearColor Color;
+	FLinearColor Color = FLinearColor::Black;
 
 	UPROPERTY()
-	float Area;
+	float Area = 0.f;
 };
 
 

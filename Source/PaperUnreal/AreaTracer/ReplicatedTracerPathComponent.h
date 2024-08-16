@@ -61,7 +61,7 @@ struct FOptionalVector2D
 	bool bSet = false;
 
 	UPROPERTY()
-	FVector2D Vector2D;
+	FVector2D Vector2D = FVector2D::ZeroVector;
 
 	FOptionalVector2D() = default;
 
