@@ -7,6 +7,7 @@
 #include "FreePlayerStateComponent.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
 #include "PaperUnreal/GameFramework2/GameModeComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/KillZComponent.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/PawnSpawnerComponent.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/ReadyStateComponent.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
@@ -70,5 +71,14 @@ private:
 			[&](APawn* Spawned) { NewChildComponent<UFreePawnComponent>(Spawned)->RegisterComponent(); });
 
 		Player->Possess(Pawn);
+
+		while (true)
+		{
+			auto KillZComponent = NewChildComponent<UKillZComponent>(Pawn);
+			KillZComponent->RegisterComponent();
+			co_await KillZComponent->OnKillZ;
+			Pawn->FindComponentByClass<UFreePawnComponent>()->GetTracer().Get()->ServerTracerPath->ClearPath();
+			Pawn->SetActorLocation({1500.f, 1500.f, 100.f});
+		}
 	}
 };

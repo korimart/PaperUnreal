@@ -24,6 +24,8 @@ public:
 	// TODO remove dependency
 	void SetNoPathArea(UAreaBoundaryComponent* Area) { NoPathArea = Area; }
 
+	void ClearPath() { EmptyPoints(); }
+
 private:
 	UPROPERTY()
 	UAreaBoundaryComponent* NoPathArea;

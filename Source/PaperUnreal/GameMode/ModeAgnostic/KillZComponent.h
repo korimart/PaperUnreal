@@ -25,7 +25,7 @@ private:
 	{
 		Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 		
-		if (GetOwner()->GetActorLocation().Z < -500.f)
+		if (GetOwner()->GetActorLocation().Z < -300.f)
 		{
 			OnKillZ.Broadcast();
 			DestroyComponent();

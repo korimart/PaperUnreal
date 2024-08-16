@@ -96,7 +96,6 @@ private:
 		{
 			auto KillZComponent = NewChildComponent<UKillZComponent>();
 			KillZComponent->RegisterComponent();
-			
 			co_await KillZComponent->OnKillZ;
 			
 			UE_LOG(LogBattleGameMode, Log, TEXT("%p KillZ로 인해 사망합니다"), this);

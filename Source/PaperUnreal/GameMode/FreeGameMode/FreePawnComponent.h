@@ -17,10 +17,16 @@ class UFreePawnComponent : public UComponentGroupComponent
 {
 	GENERATED_BODY()
 
+public:
+	TLiveDataView<UTracerComponent*&> GetTracer() const
+	{
+		return Tracer;
+	}
+
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_Tracer)
 	UTracerComponent* RepTracer;
-	TLiveData<UTracerComponent*&> Tracer{RepTracer};
+	mutable TLiveData<UTracerComponent*&> Tracer{RepTracer};
 
 	UFUNCTION()
 	void OnRep_Tracer() { Tracer.Notify(); }
