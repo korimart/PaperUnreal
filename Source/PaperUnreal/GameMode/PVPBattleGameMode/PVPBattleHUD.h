@@ -67,6 +67,9 @@ private:
 	TSubclassOf<UBattleResultWidget> ResultWidgetClass;
 
 	UPROPERTY(EditAnywhere)
+	UInputMappingContext* InGameSettingsMappingContext;
+
+	UPROPERTY(EditAnywhere)
 	UInputAction* EditConfigAction;
 	FSimpleMulticastDelegate OnEditConfigActionTriggered;
 	void OnEditConfigActionTriggeredFunc() { OnEditConfigActionTriggered.Broadcast(); }
@@ -87,6 +90,7 @@ private:
 	{
 		Super::BeginPlay();
 
+		GetEnhancedInputSubsystem()->AddMappingContext(InGameSettingsMappingContext, 0);
 		GetEnhancedInputComponent()->BindAction(EditConfigAction, ETriggerEvent::Triggered, this, &ThisClass::OnEditConfigActionTriggeredFunc);
 		GetEnhancedInputComponent()->BindAction(StartGameAction, ETriggerEvent::Triggered, this, &ThisClass::OnStartGameActionTriggeredFunc);
 		GetEnhancedInputComponent()->BindAction(SelectCharacterAction, ETriggerEvent::Triggered, this, &ThisClass::OnSelectCharacterActionTriggeredFunc);
@@ -137,7 +141,14 @@ private:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override
 	{
 		Super::EndPlay(EndPlayReason);
+		
 		WorldTimerComponent->DestroyComponent();
+
+		// 월드 종료로 인한 EndPlay 시에는 존재하지 않을 수 있음
+		if (const auto InputSubsystem = GetEnhancedInputSubsystem())
+		{
+			InputSubsystem->RemoveMappingContext(InGameSettingsMappingContext);
+		}
 	}
 
 	/**
@@ -191,8 +202,13 @@ private:
 	{
 		auto PawnComponent = co_await WaitForComponent<UBattlePawnComponent>(BattlePawn);
 		auto PawnLife = co_await PawnComponent->GetLife();
+
 		co_await PawnLife->GetbAlive().If(false);
+
 		FToastHandle H = ToastWidget->Toast(FText::FromString(TEXT("부활 대기 중...")));
+		TAbortableCoroutineHandle SelectCharacter
+			= WhileComponentIsValid<UCharacterSetterComponent>(&ThisClass::ListenToSelectCharacterActionTrigger);
+
 		co_await Awaitables::Forever();
 	}
 

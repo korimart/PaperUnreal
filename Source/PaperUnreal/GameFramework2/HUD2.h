@@ -3,11 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "EnhancedInputSubsystems.h"
 #include "EnhancedInputComponent.h"
 #include "PlayerController2.h"
 #include "GameFramework/HUD.h"
-#include "GameFramework/PlayerState.h"
-#include "PaperUnreal/WeakCoroutine/TransformAwaitable.h"
 #include "HUD2.generated.h"
 
 /**
@@ -22,6 +21,11 @@ public:
 	auto GetOwningPawn2() const
 	{
 		return CastChecked<APlayerController2>(GetOwningPlayerController())->GetPawn2();
+	}
+
+	UEnhancedInputLocalPlayerSubsystem* GetEnhancedInputSubsystem() const
+	{
+		return ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetOwningPlayerController()->GetLocalPlayer());
 	}
 
 	UEnhancedInputComponent* GetEnhancedInputComponent() const
