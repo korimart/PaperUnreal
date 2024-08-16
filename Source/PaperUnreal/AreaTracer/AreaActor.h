@@ -7,6 +7,7 @@
 #include "AreaMeshGeneratorComponent.h"
 #include "ReplicatedAreaBoundaryComponent.h"
 #include "PaperUnreal/GameFramework2/Actor2.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/AssetPaths.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/LifeComponent.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/SolidColorMaterial.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/TeamComponent.h"
@@ -56,6 +57,9 @@ private:
 		DOREPLIFETIME(ThisClass, RepServerCalculatedArea);
 	}
 
+	UPROPERTY()
+	FSolidColorMaterial ClientAreaMaterial;
+
 	AAreaActor()
 	{
 		bReplicates = true;
@@ -103,6 +107,18 @@ private:
 		ClientAreaMesh = NewObject<UAreaMeshComponent>(this);
 		ClientAreaMesh->RegisterComponent();
 
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
+		{
+			auto BaseColorMaterial = co_await RequestAsyncLoad(FAssetPaths::SoftBaseColorMaterial());
+			ClientAreaMaterial.SetBaseColorMaterial(BaseColorMaterial);
+			ClientAreaMesh->ConfigureMaterialSet({ClientAreaMaterial.Get()});
+
+			for (auto ColorStream = AreaBaseColor.MakeStream();;)
+			{
+				ClientAreaMaterial.SetColor(co_await ColorStream);
+			}
+		});
+
 		IAreaBoundaryProvider* AreaBoundaryProvider = GetNetMode() == NM_Client
 			? static_cast<IAreaBoundaryProvider*>(FindComponentByClass<UReplicatedAreaBoundaryComponent>())
 			: static_cast<IAreaBoundaryProvider*>(FindComponentByClass<UAreaBoundaryComponent>());
@@ -114,20 +130,6 @@ private:
 		AreaMeshGenerator->SetMeshSource(AreaBoundaryProvider);
 		AreaMeshGenerator->SetMeshDestination(ClientAreaMesh);
 		AreaMeshGenerator->RegisterComponent();
-
-		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
-		{
-			auto ColorStream = AreaBaseColor.MakeStream();
-			auto FirstColor = co_await ColorStream;
-			auto Material = co_await FSolidColorMaterial::Create(FirstColor);
-
-			ClientAreaMesh->ConfigureMaterialSet({Material.Get()});
-
-			while (true)
-			{
-				Material.SetColor(co_await ColorStream);
-			}
-		});
 
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{

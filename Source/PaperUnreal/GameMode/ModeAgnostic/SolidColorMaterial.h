@@ -3,48 +3,52 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "PaperUnreal/WeakCoroutine/CancellableFuture.h"
-#include "PaperUnreal/WeakCoroutine/MinimalCoroutine.h"
+#include "SolidColorMaterial.generated.h"
 
 
-class FSolidColorMaterial
+USTRUCT()
+struct FSolidColorMaterial
 {
-public:
-	static TCancellableFuture<FSolidColorMaterial> Create(const FLinearColor& Color)
+	GENERATED_BODY()
+
+	FSolidColorMaterial() = default;
+
+	void SetBaseColorMaterial(UMaterial* BaseColorMaterial)
 	{
-		auto [Promise, Future] = MakePromise<FSolidColorMaterial>();
-
-		[](TCancellablePromise<FSolidColorMaterial> Promise, FLinearColor Color) -> FMinimalCoroutine
-		{
-			static const TSoftObjectPtr<UMaterial> BaseColorMaterial
-			{
-				FSoftObjectPath{TEXT("/Script/Engine.Material'/Game/LevelPrototyping/Materials/M_Solid.M_Solid'")}
-			};
-
-			if (auto Material = co_await RequestAsyncLoad(BaseColorMaterial))
-			{
-				FSolidColorMaterial Ret{UMaterialInstanceDynamic::Create(Material.GetResult(), GetTransientPackage())};
-				Ret.SetColor(Color);
-				Promise.SetValue(Ret);
-			}
-		}(MoveTemp(Promise), Color);
-
-		return MoveTemp(Future);
+		Material = UMaterialInstanceDynamic::Create(BaseColorMaterial, GetTransientPackage());
+		UpdateMaterialParameterValues();
 	}
 
-	void SetColor(const FLinearColor& Color)
+	void SetColor(const FLinearColor& InColor)
 	{
-		static FName ColorParamName{TEXT("Base Color")};
-		Material->SetVectorParameterValue(ColorParamName, Color);
+		Color = InColor;
+		UpdateMaterialParameterValues();
 	}
 
-	UMaterialInstanceDynamic* Get() const { return Material.Get(); }
+	void SetOpacity(float InOpacity)
+	{
+		Opacity = InOpacity;
+		UpdateMaterialParameterValues();
+	}
+
+	UMaterialInstanceDynamic* Get() const { return Material; }
 
 private:
-	TStrongObjectPtr<UMaterialInstanceDynamic> Material;
+	UPROPERTY()
+	UMaterialInstanceDynamic* Material = nullptr;
+	
+	FLinearColor Color = FLinearColor::Black;
+	float Opacity = 1.f;
 
-	FSolidColorMaterial(UMaterialInstanceDynamic* Instance)
-		: Material(Instance)
+	void UpdateMaterialParameterValues()
 	{
+		if (IsValid(Material))
+		{
+			static FName ColorParamName{TEXT("Base Color")};
+			Material->SetVectorParameterValue(ColorParamName, Color);
+
+			static FName OpacityParamName{TEXT("Opacity")};
+			Material->SetScalarParameterValue(OpacityParamName, Opacity);
+		}
 	}
 };

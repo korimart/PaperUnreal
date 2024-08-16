@@ -8,6 +8,7 @@
 #include "TracerPointEventComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/AssetPaths.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/ComponentRegistry.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/LineMeshComponent.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/SolidColorMaterial.h"
@@ -47,7 +48,9 @@ private:
 	UPROPERTY()
 	ULineMeshComponent* ClientTracerMesh;
 
-	TLiveData<bool> bClientComponentsAttached;
+	UPROPERTY()
+	FSolidColorMaterial ClientTracerMaterial;
+
 	TAbortableCoroutineHandle<FWeakCoroutine> ColorFeeder;
 
 	virtual void AttachServerMachineComponents() override
@@ -79,22 +82,17 @@ private:
 			TracerPointEvent->RegisterComponent();
 			TracerPointEvent->AddEventListener(ClientTracerMesh);
 
-			bClientComponentsAttached = true;
+			auto BaseColorMaterial = co_await RequestAsyncLoad(FAssetPaths::SoftBaseColorMaterial());
+			ClientTracerMaterial.SetBaseColorMaterial(BaseColorMaterial);
+			ClientTracerMesh->ConfigureMaterialSet({ClientTracerMaterial.Get()});
 		});
 	}
 
 	FWeakCoroutine InitiateColorFeeder(TValueStream<FLinearColor> ColorStream)
 	{
-		co_await (bClientComponentsAttached.MakeStream() | Awaitables::If(true));
-		
-		auto FirstColor = co_await ColorStream;
-		auto Material = co_await FSolidColorMaterial::Create(FirstColor);
-
-		ClientTracerMesh->ConfigureMaterialSet({Material.Get()});
-
 		while (true)
 		{
-			Material.SetColor(co_await ColorStream);
+			ClientTracerMaterial.SetColor(co_await ColorStream);
 		}
 	}
 };
