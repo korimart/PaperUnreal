@@ -12,7 +12,7 @@ struct FLoggingPromise
 {
 	~FLoggingPromise()
 	{
-		if (LastCoAwaitSourceLocation)
+		if (LastCoAwaitSourceLocation && false)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("FLoggingPromise 에러 발생."));
 			UE_LOG(LogTemp, Warning, TEXT("파일: %hs"), LastCoAwaitSourceLocation->file_name());

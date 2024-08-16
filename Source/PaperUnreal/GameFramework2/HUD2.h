@@ -22,6 +22,11 @@ public:
 	{
 		return CastChecked<APlayerController2>(GetOwningPlayerController())->GetPawn2();
 	}
+	
+	auto GetOwningPawnOrSpectator2() const
+	{
+		return CastChecked<APlayerController2>(GetOwningPlayerController())->GetPawnOrSpectator2();
+	}
 
 	UEnhancedInputLocalPlayerSubsystem* GetEnhancedInputSubsystem() const
 	{

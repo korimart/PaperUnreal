@@ -119,7 +119,12 @@ private:
 		}
 		else
 		{
-			// TODO 꽉차서 더 이상 입장할 수 없으니 플레이어한테 알려주던가 그런 처리
+			// TODO 자리가 비면 입장시켜주기
+			UE_LOG(LogBattleGameMode, Log, TEXT("%p 플레이어 팀 세팅 실패 관전자로 게임 시작을 기다리는 중"), Player);
+			co_await (bGameStarted.MakeStream() | Awaitables::If(true));
+			
+			Player->ChangeState(NAME_Spectating);
+			Player->ClientGotoState(NAME_Spectating);
 			co_return;
 		}
 
@@ -230,6 +235,12 @@ private:
 		{
 			UE_LOG(LogBattleGameMode, Log, TEXT("팀의 수가 1이하이므로 게임을 종료합니다"));
 		}
+		
+		for (APlayerState* Each : GetWorld()->GetGameState()->PlayerArray)
+		{
+			Each->GetPlayerController()->ChangeState(NAME_Spectating);
+			Each->GetPlayerController()->ClientGotoState(NAME_Spectating);
+		}
 
 		FBattleResult Result;
 		for (const auto& [TeamIndex, Color] : TeamColors)
@@ -245,7 +256,7 @@ private:
 
 		// TODO 두 에리어가 동시에 파괴되면 무승부가 발생할 수 있음
 		Algo::SortBy(Result.Items, &FBattleResultItem::Area, TGreater{});
-		
+
 		GameStateComponent->SetBattleResult(Result);
 	}
 
@@ -298,7 +309,7 @@ public:
 		Impl->Start(GameStateComponent).Then([Promise = MoveTemp(Promise)](const auto&) mutable { Promise.SetValue(); });
 		return MoveTemp(Future);
 	}
-	
+
 	UBattleGameStateComponent* GetGameStateComponent() const
 	{
 		return GameStateComponent;
@@ -307,7 +318,7 @@ public:
 private:
 	UPROPERTY()
 	UBattleGameModeComponentImpl* Impl;
-	
+
 	UPROPERTY()
 	UBattleGameStateComponent* GameStateComponent;
 };

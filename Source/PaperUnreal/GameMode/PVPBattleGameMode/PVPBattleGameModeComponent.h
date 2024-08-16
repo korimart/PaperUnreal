@@ -180,8 +180,6 @@ private:
 			for (APlayerState* Each : GetWorld()->GetGameState()->PlayerArray)
 			{
 				Each->FindComponentByClass<UReadyStateComponent>()->SetbReady(false);
-				Each->GetPlayerController()->ChangeState(NAME_Spectating);
-				Each->GetPlayerController()->ClientGotoState(NAME_Spectating);
 			}
 
 			PrevBattleGameModeComponent = BattleGameMode;

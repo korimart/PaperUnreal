@@ -18,13 +18,30 @@ class APlayerController2 : public APlayerController
 
 public:
 	TLiveDataView<APawn*> GetPawn2() { return Pawn2; }
+	TLiveDataView<APawn*> GetSpectatorPawn2() { return SpectatorPawn2; }
+
+	auto GetPawnOrSpectator2()
+	{
+		return Stream::Combine(GetPawn2().MakeStream(), GetSpectatorPawn2().MakeStream())
+			| Awaitables::Transform([](APawn* InRegularPawn, APawn* InSpectatorPawn)
+			{
+				return IsValid(InRegularPawn) ? InRegularPawn : InSpectatorPawn;
+			});
+	}
+
 	TLiveDataView<TObjectPtr<APlayerState>&> GetPlayerState() { return PlayerStateLiveData; }
-	
+
 protected:
 	virtual void BeginPlay() override
 	{
 		Super::BeginPlay();
 		OnPossessedPawnChanged.AddUniqueDynamic(this, &ThisClass::OnPossessedPawnChangedDynamicCallback);
+	}
+
+	virtual void SetSpectatorPawn(ASpectatorPawn* NewSpectatorPawn) override
+	{
+		Super::SetSpectatorPawn(NewSpectatorPawn);
+		SpectatorPawn2 = GetSpectatorPawn();
 	}
 
 	// 아래는 서버가 지정하는 Pawn이 없을 때 클라가 클라폰(Spectator Pawn)을 사용하게 하기 위한 코드인데
@@ -68,7 +85,7 @@ protected:
 	{
 		Super::SetViewTarget(GetSpectatorPawn() ? GetSpectatorPawn() : NewViewTarget, TransitionParams);
 	}
-	
+
 	virtual void OnRep_PlayerState() override
 	{
 		Super::OnRep_PlayerState();
@@ -77,8 +94,9 @@ protected:
 
 private:
 	TLiveData<APawn*> Pawn2;
+	TLiveData<APawn*> SpectatorPawn2;
 	TLiveData<TObjectPtr<APlayerState>&> PlayerStateLiveData{PlayerState};
-	
+
 	UFUNCTION()
 	void OnPossessedPawnChangedDynamicCallback(APawn* InOldPawn, APawn* InNewPawn)
 	{

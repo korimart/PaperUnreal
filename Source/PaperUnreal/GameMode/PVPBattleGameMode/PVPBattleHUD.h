@@ -141,7 +141,7 @@ private:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override
 	{
 		Super::EndPlay(EndPlayReason);
-		
+
 		WorldTimerComponent->DestroyComponent();
 
 		// 월드 종료로 인한 EndPlay 시에는 존재하지 않을 수 있음
@@ -190,12 +190,25 @@ private:
 		TAbortableCoroutineHandle Time = ShowTime();
 
 		TAbortableCoroutineHandle<FWeakCoroutine> PawnSequence;
-		auto PawnStream = GetOwningPawn2().MakeStream() | Awaitables::IfValid();
+		auto PawnStream = GetOwningPawnOrSpectator2() | Awaitables::IfValid();
 		while (true)
 		{
 			APawn* Pawn = (co_await PawnStream).Unsafe();
-			PawnSequence = InitiateBattlePawnSequence(Pawn);
+			PawnSequence = Pawn->IsA<ASpectatorPawn>()
+				? InitiateSpectatorPawnSequence(Pawn)
+				: InitiateBattlePawnSequence(Pawn);
 		}
+	}
+
+	FWeakCoroutine InitiateSpectatorPawnSequence(APawn* SpectatorPawn)
+	{
+		{
+			FToastHandle H = ToastWidget->Toast(FText::FromString(TEXT("경기 정원이 가득차 관전자로 배정되었습니다.")));
+			co_await WaitForSeconds(GetWorld(), 5.f);
+		}
+		
+		FToastHandle H = ToastWidget->Toast(FText::FromString(TEXT("관전 모드")));
+		co_await Awaitables::Forever();
 	}
 
 	FWeakCoroutine InitiateBattlePawnSequence(APawn* BattlePawn)
