@@ -85,7 +85,7 @@ private:
 
 	FWeakCoroutine InitiateColorFeeder(TValueStream<FLinearColor> ColorStream)
 	{
-		co_await (bClientComponentsAttached.CreateStream() | Awaitables::If(true));
+		co_await (bClientComponentsAttached.MakeStream() | Awaitables::If(true));
 		
 		auto FirstColor = co_await ColorStream;
 		auto Material = co_await FSolidColorMaterial::Create(FirstColor);

@@ -13,7 +13,7 @@ bool FWhileTrueAwaitableTest::RunTest(const FString& Parameters)
 
 		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
-			co_await (LiveData.CreateStream() | Awaitables::WhileTrue([&]()
+			co_await (LiveData.MakeStream() | Awaitables::WhileTrue([&]()
 			{
 				return [](bool& bStarted) -> FMinimalAbortableCoroutine
 				{

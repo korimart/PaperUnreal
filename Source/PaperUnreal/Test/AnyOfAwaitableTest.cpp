@@ -82,7 +82,7 @@ bool FAnyOfAwaitableTest::RunTest(const FString& Parameters)
 		TArray<int32> Received;
 		FWeakCoroutine Coroutine = RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
-			auto AnyOfAwaitable = Awaitables::AnyOf(LiveData0.CreateStream(), LiveData1.CreateStream());
+			auto AnyOfAwaitable = Awaitables::AnyOf(LiveData0.MakeStream(), LiveData1.MakeStream());
 
 			while (true)
 			{

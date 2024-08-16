@@ -105,7 +105,7 @@ private:
 		co_await AddToWeakList(Player);
 
 		UE_LOG(LogBattleGameMode, Log, TEXT("%p 플레이어 입장 게임설정을 기다리는 중"), Player);
-		co_await (bConfigured.CreateStream() | Awaitables::If(true));
+		co_await (bConfigured.MakeStream() | Awaitables::If(true));
 
 		auto ReadyState = Player->PlayerState->FindComponentByClass<UReadyStateComponent>();
 		auto PlayerStateComponent = Player->PlayerState->FindComponentByClass<UBattlePlayerStateComponent>();
@@ -135,7 +135,7 @@ private:
 		Inventory->SetTracerBaseColor(ALittleBrighter(TeamColors[ThisPlayerTeamIndex]));
 
 		UE_LOG(LogBattleGameMode, Log, TEXT("%p 플레이어 팀 세팅 완료 게임 시작을 기다리는 중"), Player);
-		co_await (bGameStarted.CreateStream() | Awaitables::If(true));
+		co_await (bGameStarted.MakeStream() | Awaitables::If(true));
 
 		InitiatePawnSpawnSequence(Player, ThisPlayerTeamIndex);
 	}

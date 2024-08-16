@@ -48,36 +48,36 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 		TArray<int32> Received;
 		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
-			for (auto Stream = LiveData.CreateStream();;)
+			for (auto Stream = LiveData.MakeStream();;)
 			{
 				Received.Add(co_await Stream);
 			}
 		});
 
-		TestEqual(TEXT("non validable type인 live data의 CreateStream 테스트"), Received.Num(), 1);
-		TestEqual(TEXT("non validable type인 live data의 CreateStream 테스트"), Received.Last(), 0);
+		TestEqual(TEXT("non validable type인 live data의 MakeStream 테스트"), Received.Num(), 1);
+		TestEqual(TEXT("non validable type인 live data의 MakeStream 테스트"), Received.Last(), 0);
 		LiveData = 0;
-		TestEqual(TEXT("non validable type인 live data의 CreateStream 테스트"), Received.Num(), 1);
-		TestEqual(TEXT("non validable type인 live data의 CreateStream 테스트"), Received.Last(), 0);
+		TestEqual(TEXT("non validable type인 live data의 MakeStream 테스트"), Received.Num(), 1);
+		TestEqual(TEXT("non validable type인 live data의 MakeStream 테스트"), Received.Last(), 0);
 		LiveData = 1;
-		TestEqual(TEXT("non validable type인 live data의 CreateStream 테스트"), Received.Num(), 2);
-		TestEqual(TEXT("non validable type인 live data의 CreateStream 테스트"), Received.Last(), 1);
+		TestEqual(TEXT("non validable type인 live data의 MakeStream 테스트"), Received.Num(), 2);
+		TestEqual(TEXT("non validable type인 live data의 MakeStream 테스트"), Received.Last(), 1);
 		LiveData = 5;
-		TestEqual(TEXT("non validable type인 live data의 CreateStream 테스트"), Received.Num(), 3);
-		TestEqual(TEXT("non validable type인 live data의 CreateStream 테스트"), Received.Last(), 5);
+		TestEqual(TEXT("non validable type인 live data의 MakeStream 테스트"), Received.Num(), 3);
+		TestEqual(TEXT("non validable type인 live data의 MakeStream 테스트"), Received.Last(), 5);
 		LiveData.SetValue(5);
-		TestEqual(TEXT("non validable type인 live data의 CreateStream 테스트"), Received.Num(), 3);
-		TestEqual(TEXT("non validable type인 live data의 CreateStream 테스트"), Received.Last(), 5);
+		TestEqual(TEXT("non validable type인 live data의 MakeStream 테스트"), Received.Num(), 3);
+		TestEqual(TEXT("non validable type인 live data의 MakeStream 테스트"), Received.Last(), 5);
 		LiveData.SetValueNoComparison(5);
-		TestEqual(TEXT("non validable type인 live data의 CreateStream 테스트"), Received.Num(), 4);
-		TestEqual(TEXT("non validable type인 live data의 CreateStream 테스트"), Received.Last(), 5);
+		TestEqual(TEXT("non validable type인 live data의 MakeStream 테스트"), Received.Num(), 4);
+		TestEqual(TEXT("non validable type인 live data의 MakeStream 테스트"), Received.Last(), 5);
 		LiveData.Modify([&](int32& Value)
 		{
 			Value = 6;
 			return true;
 		});
-		TestEqual(TEXT("non validable type인 live data의 CreateStream 테스트"), Received.Num(), 5);
-		TestEqual(TEXT("non validable type인 live data의 CreateStream 테스트"), Received.Last(), 6);
+		TestEqual(TEXT("non validable type인 live data의 MakeStream 테스트"), Received.Num(), 5);
+		TestEqual(TEXT("non validable type인 live data의 MakeStream 테스트"), Received.Last(), 6);
 	}
 
 	{
@@ -87,7 +87,7 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 		auto Handle = LiveData.Observe([](auto)
 		{
 		});
-		LiveData.CreateStream();
+		LiveData.MakeStream();
 		LiveData.SetValue(5);
 	}
 

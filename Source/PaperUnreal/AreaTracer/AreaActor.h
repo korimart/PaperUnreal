@@ -80,8 +80,8 @@ private:
 
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
-			auto AreaStream = ServerAreaBoundary->GetBoundary().CreateStream() | Awaitables::Transform(&FLoopedSegmentArray2D::CalculateArea);
-			auto LifeAndArea = Stream::Combine(LifeComponent->GetbAlive().CreateStream(), MoveTemp(AreaStream));
+			auto AreaStream = ServerAreaBoundary->GetBoundary().MakeStream() | Awaitables::Transform(&FLoopedSegmentArray2D::CalculateArea);
+			auto LifeAndArea = Stream::Combine(LifeComponent->GetbAlive().MakeStream(), MoveTemp(AreaStream));
 
 			while (true)
 			{
@@ -117,7 +117,7 @@ private:
 
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
-			auto ColorStream = AreaBaseColor.CreateStream();
+			auto ColorStream = AreaBaseColor.MakeStream();
 			auto FirstColor = co_await ColorStream;
 			auto Material = co_await FSolidColorMaterial::Create(FirstColor);
 

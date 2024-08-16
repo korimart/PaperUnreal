@@ -54,7 +54,7 @@ private:
 	FWeakCoroutine InitiatePawnSpawnSequence(APlayerController* Player)
 	{
 		co_await AddToWeakList(Player);
-		co_await (bStarted.CreateStream() | Awaitables::If(true));
+		co_await (bStarted.MakeStream() | Awaitables::If(true));
 
 		Player
 			->PlayerState

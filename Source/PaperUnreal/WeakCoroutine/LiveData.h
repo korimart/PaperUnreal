@@ -339,7 +339,7 @@ public:
 		};
 	}
 
-	TValueStream<DecayedValueType> CreateStream()
+	TValueStream<DecayedValueType> MakeStream()
 	{
 		return MakeStreamFromDelegate(
 			OnChanged, TArray<DecayedValueType>{Value}).template Get<0>();
@@ -618,7 +618,7 @@ public:
 	template <typename... ArgTypes>
 	decltype(auto) ObserveRemoveIfValid(ArgTypes&&... Args) { return LiveData.ObserveRemoveIfValid(Forward<ArgTypes>(Args)...); }
 
-	decltype(auto) CreateStream() { return LiveData.CreateStream(); }
+	decltype(auto) MakeStream() { return LiveData.MakeStream(); }
 	decltype(auto) CreateAddStream() { return LiveData.CreateAddStream(); }
 	decltype(auto) CreateStrictAddStream() { return LiveData.CreateStrictAddStream(); }
 
@@ -638,13 +638,13 @@ public:
 	template <typename ArgType>
 	auto If(ArgType&& OfThis)
 	{
-		return CreateStream() | Awaitables::If(Forward<ArgType>(OfThis));
+		return MakeStream() | Awaitables::If(Forward<ArgType>(OfThis));
 	}
 	
 	template <typename ArgType>
 	auto IfNot(ArgType&& OfThis)
 	{
-		return CreateStream() | Awaitables::IfNot(Forward<ArgType>(OfThis));
+		return MakeStream() | Awaitables::IfNot(Forward<ArgType>(OfThis));
 	}
 
 	//

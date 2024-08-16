@@ -190,7 +190,7 @@ private:
 		TAbortableCoroutineHandle Time = ShowTime();
 
 		TAbortableCoroutineHandle<FWeakCoroutine> PawnSequence;
-		auto PawnStream = GetOwningPawn2().CreateStream() | Awaitables::IfValid();
+		auto PawnStream = GetOwningPawn2().MakeStream() | Awaitables::IfValid();
 		while (true)
 		{
 			APawn* Pawn = (co_await PawnStream).Unsafe();
@@ -327,7 +327,7 @@ private:
 				co_await AddToWeakList(Area);
 				co_await AddToWeakList(TeamScoresWidget);
 
-				auto AreaAreaStream = Area->GetServerCalculatedArea().CreateStream();
+				auto AreaAreaStream = Area->GetServerCalculatedArea().MakeStream();
 
 				while (true)
 				{

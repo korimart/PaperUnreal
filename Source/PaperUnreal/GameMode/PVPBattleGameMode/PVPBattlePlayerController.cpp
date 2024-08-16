@@ -19,7 +19,7 @@ void APVPBattlePlayerController::BeginPlay()
 		{
 			TOptional<FWeakCoroutine> WaitingForDeath;
 
-			for (auto PawnStream = GetPawn2().CreateStream();;)
+			for (auto PawnStream = GetPawn2().MakeStream();;)
 			{
 				auto PossessedPawn = co_await PawnStream;
 

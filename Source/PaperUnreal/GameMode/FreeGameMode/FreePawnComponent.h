@@ -46,11 +46,11 @@ private:
 			auto Inventory = co_await PlayerStateComponent->GetInventoryComponent();
 
 			auto MeshFeeder = NewChildComponent<UCharacterMeshFeeder>();
-			MeshFeeder->SetMeshStream(Inventory->GetCharacterMesh().CreateStream());
+			MeshFeeder->SetMeshStream(Inventory->GetCharacterMesh().MakeStream());
 			MeshFeeder->RegisterComponent();
 
 			co_await Tracer;
-			Tracer.Get()->SetTracerColorStream(Inventory->GetTracerBaseColor().CreateStream());
+			Tracer.Get()->SetTracerColorStream(Inventory->GetTracerBaseColor().MakeStream());
 		});
 	}
 };

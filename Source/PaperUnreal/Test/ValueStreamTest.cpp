@@ -52,9 +52,9 @@ bool FValueStreamTest::RunTest(const FString& Parameters)
 		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
 			auto AllEven = Stream::AllOf(
-				LiveData0.CreateStream() | Awaitables::Transform([](int32 Value) { return Value % 2 == 0; }),
-				LiveData1.CreateStream() | Awaitables::Transform([](int32 Value) { return Value % 2 == 0; }),
-				LiveData2.CreateStream() | Awaitables::Transform([](int32 Value) { return Value % 2 == 0; }));
+				LiveData0.MakeStream() | Awaitables::Transform([](int32 Value) { return Value % 2 == 0; }),
+				LiveData1.MakeStream() | Awaitables::Transform([](int32 Value) { return Value % 2 == 0; }),
+				LiveData2.MakeStream() | Awaitables::Transform([](int32 Value) { return Value % 2 == 0; }));
 
 			while (true)
 			{
