@@ -152,8 +152,16 @@ private:
 
 			auto BattleGameMode = NewChildComponent<UBattleGameModeComponent>();
 			BattleGameMode->RegisterComponent();
-			// TODO real numbers
-			BattleGameMode->Configure(2, 2);
+			
+			for (auto It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+			{
+				if (auto BattleConfig = It->Get()->FindComponentByClass<UBattleConfigComponent>())
+				{
+					FBattleConfig Config = BattleConfig->GetConfig();
+					BattleGameMode->Configure(Config.MaxTeamCount, Config.MaxMemberCount);
+					break;
+				}
+			}
 
 			const float PlayStartTime = GetWorld()->GetTimeSeconds() + 5.f;
 			StageComponent->SetStageWorldStartTime(PVPBattleStage::Playing, PlayStartTime);
