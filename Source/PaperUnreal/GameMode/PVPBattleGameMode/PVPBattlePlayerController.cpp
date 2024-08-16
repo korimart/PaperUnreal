@@ -17,34 +17,15 @@ void APVPBattlePlayerController::BeginPlay()
 	{
 		RunWeakCoroutine(this, [this, Subsystem]() -> FWeakCoroutine
 		{
-			TOptional<FWeakCoroutine> WaitingForDeath;
-
+			co_await AddToWeakList(Subsystem);
+			
 			for (auto PawnStream = GetPawn2().MakeStream();;)
 			{
 				auto PossessedPawn = co_await PawnStream;
 
-				if (WaitingForDeath)
-				{
-					WaitingForDeath->Abort();
-					WaitingForDeath.Reset();
-				}
-
 				if (!PossessedPawn || PossessedPawn->IsA<ASpectatorPawn>())
 				{
 					Subsystem->RemoveMappingContext(DefaultMappingContext);
-					continue;
-				}
-
-				if (ULifeComponent* LifeComponent = PossessedPawn->FindComponentByClass<ULifeComponent>())
-				{
-					WaitingForDeath = RunWeakCoroutine(this, [this, LifeComponent, Subsystem]() -> FWeakCoroutine
-					{
-						co_await AddToWeakList(LifeComponent);
-
-						Subsystem->AddMappingContext(DefaultMappingContext, 0);
-						co_await LifeComponent->GetbAlive().If(false);
-						Subsystem->RemoveMappingContext(DefaultMappingContext);
-					});
 				}
 				else
 				{
