@@ -17,7 +17,6 @@
 #include "PaperUnreal/GameFramework2/Character2.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/AssetPaths.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/CharacterMeshFeeder.h"
-#include "PaperUnreal/GameMode/ModeAgnostic/LineMeshComponent.h"
 #include "BattlePawnComponent.generated.h"
 
 
@@ -84,9 +83,6 @@ private:
 	UPROPERTY()
 	UTracerToAreaConverterComponent* ServerTracerToAreaConverter;
 
-	UPROPERTY()
-	ULineMeshComponent* ClientTracerMesh;
-
 	virtual void InitializeComponent() override
 	{
 		Super::InitializeComponent();
@@ -112,15 +108,19 @@ private:
 			co_await AddToWeakList(ServerOverlapChecker);
 			co_await AddToWeakList(ServerHomeArea);
 
-			auto PawnStream
+			auto PawnComponentStream
 				= ServerGameState->ServerPawnSpawner->GetSpawnedPawns().CreateAddStream()
 				| Awaitables::FindComponentByClass<UBattlePawnComponent>()
-				| Awaitables::Filter([this](auto Pawn) { return Pawn->ServerHomeArea != ServerHomeArea; });
+				| Awaitables::Filter([this](UBattlePawnComponent* PawnComponent)
+				{
+					return PawnComponent->GetLife().Get()->GetbAlive().Get()
+						&& PawnComponent->ServerHomeArea != ServerHomeArea;
+				});
 
 			while (true)
 			{
-				auto NewPawn = co_await PawnStream;
-				ServerOverlapChecker->AddOverlapTarget(NewPawn->Tracer.Get()->ServerTracerPath);
+				auto NewPawnComponent = co_await PawnComponentStream;
+				ServerOverlapChecker->AddOverlapTarget(NewPawnComponent->Tracer.Get()->ServerTracerPath);
 			}
 		});
 
@@ -136,6 +136,7 @@ private:
 
 			auto AreaStream
 				= ServerGameState->GetAreaSpawner().Get()->GetSpawnedAreas().CreateAddStream()
+				| Awaitables::Filter([](AAreaActor* Area) { return Area->LifeComponent->GetbAlive().Get(); })
 				| Awaitables::IfNot(ServerHomeArea);
 
 			while (true)
@@ -165,7 +166,7 @@ private:
 
 			// 현재 얘만 파괴해주면 나머지 컴포넌트는 디펜던시가 사라짐에 따라 알아서 사라짐
 			// Path를 파괴해서 상호작용을 없애 게임에 영향을 미치지 않게 한다
-			FindAndDestroyComponent<UTracerPathComponent>(GetOwner());
+			Tracer.Get()->DestroyComponent();
 
 			// 클라이언트에서 데스 애니메이션을 플레이하고 액터를 숨기기에 충분한 시간을 준다
 			co_await WaitForSeconds(GetWorld(), 10.f);

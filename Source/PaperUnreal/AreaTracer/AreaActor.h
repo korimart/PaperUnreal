@@ -134,8 +134,7 @@ private:
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
 			co_await LifeComponent->GetbAlive().If(false);
-
-			// TODO play death animation
+			ClientAreaMesh->DestroyComponent();
 		});
 	}
 };
