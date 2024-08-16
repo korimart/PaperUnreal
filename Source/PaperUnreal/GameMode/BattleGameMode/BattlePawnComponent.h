@@ -44,14 +44,14 @@ private:
 	UPROPERTY(ReplicatedUsing=OnRep_Tracer)
 	UTracerComponent* RepTracer;
 	TLiveData<UTracerComponent*&> Tracer{RepTracer};
-	
+
 	UFUNCTION()
 	void OnRep_Tracer() { Tracer.Notify(); }
 
 	UPROPERTY(ReplicatedUsing=OnRep_TracerPathProvider)
 	TScriptInterface<ITracerPathProvider> RepTracerPathProvider;
 	TLiveData<TScriptInterface<ITracerPathProvider>&> TracerPathProvider{RepTracerPathProvider};
-	
+
 	UFUNCTION()
 	void OnRep_TracerPathProvider() { TracerPathProvider.Notify(); }
 
@@ -188,9 +188,18 @@ private:
 
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
+			const TSoftClassPtr<AActor> SoftExplosionActorClass
+			{
+				FSoftObjectPath{TEXT("/Script/Engine.Blueprint'/Game/ExplostionFromStarterContent/Blueprint_Effect_Explosion.Blueprint_Effect_Explosion_C'")}
+			};
+			
+			TStrongObjectPtr ExplosionActorClass{(co_await RequestAsyncLoad(SoftExplosionActorClass)).Unsafe()};
+
 			co_await Life;
 			co_await Life.Get()->GetbAlive().If(false);
-			// TODO play death animation and hide actor
+
+			GetOwner()->GetRootComponent()->SetVisibility(false, true);
+			GetWorld()->SpawnActorAbsolute(ExplosionActorClass.Get(), GetOwner()->GetActorTransform());
 		});
 	}
 };
