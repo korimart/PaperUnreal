@@ -49,8 +49,8 @@ private:
 		// 만약 이전 게임모드에서 골라놓은 게 있으면 그걸 기본값으로 일단 사용한다
 		if (auto Setter = GetOuterAPlayerState()->GetPlayerController()->FindComponentByClass<UCharacterSetterComponent>())
 		{
-			InventoryComponent.Get()->SetCharacterMesh(Setter->MostRecentChoice);
+			InventoryComponent->SetCharacterMesh(Setter->MostRecentChoice);
 		}
-		InventoryComponent.Get()->RegisterComponent();
+		InventoryComponent->RegisterComponent();
 	}
 };

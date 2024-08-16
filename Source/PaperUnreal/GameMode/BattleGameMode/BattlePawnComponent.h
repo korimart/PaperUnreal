@@ -96,11 +96,11 @@ private:
 	virtual void AttachServerMachineComponents() override
 	{
 		Tracer = NewChildComponent<UTracerComponent>(GetOwner());
-		Tracer.Get()->RegisterComponent();
-		Tracer.Get()->ServerTracerPath->SetNoPathArea(ServerHomeArea->ServerAreaBoundary);
+		Tracer->RegisterComponent();
+		Tracer->ServerTracerPath->SetNoPathArea(ServerHomeArea->ServerAreaBoundary);
 
 		ServerOverlapChecker = NewChildComponent<UTracerOverlapCheckerComponent>(GetOwner());
-		ServerOverlapChecker->SetTracer(Tracer.Get()->ServerTracerPath);
+		ServerOverlapChecker->SetTracer(Tracer->ServerTracerPath);
 		ServerOverlapChecker->RegisterComponent();
 
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
@@ -113,19 +113,19 @@ private:
 				| Awaitables::FindComponentByClass<UBattlePawnComponent>()
 				| Awaitables::Filter([this](UBattlePawnComponent* PawnComponent)
 				{
-					return PawnComponent->GetLife().Get()->GetbAlive().Get()
+					return PawnComponent->GetLife()->GetbAlive().Get()
 						&& PawnComponent->ServerHomeArea != ServerHomeArea;
 				});
 
 			while (true)
 			{
 				auto NewPawnComponent = co_await PawnComponentStream;
-				ServerOverlapChecker->AddOverlapTarget(NewPawnComponent->Tracer.Get()->ServerTracerPath);
+				ServerOverlapChecker->AddOverlapTarget(NewPawnComponent->Tracer->ServerTracerPath);
 			}
 		});
 
 		ServerTracerToAreaConverter = NewChildComponent<UTracerToAreaConverterComponent>(GetOwner());
-		ServerTracerToAreaConverter->SetTracer(Tracer.Get()->ServerTracerPath);
+		ServerTracerToAreaConverter->SetTracer(Tracer->ServerTracerPath);
 		ServerTracerToAreaConverter->SetConversionDestination(ServerHomeArea->ServerAreaBoundary);
 		ServerTracerToAreaConverter->RegisterComponent();
 
@@ -135,7 +135,7 @@ private:
 			co_await AddToWeakList(ServerHomeArea);
 
 			auto AreaStream
-				= ServerGameState->GetAreaSpawner().Get()->GetSpawnedAreas().CreateAddStream()
+				= ServerGameState->GetAreaSpawner()->GetSpawnedAreas().CreateAddStream()
 				| Awaitables::Filter([](AAreaActor* Area) { return Area->LifeComponent->GetbAlive().Get(); })
 				| Awaitables::IfNot(ServerHomeArea);
 
@@ -150,23 +150,23 @@ private:
 		});
 
 		auto Killer = NewChildComponent<UBattlePawnKillerComponent>(GetOwner());
-		Killer->SetTracer(Tracer.Get()->ServerTracerPath);
+		Killer->SetTracer(Tracer->ServerTracerPath);
 		Killer->SetArea(ServerHomeArea->ServerAreaBoundary);
 		Killer->SetOverlapChecker(ServerOverlapChecker);
 		Killer->RegisterComponent();
 
 		Life = NewChildComponent<ULifeComponent>(GetOwner());
-		Life.Get()->RegisterComponent();
+		Life->RegisterComponent();
 
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
-			co_await Life.Get()->GetbAlive().If(false);
+			co_await Life->GetbAlive().If(false);
 
 			GetOuterACharacter2()->GetCharacterMovement()->DisableMovement();
 
 			// 현재 얘만 파괴해주면 나머지 컴포넌트는 디펜던시가 사라짐에 따라 알아서 사라짐
 			// Path를 파괴해서 상호작용을 없애 게임에 영향을 미치지 않게 한다
-			Tracer.Get()->DestroyComponent();
+			Tracer->DestroyComponent();
 
 			// 클라이언트에서 데스 애니메이션을 플레이하고 액터를 숨기기에 충분한 시간을 준다
 			co_await WaitForSeconds(GetWorld(), 10.f);
@@ -188,7 +188,7 @@ private:
 			MeshFeeder->RegisterComponent();
 
 			co_await Tracer;
-			Tracer.Get()->SetTracerColorStream(Inventory->GetTracerBaseColor().MakeStream());
+			Tracer->SetTracerColorStream(Inventory->GetTracerBaseColor().MakeStream());
 		});
 
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
@@ -196,7 +196,7 @@ private:
 			TStrongObjectPtr ExplosionActorClass{(co_await RequestAsyncLoad(FAssetPaths::SoftExplosionActor())).Unsafe()};
 
 			co_await Life;
-			co_await Life.Get()->GetbAlive().If(false);
+			co_await Life->GetbAlive().If(false);
 
 			GetOwner()->GetRootComponent()->SetVisibility(false, true);
 			GetWorld()->SpawnActorAbsolute(ExplosionActorClass.Get(), GetOwner()->GetActorTransform());

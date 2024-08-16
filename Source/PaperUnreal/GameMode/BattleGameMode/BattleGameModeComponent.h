@@ -93,7 +93,7 @@ private:
 			if (auto PawnComponent = Pawn->FindComponentByClass<UBattlePawnComponent>())
 			{
 				UE_LOG(LogBattleGameMode, Log, TEXT("%p 플레이어가 접속을 종료함에 따라 폰을 사망시킵니다"), PC);
-				PawnComponent->GetLife().Get()->SetbAlive(false);
+				PawnComponent->GetLife()->SetbAlive(false);
 			}
 		}
 	}
@@ -181,7 +181,7 @@ private:
 		co_await AddToWeakList(Pawn);
 
 		UE_LOG(LogBattleGameMode, Log, TEXT("%p 폰의 사망을 기다리는 중"), Pawn);
-		co_await Pawn->GetLife().Get()->GetbAlive().If(false);
+		co_await Pawn->GetLife()->GetbAlive().If(false);
 
 		UE_LOG(LogBattleGameMode, Log, TEXT("%p 폰이 사망함에 따라 영역 파괴를 검토하는 중"), Pawn);
 		if (GameStateComponent->KillAreaIfNobodyAlive(TeamIndex))
@@ -251,7 +251,7 @@ private:
 
 	AAreaActor* InitializeNewAreaActor(int32 TeamIndex)
 	{
-		return GameStateComponent->GetAreaSpawner().Get()->SpawnAreaAtRandomEmptyLocation([&](AAreaActor* Area)
+		return GameStateComponent->GetAreaSpawner()->SpawnAreaAtRandomEmptyLocation([&](AAreaActor* Area)
 		{
 			Area->TeamComponent->SetTeamIndex(TeamIndex);
 			Area->SetAreaBaseColor(TeamColors.FindRef(TeamIndex));

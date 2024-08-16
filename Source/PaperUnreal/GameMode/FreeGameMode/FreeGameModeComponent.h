@@ -77,7 +77,7 @@ private:
 			auto KillZComponent = NewChildComponent<UKillZComponent>(Pawn);
 			KillZComponent->RegisterComponent();
 			co_await KillZComponent->OnKillZ;
-			Pawn->FindComponentByClass<UFreePawnComponent>()->GetTracer().Get()->ServerTracerPath->ClearPath();
+			Pawn->FindComponentByClass<UFreePawnComponent>()->GetTracer()->ServerTracerPath->ClearPath();
 			Pawn->SetActorLocation({1500.f, 1500.f, 100.f});
 		}
 	}

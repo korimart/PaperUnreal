@@ -101,7 +101,7 @@ public:
 
 	AAreaActor* FindLivingAreaOfTeam(int32 TeamIndex) const
 	{
-		return ValidOrNull(AreaSpawner.Get()->GetSpawnedAreas().Get().FindByPredicate([&](AAreaActor* Each)
+		return ValidOrNull(AreaSpawner->GetSpawnedAreas().Get().FindByPredicate([&](AAreaActor* Each)
 		{
 			return IsValid(Each)
 				&& Each->LifeComponent->GetbAlive().Get()
@@ -174,7 +174,7 @@ private:
 		ServerWorldTimer->RegisterComponent();
 
 		AreaSpawner = NewChildComponent<UAreaSpawnerComponent>(GetOuterAGameStateBase());
-		AreaSpawner.Get()->RegisterComponent();
+		AreaSpawner->RegisterComponent();
 
 		ServerPawnSpawner = NewChildComponent<UPawnSpawnerComponent>(GetOuterAGameStateBase());
 		ServerPawnSpawner->RegisterComponent();

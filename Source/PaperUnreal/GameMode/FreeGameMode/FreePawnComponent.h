@@ -40,7 +40,7 @@ private:
 	virtual void AttachServerMachineComponents() override
 	{
 		Tracer = NewChildComponent<UTracerComponent>();
-		Tracer.Get()->RegisterComponent();
+		Tracer->RegisterComponent();
 	}
 
 	virtual void AttachPlayerMachineComponents() override
@@ -56,7 +56,7 @@ private:
 			MeshFeeder->RegisterComponent();
 
 			co_await Tracer;
-			Tracer.Get()->SetTracerColorStream(Inventory->GetTracerBaseColor().MakeStream());
+			Tracer->SetTracerColorStream(Inventory->GetTracerBaseColor().MakeStream());
 		});
 	}
 };

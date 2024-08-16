@@ -94,14 +94,14 @@ class FLiveDataBase
 {
 public:
 	FLiveDataBase() = default;
-	
+
 	// Value Stream을 Multicast Delegate을 통해서 만들기 때문에 허용하면 여러 곳에서
 	// Value Stream을 Value를 넣을 수 있게 됨
 	FLiveDataBase(const FLiveDataBase&) = delete;
 	FLiveDataBase& operator=(const FLiveDataBase&) = delete;
 
 	FLiveDataBase(FLiveDataBase&&) = default;
-	
+
 protected:
 	bool bExecutingCallbacks = false;
 	TArray<TCancellablePromise<void>> CallbackGuardAwaiters;
@@ -309,6 +309,11 @@ public:
 	ConstRefValueType Get() const
 	{
 		return Value;
+	}
+
+	ConstRefValueType operator->() const requires std::is_pointer_v<DecayedValueType>
+	{
+		return Get();
 	}
 
 	bool IsValid() const requires Validator::bSupported
@@ -627,6 +632,9 @@ public:
 	decltype(auto) Get() { return LiveData.Get(); }
 	decltype(auto) Get() const { return LiveData.Get(); }
 
+	decltype(auto) operator->() const { return LiveData.operator->(); }
+	decltype(auto) operator->() { return LiveData.operator->(); }
+
 	//
 	// ~Forwarding Functions
 	//
@@ -640,7 +648,7 @@ public:
 	{
 		return MakeStream() | Awaitables::If(Forward<ArgType>(OfThis));
 	}
-	
+
 	template <typename ArgType>
 	auto IfNot(ArgType&& OfThis)
 	{
