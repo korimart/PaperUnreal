@@ -17,6 +17,11 @@ void UActorComponent2::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 	GetWorld()->GetSubsystem<UComponentRegistry>()->OnComponentEndPlay(this);
 	OnEndPlay.Broadcast();
+
+	if (EndPlayReason == EEndPlayReason::Destroyed)
+	{
+		OnDestroyed.Broadcast();
+	}
 }
 
 void UActorComponent2::AddLifeDependency(UActorComponent2* Dependency)

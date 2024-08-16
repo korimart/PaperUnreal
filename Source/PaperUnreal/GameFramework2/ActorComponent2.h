@@ -15,6 +15,7 @@ class UActorComponent2 : public UActorComponent
 public:
 	FSimpleMulticastDelegate OnBeginPlay;
 	FSimpleMulticastDelegate OnEndPlay;
+	FSimpleMulticastDelegate OnDestroyed;
 	
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;

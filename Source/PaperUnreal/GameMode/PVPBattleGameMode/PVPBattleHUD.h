@@ -104,13 +104,12 @@ private:
 		{
 			auto GameState = co_await WaitForGameState(GetWorld());
 
-			// 결과창을 오래 동안 보고 있으면 여러 매치가 끝나면서
-			// 스트림 안에는 이전 매치의 쓰레기가 된 Component들이 들어있음
-			// 그것들은 무시하고 항상 가장 최신의 Component를 받는다
 			auto GameStateComponentStream
 				= MakeComponentStream<UPVPBattleGameStateComponent>(GameState)
-				// TODO | Awaitables::Latest() 네트워크와 관련된 모종의 이유로 Valid인 StateComponent가 한 번에 여러개 존재할 수 있음
-				| Awaitables::IfValid();
+				// 결과창을 오래 동안 보고 있으면 여러 매치가 끝나면서
+				// 스트림 안에는 이전 매치의 쓰레기가 된 Component들이 들어있음
+				// 그것들은 무시하고 항상 가장 최신의 Component를 받는다
+				| Awaitables::IgnoreError<UInvalidObjectError>();
 
 			while (true)
 			{
@@ -119,8 +118,15 @@ private:
 
 				if (StageComponent->GetCurrentStage().Get() != PVPBattleStage::Result)
 				{
-					TAbortableCoroutineHandle S = SelectCharacterAndShowHUD();
-					co_await StageComponent->GetCurrentStage().If(PVPBattleStage::Result);
+					TAbortableCoroutineHandle S = InitiatePreResultSequence();
+
+					// 렉이 심하게 걸렸다가 회복된 경우 StageComponent는 이미 파괴되어
+					// PVPBattleStage::Result의 Replication이 누락될 수 있음
+					// 그래서 OnDestroyed도 함께 체크해준다 물론 이 경우 결과창에는 아무것도 표시할 수 없음
+					// @see ThisClass::ShowResults
+					co_await Awaitables::AnyOf(
+						StageComponent->GetCurrentStage().If(PVPBattleStage::Result),
+						StageComponent->OnDestroyed);
 				}
 
 				co_await ShowResults();
@@ -134,19 +140,23 @@ private:
 		WorldTimerComponent->DestroyComponent();
 	}
 
-	FWeakCoroutine SelectCharacterAndShowHUD()
+	/**
+	 * 이 함수는 코루틴이 살아있는 동안에 GameStateComponent와 StageComponent 멤버가 살아있다고 가정함
+	 * 이 함수의 Caller가 두 컴포넌트의 Valid 함을 보장해야 함
+	 */
+	FWeakCoroutine InitiatePreResultSequence()
 	{
 		co_await SelectCharacter();
 
 		if (StageComponent->GetCurrentStage().Get() == PVPBattleStage::WaitingForStart)
 		{
 			FToastHandle ToastHandle = ToastWidget->Toast(FText::FromString(TEXT("방장이 게임을 시작하길 기다리는 중...")));
-			
+
 			TArray<TAbortableCoroutineHandle<FWeakCoroutine>> Handles;
-			Handles << IfComponentValid<UBattleConfigComponent>(&ThisClass::ListenToEditConfigActionTrigger);
-			Handles << IfComponentValid<UGameStarterComponent>(&ThisClass::ListenToStartGameActionTrigger);
-			Handles << IfComponentValid<UCharacterSetterComponent>(&ThisClass::ListenToSelectCharacterActionTrigger);
-			
+			Handles << WhileComponentIsValid<UBattleConfigComponent>(&ThisClass::ListenToEditConfigActionTrigger);
+			Handles << WhileComponentIsValid<UGameStarterComponent>(&ThisClass::ListenToStartGameActionTrigger);
+			Handles << WhileComponentIsValid<UCharacterSetterComponent>(&ThisClass::ListenToSelectCharacterActionTrigger);
+
 			co_await StageComponent->GetCurrentStage().IfNot(PVPBattleStage::WaitingForStart);
 		}
 
@@ -161,7 +171,7 @@ private:
 			CountDownToast = ToastWidget->Toast(FText::FromString(TEXT("2초 뒤에 게임이 시작됩니다.")));
 			co_await WorldTimerComponent->At(StartTime - 1);
 			CountDownToast = ToastWidget->Toast(FText::FromString(TEXT("1초 뒤에 게임이 시작됩니다.")));
-			
+
 			co_await StageComponent->GetCurrentStage().IfNot(PVPBattleStage::WillPlay);
 		}
 
@@ -250,7 +260,7 @@ private:
 	FWeakCoroutine EditConfig()
 	{
 		auto ConfigComponent = co_await GetOwningPlayerController()->FindComponentByClass<UBattleConfigComponent>();
-		auto ConfigWidget = co_await CreateWidget<UBattleConfigWidget>(GetOwningPlayerController(), ConfigWidgetClass);
+		auto ConfigWidget = CreateWidget<UBattleConfigWidget>(GetOwningPlayerController(), ConfigWidgetClass);
 		auto S = ScopedAddToViewport(ConfigWidget);
 		bDialogOpen = true;
 		auto F = FinallyIfValid(this, [this]() { bDialogOpen = false; });
@@ -273,7 +283,7 @@ private:
 		auto CharacterSetter = co_await WaitForComponent<UCharacterSetterComponent>(GetOwningPlayerController());
 		auto ReadySetter = co_await WaitForComponent<UReadySetterComponent>(GetOwningPlayerController());
 
-		auto SelectCharacterWidget = co_await CreateWidget<USelectCharacterWidget>(GetOwningPlayerController(), SelectCharacterWidgetClass);
+		auto SelectCharacterWidget = CreateWidget<USelectCharacterWidget>(GetOwningPlayerController(), SelectCharacterWidgetClass);
 		auto S = ScopedAddToViewport(SelectCharacterWidget);
 		bDialogOpen = true;
 		auto F = FinallyIfValid(this, [this]() { bDialogOpen = false; });
@@ -286,7 +296,7 @@ private:
 	FWeakCoroutine ShowTeamScores()
 	{
 		auto BattleGameStateComponent = co_await GameStateComponent->GetBattleGameStateComponent();
-		auto TeamScoresWidget = co_await CreateWidget<UTeamScoresWidget>(GetOwningPlayerController(), TeamScoresWidgetClass);
+		auto TeamScoresWidget = CreateWidget<UTeamScoresWidget>(GetOwningPlayerController(), TeamScoresWidgetClass);
 		auto S = ScopedAddToViewport(TeamScoresWidget);
 
 		TAbortPtr<UAreaSpawnerComponent> AreaSpawner = co_await BattleGameStateComponent->GetAreaSpawner();
@@ -296,7 +306,7 @@ private:
 		{
 			AAreaActor* Area = (co_await AreaStream).Unsafe();
 
-			RunWeakCoroutine([Area, TeamScoresWidget = TeamScoresWidget.Unsafe()]() -> FWeakCoroutine
+			RunWeakCoroutine([Area, TeamScoresWidget = TeamScoresWidget]() -> FWeakCoroutine
 			{
 				co_await AddToWeakList(Area);
 				co_await AddToWeakList(TeamScoresWidget);
@@ -319,7 +329,7 @@ private:
 	FWeakCoroutine ShowTime()
 	{
 		auto BattleGameStateComponent = co_await GameStateComponent->GetBattleGameStateComponent();
-		auto TimeWidget = co_await CreateWidget<UTimeWidget>(GetOwningPlayerController(), TimeWidgetClass);
+		auto TimeWidget = CreateWidget<UTimeWidget>(GetOwningPlayerController(), TimeWidgetClass);
 		auto S = ScopedAddToViewport(TimeWidget);
 
 		const float EndTime = BattleGameStateComponent->GameEndWorldTime;
@@ -336,29 +346,37 @@ private:
 
 	FWeakCoroutine ShowResults()
 	{
-		auto BattleGameStateComponent = co_await GameStateComponent->GetBattleGameStateComponent();
-		auto ResultWidget = co_await CreateWidget<UBattleResultWidget>(GetOwningPlayerController(), ResultWidgetClass);
+		auto ResultWidget = CreateWidget<UBattleResultWidget>(GetOwningPlayerController(), ResultWidgetClass);
 		auto S = ScopedAddToViewport(ResultWidget);
 
-		const float ResultStartTime = co_await StageComponent->GetStageWorldStartTime(PVPBattleStage::Result);
-		co_await WorldTimerComponent->At(ResultStartTime + 3.f);
+		co_await WaitForSeconds(GetWorld(), 3.f);
 		ResultWidget->ShowScores();
 
-		TAbortableCoroutineHandle Handle = RunWeakCoroutine([&]() -> FWeakCoroutine
+		// 렉이 심하게 걸렸다가 회복된 경우 저번 매치는 이미 끝나서 GameStateComponent가 파괴되어있을 수 있음
+		TAbortableCoroutineHandle<FWeakCoroutine> Handle;
+		if (IsValid(GameStateComponent))
 		{
-			auto Result = co_await BattleGameStateComponent->GetBattleResult();
-			for (const FBattleResultItem& Each : Result.Items)
+			Handle = RunWeakCoroutine([&]() -> FWeakCoroutine
 			{
-				ResultWidget->TeamScoresWidget->FindOrSetTeamScore(Each.TeamIndex, Each.Color, Each.Area);
-			}
-			ResultWidget->OnScoresSet();
-		});
+				auto BattleGameStateComponent = co_await GameStateComponent->GetBattleGameStateComponent();
+				auto Result = co_await BattleGameStateComponent->GetBattleResult();
+				for (const FBattleResultItem& Each : Result.Items)
+				{
+					ResultWidget->TeamScoresWidget->FindOrSetTeamScore(Each.TeamIndex, Each.Color, Each.Area);
+				}
+				ResultWidget->OnScoresSet();
+			});
+		}
+		else
+		{
+			// TODO 렉이 너무 걸렸어서 결과를 가져올 수 없습니다 표시
+		}
 
 		co_await ResultWidget->OnConfirmed;
 	}
 
 	template <typename ComponentType>
-	FWeakCoroutine IfComponentValid(auto FuncPtr)
+	FWeakCoroutine WhileComponentIsValid(auto FuncPtr)
 	{
 		return RunWeakCoroutine(this,
 			MakeComponentStream<ComponentType>(GetOwningPlayerController())

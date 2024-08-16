@@ -161,6 +161,14 @@ namespace Awaitables
 	template <typename... ErrorTypes>
 	auto IgnoreError()
 	{
-		return FilterWithError([](const auto& Result) { return Result.template OnlyContains<ErrorTypes...>(); });
+		return FilterWithError([](const auto& Result)
+		{
+			if (Result)
+			{
+				return true;
+			}
+			
+			return !Result.template OnlyContains<ErrorTypes...>();
+		});
 	}
 }
