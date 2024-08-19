@@ -6,6 +6,7 @@
 #include "PVPBattleGameModeComponent.h"
 #include "PVPBattleGameStateComponent.h"
 #include "Blueprint/UserWidget.h"
+#include "Kismet/GameplayStatics.h"
 #include "PaperUnreal/GameMode/BattleGameMode/BattleGameModeComponent.h"
 #include "PaperUnreal/GameMode/BattleGameMode/BattleConfigComponent.h"
 #include "PaperUnreal/GameMode/BattleGameMode/BattlePawnComponent.h"
@@ -21,6 +22,7 @@
 #include "PaperUnreal/WeakCoroutine/WhileTrueAwaitable.h"
 #include "PaperUnreal/Widgets/BattleConfigWidget.h"
 #include "PaperUnreal/Widgets/BattleResultWidget.h"
+#include "PaperUnreal/Widgets/ExitWidget.h"
 #include "PaperUnreal/Widgets/LoadingWidgetSubsystem.h"
 #include "PaperUnreal/Widgets/TeamScoresWidget.h"
 #include "PaperUnreal/Widgets/SelectCharacterWidget.h"
@@ -46,7 +48,10 @@ private:
 
 	UPROPERTY()
 	UStageComponent* StageComponent;
-	
+
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<UExitWidget> ExitWidgetClass;
+
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<UToastWidget> ToastWidgetClass;
 
@@ -92,6 +97,14 @@ private:
 	{
 		Super::BeginPlay();
 
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
+		{
+			auto ExitWidget = CreateWidget<UExitWidget>(GetOwningPlayerController(), ExitWidgetClass);
+			auto S = ScopedAddToViewport(ExitWidget);
+			co_await ExitWidget->OnExitPressed;
+			UGameplayStatics::OpenLevel(GetWorld(), TEXT("TopDownMap"), true, TEXT("Game=Menu"));
+		});
+
 		GetEnhancedInputSubsystem()->AddMappingContext(InGameSettingsMappingContext, 0);
 		GetEnhancedInputComponent()->BindAction(EditConfigAction, ETriggerEvent::Triggered, this, &ThisClass::OnEditConfigActionTriggeredFunc);
 		GetEnhancedInputComponent()->BindAction(StartGameAction, ETriggerEvent::Triggered, this, &ThisClass::OnStartGameActionTriggeredFunc);
@@ -116,7 +129,7 @@ private:
 			while (true)
 			{
 				auto SpectatorPawn = co_await SpectatorPawnStream;
-				
+
 				// 에디터에서 적당히 카메라를 움직여 결정한 값
 				SpectatorPawn->SetActorLocation({170.449452f, 3101.368152f, 1058.444710f});
 				SpectatorPawn->SetActorRotation({-40.f, -50.f, 0.f});
