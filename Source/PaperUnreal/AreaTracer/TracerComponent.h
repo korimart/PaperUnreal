@@ -78,7 +78,9 @@ private:
 			ClientTracerMesh->RegisterComponent();
 
 			auto TracerPointEvent = NewChildComponent<UTracerPointEventComponent>(GetOwner());
-			TracerPointEvent->SetEventSource(TracerPathProvider.Get().GetInterface());
+			TracerPointEvent->SetEventSource(
+				// Standalone 또는 Listen Server에서는 PlayerMachine에서도 ServerTracerPath가 있을 수가 있음
+				IsValid(ServerTracerPath) ? ServerTracerPath : TracerPathProvider.Get().GetInterface());
 			TracerPointEvent->RegisterComponent();
 			TracerPointEvent->AddEventListener(ClientTracerMesh);
 
