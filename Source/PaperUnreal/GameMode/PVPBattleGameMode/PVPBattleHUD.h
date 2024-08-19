@@ -21,6 +21,7 @@
 #include "PaperUnreal/WeakCoroutine/WhileTrueAwaitable.h"
 #include "PaperUnreal/Widgets/BattleConfigWidget.h"
 #include "PaperUnreal/Widgets/BattleResultWidget.h"
+#include "PaperUnreal/Widgets/LoadingWidgetSubsystem.h"
 #include "PaperUnreal/Widgets/TeamScoresWidget.h"
 #include "PaperUnreal/Widgets/SelectCharacterWidget.h"
 #include "PaperUnreal/Widgets/TimeWidget.h"
@@ -45,7 +46,7 @@ private:
 
 	UPROPERTY()
 	UStageComponent* StageComponent;
-
+	
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<UToastWidget> ToastWidgetClass;
 
@@ -137,6 +138,8 @@ private:
 			{
 				GameStateComponent = (co_await GameStateComponentStream).Unsafe();
 				StageComponent = (co_await GameStateComponent->GetStageComponent()).Unsafe();
+
+				GetWorld()->GetSubsystem<ULoadingWidgetSubsystem>()->Remove();
 
 				if (StageComponent->GetCurrentStage().Get() != PVPBattleStage::Result)
 				{

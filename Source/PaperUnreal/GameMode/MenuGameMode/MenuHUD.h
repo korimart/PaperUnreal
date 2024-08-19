@@ -8,6 +8,7 @@
 #include "PaperUnreal/AreaTracer/TracerComponent.h"
 #include "PaperUnreal/GameFramework2/HUD2.h"
 #include "PaperUnreal/WeakCoroutine/AnyOfAwaitable.h"
+#include "PaperUnreal/Widgets/LoadingWidgetSubsystem.h"
 #include "PaperUnreal/Widgets/MenuWidget.h"
 #include "MenuHUD.generated.h"
 
@@ -46,6 +47,7 @@ private:
 
 		GetOwningPlayerController()->SetShowMouseCursor(true);
 
+		GetWorld()->GetSubsystem<ULoadingWidgetSubsystem>()->Remove();
 		MenuWidget = CreateWidget<UMenuWidget>(GetOwningPlayerController(), MenuWidgetClass);
 		MenuWidget->AddToViewport();
 
