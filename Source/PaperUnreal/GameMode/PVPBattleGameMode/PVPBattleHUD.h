@@ -12,6 +12,7 @@
 #include "PaperUnreal/GameFramework2/HUD2.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/CharacterSetterComponent.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/ComponentRegistry.h"
+#include "PaperUnreal/GameMode/ModeAgnostic/FixedCameraPawn.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/GameStarterComponent.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/ReadyStateComponent.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/StageComponent.h"
@@ -102,6 +103,23 @@ private:
 		bDialogOpen.Observe(this, [this](bool bOpen)
 		{
 			bOpen ? RemoveFromParentIfHasParent(ToastWidget) : AddToViewportIfNotAdded(ToastWidget);
+		});
+
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
+		{
+			auto SpectatorPawnStream
+				= GetOwningSpectatorPawn2().MakeStream()
+				| Awaitables::IfValid()
+				| Awaitables::CastChecked<AFixedCameraPawn>();
+
+			while (true)
+			{
+				auto SpectatorPawn = co_await SpectatorPawnStream;
+				
+				// 에디터에서 적당히 카메라를 움직여 결정한 값
+				SpectatorPawn->SetActorLocation({170.449452f, 3101.368152f, 1058.444710f});
+				SpectatorPawn->SetActorRotation({-40.f, -50.f, 0.f});
+			}
 		});
 
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
