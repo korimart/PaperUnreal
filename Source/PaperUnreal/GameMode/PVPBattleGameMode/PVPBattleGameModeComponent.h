@@ -110,7 +110,7 @@ private:
 
 	FWeakCoroutine InitiatePrivilegeGranter()
 	{
-		auto PrivilegeStream = Privileges.CreateAddStream();
+		auto PrivilegeStream = Privileges.MakeAddStream();
 
 		{
 			auto FirstPlayerPrivilege = co_await PrivilegeStream;

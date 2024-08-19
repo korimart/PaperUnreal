@@ -171,8 +171,8 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 		TLiveData<TArray<UDummy*>&> LiveData{BackingField};
 
 		// 컴파일 되는지 테스트
-		LiveData.CreateAddStream();
-		LiveData.CreateStrictAddStream();
+		LiveData.MakeAddStream();
+		LiveData.MakeStrictAddStream();
 
 		TArray<UDummy*> Added;
 		auto Handle = LiveData.ObserveAddIfValid([&](UDummy* Value)
@@ -228,7 +228,7 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 		TArray<int32> Received;
 		RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
-			for (auto Stream = LiveData.CreateStrictAddStream();;)
+			for (auto Stream = LiveData.MakeStrictAddStream();;)
 			{
 				Received.Add(co_await Stream);
 			}
@@ -238,7 +238,7 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 		// 멀티캐스트 델리게이트의 내부 Delegate Array가 커질 때 복사 안 하는지 테스트
 		for (int32 i = 0; i < 50; i++)
 		{
-			LiveData.CreateStrictAddStream();
+			LiveData.MakeStrictAddStream();
 		}
 
 		TestEqual(TEXT("TArray의 create strict add stream 테스트"), Received.Num(), 0);
@@ -334,7 +334,7 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 		{
 			while (LoopCount < 100)
 			{
-				co_await LiveData.CreateStrictAddStream().EndOfStream();
+				co_await LiveData.MakeStrictAddStream().EndOfStream();
 				LoopCount++;
 			}
 		});

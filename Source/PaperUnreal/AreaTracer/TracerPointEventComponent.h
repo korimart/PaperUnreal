@@ -52,7 +52,7 @@ private:
 
 			while (true)
 			{
-				auto Stream = EventSource->GetRunningPathTail().CreateStrictAddStream() | Awaitables::Catch<UEndOfStreamError>();
+				auto Stream = EventSource->GetRunningPathTail().MakeStrictAddStream() | Awaitables::Catch<UEndOfStreamError>();
 
 				const TFailableResult<FVector2D> FirstPoint = co_await Stream;
 				if (!FirstPoint)

@@ -330,7 +330,7 @@ private:
 		auto TeamScoresWidget = CreateWidget<UTeamScoresWidget>(GetOwningPlayerController(), TeamScoresWidgetClass);
 		auto S = ScopedAddToViewport(TeamScoresWidget);
 
-		auto AreaStream = BattleGameStateComponent->GetLiveAreas().CreateAddStream() | Awaitables::IfValid();
+		auto AreaStream = BattleGameStateComponent->GetLiveAreas().MakeAddStream() | Awaitables::IfValid();
 
 		while (true)
 		{

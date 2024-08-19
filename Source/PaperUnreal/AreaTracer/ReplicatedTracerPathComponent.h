@@ -204,7 +204,7 @@ private:
 			while (true)
 			{
 				auto Stream
-					= ServerTracerPath->GetRunningPathTail().CreateStrictAddStream()
+					= ServerTracerPath->GetRunningPathTail().MakeStrictAddStream()
 					| Awaitables::Catch<UEndOfStreamError>();
 
 				while (auto NextPoint = co_await Stream)

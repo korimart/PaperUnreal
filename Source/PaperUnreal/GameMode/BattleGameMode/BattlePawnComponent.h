@@ -109,7 +109,7 @@ private:
 			co_await AddToWeakList(ServerHomeArea);
 
 			auto PawnComponentStream
-				= ServerGameState->ServerPawnSpawner->GetSpawnedPawns().CreateAddStream()
+				= ServerGameState->ServerPawnSpawner->GetSpawnedPawns().MakeAddStream()
 				| Awaitables::FindComponentByClass<UBattlePawnComponent>()
 				| Awaitables::Filter([this](UBattlePawnComponent* PawnComponent)
 				{
@@ -135,7 +135,7 @@ private:
 			co_await AddToWeakList(ServerHomeArea);
 
 			auto AreaStream
-				= ServerGameState->GetLiveAreas().CreateAddStream()
+				= ServerGameState->GetLiveAreas().MakeAddStream()
 				| Awaitables::IfNot(ServerHomeArea);
 
 			while (true)
