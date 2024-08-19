@@ -55,6 +55,11 @@ struct FDelegateSPHandle
 
 	const TSharedRef<bool>& ToShared() const { return Life; }
 
+	friend void operator<<(TArray<FDelegateSPHandle>& Array, FDelegateSPHandle Handle)
+	{
+		Array.Add(Handle);
+	}
+
 private:
 	TSharedRef<bool> Life = MakeShared<bool>();
 };
@@ -131,7 +136,7 @@ T* ValidOrNull(T* Object)
 
 
 template <typename T>
-T* ValidOrNull(T** Object)
+T* ValidOrNull(T* const* Object)
 {
 	return Object ? *Object : nullptr;
 }

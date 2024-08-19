@@ -428,6 +428,7 @@ public:
 		for (const ElementType& Each : Removed)
 		{
 			OnElementRemoved.Broadcast(Each);
+			OnArrayChanged.Broadcast(Get());
 		}
 
 		if (Removed.Num() > 0)
@@ -446,6 +447,7 @@ public:
 			if (!Array.Contains(Each))
 			{
 				OnElementRemoved.Broadcast(Each);
+				OnArrayChanged.Broadcast(Get());
 				bAnyRemoved = true;
 			}
 		}
@@ -455,6 +457,7 @@ public:
 			if (!OldArray.Contains(Each))
 			{
 				OnElementAdded.Broadcast(Each);
+				OnArrayChanged.Broadcast(Get());
 			}
 		}
 
@@ -542,6 +545,11 @@ public:
 		return ObserveRemove(RelayValidRefTo<Validator>(Forward<FuncType>(Func)));
 	}
 
+	TValueStream<std::decay_t<ArrayType>> MakeStream()
+	{
+		return MakeStreamFromDelegate<std::decay_t<ArrayType>>(OnArrayChanged, {Array}).template Get<0>();
+	}
+
 	TValueStream<ElementType> CreateAddStream()
 	{
 		return MakeStreamFromDelegate(OnElementAdded, Array).template Get<0>();
@@ -554,10 +562,21 @@ public:
 		return MoveTemp(ValueStream);
 	}
 
+	TCancellableFuture<void> WaitForElementToBeRemoved(const ElementType& Element)
+	{
+		return MakeFutureFromDelegate<void>(
+			OnElementRemoved,
+			[Element](const ElementType& Removed) { return Removed == Element; },
+			[](const ElementType& Removed) { return; });
+	}
+
 	const ArrayType& Get() const { return Array; }
 
 private:
 	ArrayType Array;
+
+	DECLARE_MULTICAST_DELEGATE_OneParam(FArrayEvent, const ArrayType&);
+	FArrayEvent OnArrayChanged;
 
 	DECLARE_MULTICAST_DELEGATE_OneParam(FElementEvent, const ElementType&);
 	FElementEvent OnElementAdded;
@@ -581,12 +600,14 @@ private:
 	{
 		FScopedCallbackGuard S{this};
 		OnElementAdded.Broadcast(Element);
+		OnArrayChanged.Broadcast(Get());
 	}
 
 	void NotifyRemove(const ElementType& Element)
 	{
 		FScopedCallbackGuard S{this};
 		OnElementRemoved.Broadcast(Element);
+		OnArrayChanged.Broadcast(Get());
 		CloseStrictAddStreams();
 	}
 };
@@ -626,6 +647,8 @@ public:
 	decltype(auto) MakeStream() { return LiveData.MakeStream(); }
 	decltype(auto) CreateAddStream() { return LiveData.CreateAddStream(); }
 	decltype(auto) CreateStrictAddStream() { return LiveData.CreateStrictAddStream(); }
+
+	decltype(auto) WaitForElementToBeRemoved(const auto& Element) { return LiveData.WaitForElementToBeRemoved(Element); }
 
 	friend decltype(auto) operator co_await(TLiveDataView LiveDataView) { return operator co_await(LiveDataView.LiveData); }
 

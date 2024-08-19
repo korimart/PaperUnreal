@@ -49,10 +49,28 @@ public:
 	UPROPERTY()
 	UPawnSpawnerComponent* ServerPawnSpawner;
 
-	DECLARE_LIVE_DATA_GETTER_SETTER(AreaSpawner);
-
 	UPROPERTY(Replicated)
 	float GameEndWorldTime;
+
+	TLiveDataView<TArray<AAreaActor*>> GetLiveAreas() const
+	{
+		return LiveAreas;
+	}
+	
+	AAreaActor* FindLiveAreaByTeam(int32 TeamIndex) const
+	{
+		AAreaActor* const* Found = GetLiveAreas().Get().FindByPredicate([&](AAreaActor* Each)
+		{
+			return IsValid(Each) && Each->TeamComponent->GetTeamIndex().Get() == TeamIndex;
+		});
+
+		return Found ? *Found : nullptr;
+	}
+
+	AAreaActor* SpawnAreaAtRandomEmptyLocation(const auto& Initializer)
+	{
+		return AreaSpawner->SpawnAreaAtRandomEmptyLocation(Initializer);
+	}
 
 	TLiveDataView<TOptional<FBattleResult>> GetBattleResult() const
 	{
@@ -62,9 +80,9 @@ public:
 	void SetBattleResult(const FBattleResult& Result)
 	{
 		check(GetOwner()->HasAuthority());
-		
+
 		RepBattleResult = Result;
-		
+
 		if (GetNetMode() != NM_DedicatedServer)
 		{
 			OnRep_BattleResult();
@@ -90,23 +108,13 @@ public:
 			}
 		}
 
-		if (AAreaActor* ThisManArea = FindLivingAreaOfTeam(TeamIndex))
+		if (AAreaActor* ThisManArea = FindLiveAreaByTeam(TeamIndex))
 		{
 			ThisManArea->LifeComponent->SetbAlive(false);
 			return true;
 		}
 
 		return false;
-	}
-
-	AAreaActor* FindLivingAreaOfTeam(int32 TeamIndex) const
-	{
-		return ValidOrNull(AreaSpawner->GetSpawnedAreas().Get().FindByPredicate([&](AAreaActor* Each)
-		{
-			return IsValid(Each)
-				&& Each->LifeComponent->GetbAlive().Get()
-				&& Each->TeamComponent->GetTeamIndex().Get() == TeamIndex;
-		}));
 	}
 
 	TArray<ULifeComponent*> GetPawnLivesOfTeam(int32 TeamIndex) const
@@ -168,6 +176,8 @@ private:
 		DOREPLIFETIME(ThisClass, RepBattleResult);
 	}
 
+	mutable TLiveData<TArray<AAreaActor*>> LiveAreas;
+
 	virtual void AttachServerMachineComponents() override
 	{
 		ServerWorldTimer = NewChildComponent<UWorldTimerComponent>(GetOuterAGameStateBase());
@@ -178,5 +188,33 @@ private:
 
 		ServerPawnSpawner = NewChildComponent<UPawnSpawnerComponent>(GetOuterAGameStateBase());
 		ServerPawnSpawner->RegisterComponent();
+	}
+
+	virtual void InitializeComponent() override
+	{
+		Super::InitializeComponent();
+
+		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
+		{
+			co_await AreaSpawner;
+
+			// TODO Awaitables::WhieTrue처럼 편의함수 제공 가능
+			AreaSpawner->GetSpawnedAreas().ObserveAddIfValid(this, [this](AAreaActor* Area)
+			{
+				RunWeakCoroutine(this, [this, Area]() -> FWeakCoroutine
+				{
+					co_await AddToWeakList(Area);
+
+					FDelegateSPHandle Handle = Area->LifeComponent->GetbAlive().Observe([this, Area](bool bAlive)
+					{
+						bAlive ? LiveAreas.Add(Area) : LiveAreas.Remove(Area);
+					});
+
+					co_await AreaSpawner->GetSpawnedAreas().WaitForElementToBeRemoved(Area);
+
+					LiveAreas.Remove(Area);
+				});
+			});
+		});
 	}
 };

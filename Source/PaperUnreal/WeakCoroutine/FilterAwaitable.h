@@ -147,6 +147,12 @@ namespace Awaitables
 	{
 		return Filter([Value = Forward<ValueType>(Value)](const auto& Result) { return Result != Value; });
 	}
+	
+	template <typename ValueType>
+	auto IfLessThan(ValueType&& Value)
+	{
+		return Filter([Value = Forward<ValueType>(Value)](const auto& Result) { return Result < Value; });
+	}
 
 	inline auto IfValid()
 	{

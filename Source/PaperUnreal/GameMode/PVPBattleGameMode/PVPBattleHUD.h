@@ -330,8 +330,7 @@ private:
 		auto TeamScoresWidget = CreateWidget<UTeamScoresWidget>(GetOwningPlayerController(), TeamScoresWidgetClass);
 		auto S = ScopedAddToViewport(TeamScoresWidget);
 
-		TAbortPtr<UAreaSpawnerComponent> AreaSpawner = co_await BattleGameStateComponent->GetAreaSpawner();
-		auto AreaStream = AreaSpawner->GetSpawnedAreas().CreateAddStream() | Awaitables::IfValid();
+		auto AreaStream = BattleGameStateComponent->GetLiveAreas().CreateAddStream() | Awaitables::IfValid();
 
 		while (true)
 		{

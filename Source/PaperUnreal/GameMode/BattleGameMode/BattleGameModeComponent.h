@@ -8,8 +8,6 @@
 #include "BattlePlayerStateComponent.h"
 #include "LogBattleGameMode.h"
 #include "GameFramework/PlayerState.h"
-#include "PaperUnreal/AreaTracer/AreaSpawnerComponent.h"
-#include "PaperUnreal/AreaTracer/AreaStateTrackerComponent.h"
 #include "PaperUnreal/Development/InGameCheats.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
 #include "PaperUnreal/GameFramework2/GameModeComponent.h"
@@ -122,7 +120,7 @@ private:
 			// TODO 자리가 비면 입장시켜주기
 			UE_LOG(LogBattleGameMode, Log, TEXT("%p 플레이어 팀 세팅 실패 관전자로 게임 시작을 기다리는 중"), Player);
 			co_await (bGameStarted.MakeStream() | Awaitables::If(true));
-			
+
 			Player->ChangeState(NAME_Spectating);
 			Player->ClientGotoState(NAME_Spectating);
 			co_return;
@@ -147,7 +145,7 @@ private:
 	{
 		co_await AddToWeakList(Player);
 
-		AAreaActor* ThisPlayerArea = GameStateComponent->FindLivingAreaOfTeam(TeamIndex);
+		AAreaActor* ThisPlayerArea = GameStateComponent->FindLiveAreaByTeam(TeamIndex);
 		if (!ThisPlayerArea)
 		{
 			ThisPlayerArea = InitializeNewAreaActor(TeamIndex);
@@ -211,11 +209,9 @@ private:
 
 		auto LastManStanding = RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
-			auto AreaStateTracker = NewObject<UAreaStateTrackerComponent>(GetOwner());
-			AreaStateTracker->SetSpawner(GameStateComponent->GetAreaSpawner().Get());
-			AreaStateTracker->RegisterComponent();
-			co_await AreaStateTracker->ZeroOrOneAreaIsSurviving();
-			AreaStateTracker->DestroyComponent();
+			co_await (GameStateComponent->GetLiveAreas().MakeStream()
+				| Awaitables::Transform([](const TArray<AAreaActor*>& Areas) { return Areas.Num(); })
+				| Awaitables::IfLessThan(2));
 		});
 
 		const int32 CompletedAwaitableIndex = co_await Awaitables::AnyOf(
@@ -235,7 +231,7 @@ private:
 		{
 			UE_LOG(LogBattleGameMode, Log, TEXT("팀의 수가 1이하이므로 게임을 종료합니다"));
 		}
-		
+
 		for (APlayerState* Each : GetWorld()->GetGameState()->PlayerArray)
 		{
 			Each->GetPlayerController()->ChangeState(NAME_Spectating);
@@ -245,7 +241,7 @@ private:
 		FBattleResult Result;
 		for (const auto& [TeamIndex, Color] : TeamColors)
 		{
-			AAreaActor* Area = GameStateComponent->FindLivingAreaOfTeam(TeamIndex);
+			AAreaActor* Area = GameStateComponent->FindLiveAreaByTeam(TeamIndex);
 			const float AreaArea = Area ? Area->GetServerCalculatedArea().Get() : 0.f;
 			Result.Items.Add({
 				.TeamIndex = TeamIndex,
@@ -262,7 +258,7 @@ private:
 
 	AAreaActor* InitializeNewAreaActor(int32 TeamIndex)
 	{
-		return GameStateComponent->GetAreaSpawner()->SpawnAreaAtRandomEmptyLocation([&](AAreaActor* Area)
+		return GameStateComponent->SpawnAreaAtRandomEmptyLocation([&](AAreaActor* Area)
 		{
 			Area->TeamComponent->SetTeamIndex(TeamIndex);
 			Area->SetAreaBaseColor(TeamColors.FindRef(TeamIndex));

@@ -135,8 +135,7 @@ private:
 			co_await AddToWeakList(ServerHomeArea);
 
 			auto AreaStream
-				= ServerGameState->GetAreaSpawner()->GetSpawnedAreas().CreateAddStream()
-				| Awaitables::Filter([](AAreaActor* Area) { return Area->LifeComponent->GetbAlive().Get(); })
+				= ServerGameState->GetLiveAreas().CreateAddStream()
 				| Awaitables::IfNot(ServerHomeArea);
 
 			while (true)
