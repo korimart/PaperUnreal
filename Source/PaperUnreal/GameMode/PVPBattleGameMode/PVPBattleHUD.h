@@ -189,14 +189,16 @@ private:
 		TAbortableCoroutineHandle TeamScores = ShowTeamScores();
 		TAbortableCoroutineHandle Time = ShowTime();
 
-		TAbortableCoroutineHandle<FWeakCoroutine> PawnSequence;
 		auto PawnStream = GetOwningPawnOrSpectator2() | Awaitables::IfValid();
+		APawn* Pawn = (co_await PawnStream).Unsafe();
+
 		while (true)
 		{
-			APawn* Pawn = (co_await PawnStream).Unsafe();
-			PawnSequence = Pawn->IsA<ASpectatorPawn>()
+			TAbortableCoroutineHandle PawnSequence = Pawn->IsA<ASpectatorPawn>()
 				? InitiateSpectatorPawnSequence(Pawn)
 				: InitiateBattlePawnSequence(Pawn);
+
+			Pawn = (co_await PawnStream).Unsafe();
 		}
 	}
 
@@ -206,7 +208,7 @@ private:
 			FToastHandle H = ToastWidget->Toast(FText::FromString(TEXT("경기 정원이 가득차 관전자로 배정되었습니다.")));
 			co_await WaitForSeconds(GetWorld(), 5.f);
 		}
-		
+
 		FToastHandle H = ToastWidget->Toast(FText::FromString(TEXT("관전 모드")));
 		co_await Awaitables::Forever();
 	}
@@ -345,11 +347,8 @@ private:
 				while (true)
 				{
 					const float AreaArea = co_await AreaAreaStream;
-
 					TeamScoresWidget->FindOrSetTeamScore(
-						Area->TeamComponent->GetTeamIndex().Get(),
-						Area->GetAreaBaseColor().Get(),
-						AreaArea);
+						Area->TeamComponent->GetTeamIndex().Get(), Area->GetAreaBaseColor().Get(), AreaArea);
 				}
 			});
 		}

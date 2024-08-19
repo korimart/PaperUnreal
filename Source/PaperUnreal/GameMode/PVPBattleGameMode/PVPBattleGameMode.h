@@ -12,8 +12,5 @@ class APVPBattleGameMode : public AGameModeBase2
 {
 	GENERATED_BODY()
 
-private:
 	APVPBattleGameMode();
-
-	virtual void BeginPlay() override;
 };

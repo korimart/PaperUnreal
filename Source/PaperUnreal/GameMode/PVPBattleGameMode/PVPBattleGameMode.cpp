@@ -29,11 +29,6 @@ APVPBattleGameMode::APVPBattleGameMode()
 	}
 
 	bStartPlayersAsSpectators = true;
-}
 
-void APVPBattleGameMode::BeginPlay()
-{
-	Super::BeginPlay();
-
-	NewObject<UPVPBattleGameModeComponent>(this)->RegisterComponent();
+	CreateDefaultSubobject<UPVPBattleGameModeComponent>(TEXT("PVPBattleGameModeComponent"));
 }
