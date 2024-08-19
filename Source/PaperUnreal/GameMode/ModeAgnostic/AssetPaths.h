@@ -7,9 +7,9 @@
 
 struct FAssetPaths
 {
-	inline static FSoftObjectPath ExplosionActorPath{TEXT("/Script/Engine.Blueprint'/Game/ExplostionFromStarterContent/Blueprint_Effect_Explosion.Blueprint_Effect_Explosion_C'")};
+	inline static FSoftObjectPath ExplosionActorPath{TEXT("/Game/ExplostionFromStarterContent/Blueprint_Effect_Explosion")};
 	static TSoftClassPtr<AActor> SoftExplosionActor() { return TSoftClassPtr<AActor>{ExplosionActorPath}; }
 
-	inline static FSoftObjectPath BaseColorMaterial{TEXT("/Script/Engine.Material'/Game/LevelPrototyping/Materials/M_Solid.M_Solid'")};
+	inline static FSoftObjectPath BaseColorMaterial{TEXT("/Game/LevelPrototyping/Materials/M_Solid")};
 	static TSoftObjectPtr<UMaterial> SoftBaseColorMaterial() { return TSoftObjectPtr<UMaterial>{BaseColorMaterial}; }
 };
