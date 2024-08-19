@@ -4,8 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "AIController.h"
+#include "Kismet/GameplayStatics.h"
 #include "PaperUnreal/AreaTracer/TracerComponent.h"
 #include "PaperUnreal/GameFramework2/HUD2.h"
+#include "PaperUnreal/Widgets/MenuWidget.h"
 #include "MenuHUD.generated.h"
 
 /**
@@ -19,12 +21,26 @@ class AMenuHUD : public AHUD2
 private:
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<APawn> MenuPawnClass;
+	
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<UMenuWidget> MenuWidgetClass;
+	
+	UPROPERTY()
+	UMenuWidget* MenuWidget;
 
 	virtual void BeginPlay() override
 	{
 		Super::BeginPlay();
-
+		
 		SetupLevelBackground();
+		
+		GetOwningPlayerController()->SetShowMouseCursor(true);
+		
+		MenuWidget = CreateWidget<UMenuWidget>(GetOwningPlayerController(), MenuWidgetClass);
+		MenuWidget->AddToViewport();
+
+		ListenToHostRequest();
+		ListenToJoinRequest();
 	}
 
 	void SetupLevelBackground()
@@ -45,5 +61,16 @@ private:
 		AAIController* AIController = GetWorld()->SpawnActor<AAIController>();
 		AIController->Possess(MenuPawn);
 		AIController->MoveToLocation({600.f, 700.f, 100.f});
+	}
+
+	FWeakCoroutine ListenToHostRequest()
+	{
+		co_await MenuWidget->OnHostPressed;
+		UGameplayStatics::OpenLevel(GetWorld(), TEXT("TopDownMap"), true, TEXT("Game=PVPBattle?listen"));
+	}
+	
+	FWeakCoroutine ListenToJoinRequest()
+	{
+		const FString HostAddress = co_await MenuWidget->OnJoinPressed;
 	}
 };
