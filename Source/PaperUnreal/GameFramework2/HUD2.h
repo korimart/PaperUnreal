@@ -22,6 +22,11 @@ public:
 	{
 		return CastChecked<APlayerController2>(GetOwningPlayerController())->GetPawn2();
 	}
+
+	APawn* GetOwningSpectatorPawn() const
+	{
+		return GetOwningPlayerController()->GetSpectatorPawn();
+	}
 	
 	auto GetOwningSpectatorPawn2() const
 	{
