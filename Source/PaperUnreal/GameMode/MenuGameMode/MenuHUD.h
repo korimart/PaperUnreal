@@ -7,6 +7,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "PaperUnreal/AreaTracer/TracerComponent.h"
 #include "PaperUnreal/GameFramework2/HUD2.h"
+#include "PaperUnreal/WeakCoroutine/AnyOfAwaitable.h"
 #include "PaperUnreal/Widgets/MenuWidget.h"
 #include "MenuHUD.generated.h"
 
@@ -21,21 +22,30 @@ class AMenuHUD : public AHUD2
 private:
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<APawn> MenuPawnClass;
-	
+
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<UMenuWidget> MenuWidgetClass;
-	
+
 	UPROPERTY()
 	UMenuWidget* MenuWidget;
+
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnTravelFailture, ETravelFailure::Type);
+	FOnTravelFailture OnTravelFailure;
 
 	virtual void BeginPlay() override
 	{
 		Super::BeginPlay();
-		
+
+		GEngine->OnTravelFailure().AddWeakLambda(this,
+			[this](UWorld* World, ETravelFailure::Type Type, const FString& ErrorString)
+			{
+				OnTravelFailure.Broadcast(Type);
+			});
+
 		SetupLevelBackground();
-		
+
 		GetOwningPlayerController()->SetShowMouseCursor(true);
-		
+
 		MenuWidget = CreateWidget<UMenuWidget>(GetOwningPlayerController(), MenuWidgetClass);
 		MenuWidget->AddToViewport();
 
@@ -53,7 +63,7 @@ private:
 
 		TValueStream<FLinearColor> ColorStream;
 		ColorStream.GetReceiver().Pin()->ReceiveValue(NonEyeSoaringRandomColor());
-		
+
 		UTracerComponent* Tracer = NewObject<UTracerComponent>(MenuPawn);
 		Tracer->SetTracerColorStream(MoveTemp(ColorStream));
 		Tracer->RegisterComponent();
@@ -68,9 +78,27 @@ private:
 		co_await MenuWidget->OnHostPressed;
 		UGameplayStatics::OpenLevel(GetWorld(), TEXT("TopDownMap"), true, TEXT("Game=PVPBattle?listen"));
 	}
-	
+
 	FWeakCoroutine ListenToJoinRequest()
 	{
-		const FString HostAddress = co_await MenuWidget->OnJoinPressed;
+		while (true)
+		{
+			const FString HostAddress = co_await MenuWidget->OnJoinPressed;
+
+			// OpenLevel을 호출하는 즉시 Delegate가 호출될 수 있으므로 미리 awaitable을 만들어 둠
+			auto Failure = MakeFutureFromDelegate(OnTravelFailure);
+			UGameplayStatics::OpenLevel(GetWorld(), *HostAddress);
+			
+			const int32 Reason = co_await Awaitables::AnyOf(Failure, MenuWidget->OnCancelJoinPressed);
+			if (Reason == 0)
+			{
+				MenuWidget->OnJoinFailed();
+			}
+			else
+			{
+				GEngine->CancelAllPending();
+				MenuWidget->OnJoinCancelled();
+			}
+		}
 	}
 };

@@ -20,6 +20,14 @@ public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnJoinPressed, const FString&);
 	FOnJoinPressed OnJoinPressed;
 
+	FSimpleMulticastDelegate OnCancelJoinPressed;
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnJoinFailed();
+	
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnJoinCancelled();
+
 private:
 	UFUNCTION(BlueprintCallable)
 	void Host()
@@ -31,5 +39,11 @@ private:
 	void Join(const FString& Address)
 	{
 		OnJoinPressed.Broadcast(Address);
+	}
+	
+	UFUNCTION(BlueprintCallable)
+	void CancelJoin()
+	{
+		OnCancelJoinPressed.Broadcast();
 	}
 };

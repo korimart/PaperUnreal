@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "TypeTraits.h"
 #include "ErrorReporting.h"
 #include "MinimalAbortableCoroutine.h"
 #include "NoDestroyAwaitable.h"
@@ -118,6 +119,6 @@ namespace Awaitables
 	template <typename... AwaitableTypes>
 	auto AnyOf(AwaitableTypes&&... Awaitables)
 	{
-		return TAnyOfAwaitable{Forward<AwaitableTypes>(Awaitables)...};
+		return TAnyOfAwaitable{AwaitableOrIdentity(Forward<AwaitableTypes>(Awaitables))...};
 	}
 }
