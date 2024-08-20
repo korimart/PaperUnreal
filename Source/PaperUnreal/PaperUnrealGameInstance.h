@@ -14,10 +14,7 @@ class UPaperUnrealOnlineSession : public UOnlineSession
 	GENERATED_BODY()
 
 public:
-	virtual void HandleDisconnect(UWorld *World, class UNetDriver *NetDriver) override
-	{
-		GEngine->CancelAllPending();
-	}
+	virtual void HandleDisconnect(UWorld* World, UNetDriver* NetDriver) override;
 };
 
 
@@ -30,8 +27,39 @@ class UPaperUnrealGameInstance : public UGameInstance
 	GENERATED_BODY()
 
 public:
+	TOptional<ENetworkFailure::Type> GetLastNetworkFailure() const
+	{
+		return LastNetworkFailure;
+	}
+	
+	TOptional<ENetworkFailure::Type> GetUnhandledNetworkFailure() const
+	{
+		return UnhandledNetworkFailure;
+	}
+	
+	void OnNetworkFailureHandled()
+	{
+		UnhandledNetworkFailure.Reset();
+	}
+
+	void ClearErrors()
+	{
+		LastNetworkFailure.Reset();
+	}
+
+private:
+	TOptional<ENetworkFailure::Type> UnhandledNetworkFailure;
+	TOptional<ENetworkFailure::Type> LastNetworkFailure;
+
 	virtual TSubclassOf<UOnlineSession> GetOnlineSessionClass() override
 	{
 		return UPaperUnrealOnlineSession::StaticClass();
+	}
+
+	UFUNCTION(BlueprintCallable)
+	void SetNetworkFailure(ENetworkFailure::Type Failure)
+	{
+		LastNetworkFailure = Failure;
+		UnhandledNetworkFailure = Failure;
 	}
 };

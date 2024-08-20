@@ -5,11 +5,13 @@
 #include "CoreMinimal.h"
 #include "AIController.h"
 #include "Kismet/GameplayStatics.h"
+#include "PaperUnreal/PaperUnrealGameInstance.h"
 #include "PaperUnreal/AreaTracer/TracerComponent.h"
 #include "PaperUnreal/GameFramework2/HUD2.h"
 #include "PaperUnreal/WeakCoroutine/AnyOfAwaitable.h"
 #include "PaperUnreal/Widgets/LoadingWidgetSubsystem.h"
 #include "PaperUnreal/Widgets/MenuWidget.h"
+#include "PaperUnreal/Widgets/ToastWidget.h"
 #include "MenuHUD.generated.h"
 
 /**
@@ -26,22 +28,16 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<UMenuWidget> MenuWidgetClass;
+	
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<UToastWidget> ToastWidgetClass;
 
 	UPROPERTY()
 	UMenuWidget* MenuWidget;
 
-	DECLARE_MULTICAST_DELEGATE_OneParam(FOnTravelFailture, ETravelFailure::Type);
-	FOnTravelFailture OnTravelFailure;
-
 	virtual void BeginPlay() override
 	{
 		Super::BeginPlay();
-
-		GEngine->OnTravelFailure().AddWeakLambda(this,
-			[this](UWorld* World, ETravelFailure::Type Type, const FString& ErrorString)
-			{
-				OnTravelFailure.Broadcast(Type);
-			});
 
 		SetupLevelBackground();
 
@@ -50,6 +46,8 @@ private:
 		GetWorld()->GetSubsystem<ULoadingWidgetSubsystem>()->Remove();
 		MenuWidget = CreateWidget<UMenuWidget>(GetOwningPlayerController(), MenuWidgetClass);
 		MenuWidget->AddToViewport();
+
+		DisplayNetworkErrorIfError();
 
 		ListenToHostRequest();
 		ListenToJoinRequest();
@@ -75,14 +73,56 @@ private:
 		AIController->MoveToLocation({600.f, 700.f, 100.f});
 	}
 
+	FWeakCoroutine DisplayNetworkErrorIfError()
+	{
+		UPaperUnrealGameInstance* GameInstance = GetWorld()->GetGameInstance<UPaperUnrealGameInstance>();
+		
+		const bool bReturnedToMenuByError = UGameplayStatics::HasOption(GetWorld()->GetAuthGameMode()->OptionsString, TEXT("closed"));
+		const TOptional<ENetworkFailure::Type> Error = GameInstance->GetLastNetworkFailure();
+		GameInstance->ClearErrors();
+
+		if (bReturnedToMenuByError && !Error)
+		{
+			// TODO 엔진을 다 안 읽어봐서 어떤 경우에 이게 발생할 수 있는지 모름 그러므로 로그를 남긴다 log error
+			co_return;
+		}
+		
+		if (bReturnedToMenuByError && Error)
+		{
+			UToastWidget* Toast = CreateWidget<UToastWidget>(GetOwningPlayerController(), ToastWidgetClass);
+			auto S = ScopedAddToViewport(Toast);
+
+			FText ErrorMessage;
+			if (*Error == ENetworkFailure::ConnectionLost)
+			{
+				ErrorMessage = FText::FromString(TEXT("방장이 게임을 나가서 방이 닫혔습니다."));
+			}
+			else
+			{
+				ErrorMessage = FText::FromString(TEXT("알 수 없는 네트워크 에러가 발생했습니다."));
+			}
+			
+			auto H = Toast->Toast(ErrorMessage);
+			co_await WaitForSeconds(GetWorld(), 5.f);
+		}
+	}
+
 	FWeakCoroutine ListenToHostRequest()
 	{
 		co_await MenuWidget->OnHostPressed;
 		UGameplayStatics::OpenLevel(GetWorld(), TEXT("TopDownMap"), true, TEXT("Game=PVPBattle?listen"));
 	}
 
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnTravelFailture, ETravelFailure::Type);
+	FOnTravelFailture OnTravelFailure;
+
 	FWeakCoroutine ListenToJoinRequest()
 	{
+		GEngine->OnTravelFailure().AddWeakLambda(this, [this](const auto&, ETravelFailure::Type Type, const auto&)
+		{
+			OnTravelFailure.Broadcast(Type);
+		});
+
 		while (true)
 		{
 			const FString HostAddress = co_await MenuWidget->OnJoinPressed;
@@ -90,7 +130,7 @@ private:
 			// OpenLevel을 호출하는 즉시 Delegate가 호출될 수 있으므로 미리 awaitable을 만들어 둠
 			auto Failure = MakeFutureFromDelegate(OnTravelFailure);
 			UGameplayStatics::OpenLevel(GetWorld(), *HostAddress);
-			
+
 			const int32 Reason = co_await Awaitables::AnyOf(Failure, MenuWidget->OnCancelJoinPressed);
 			if (Reason == 0)
 			{
