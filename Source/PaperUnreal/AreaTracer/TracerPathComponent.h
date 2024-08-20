@@ -82,7 +82,7 @@ private:
 	{
 		if (IsValid(NoPathArea) && NoPathArea->IsValid())
 		{
-			const FVector2D Attached = NoPathArea->FindClosestPointOnBoundary2D(Path.GetLastPoint()).GetPoint();
+			const FVector2D Attached = NoPathArea->FindClosestPointOnBoundary2D(Path.GetPoint(-1)).GetPoint();
 			Path.SetPoint(-1, Attached);
 			PathHead.SetValue(Attached);
 		}
@@ -113,7 +113,7 @@ private:
 			return;
 		}
 
-		if (Path.GetLastPoint().Equals(ActorLocation2D))
+		if (Path.GetPoint(-1).Equals(ActorLocation2D))
 		{
 			return;
 		}
@@ -126,8 +126,8 @@ private:
 
 		const float Curvature = [&]()
 		{
-			const FVector2D& Position0 = Path.GetLastPoint(1);
-			const FVector2D& Position1 = Path.GetLastPoint();
+			const FVector2D& Position0 = Path.GetPoint(-2);
+			const FVector2D& Position1 = Path.GetPoint(-1);
 			const FVector2D& Position2 = ActorLocation2D;
 
 			const float ASideLength = (Position1 - Position2).Length();
@@ -144,8 +144,8 @@ private:
 
 		const float CurrentDeviation = [&]()
 		{
-			const FVector2D DeviatingVector = ActorLocation2D - Path.GetLastPoint(1);
-			const FVector2D StraightVector = Path.GetLastSegmentDirection(1);
+			const FVector2D DeviatingVector = ActorLocation2D - Path.GetPoint(-2);
+			const FVector2D StraightVector = Path.GetSegmentDirection(-2);
 			const FVector2D Proj = StraightVector * DeviatingVector.Dot(StraightVector);
 			return (DeviatingVector - Proj).Length();
 		}();
