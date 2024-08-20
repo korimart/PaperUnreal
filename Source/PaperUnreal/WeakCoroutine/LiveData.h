@@ -346,8 +346,9 @@ public:
 
 	TValueStream<DecayedValueType> MakeStream()
 	{
-		return MakeStreamFromDelegate(
-			OnChanged, TArray<DecayedValueType>{Value}).template Get<0>();
+		auto Ret = MakeStreamFromDelegate(OnChanged);
+		Ret.GetReceiver().Pin()->ReceiveValue(Value);
+		return Ret;
 	}
 
 private:
@@ -547,19 +548,25 @@ public:
 
 	TValueStream<std::decay_t<ArrayType>> MakeStream()
 	{
-		return MakeStreamFromDelegate<std::decay_t<ArrayType>>(OnArrayChanged, {Array}).template Get<0>();
+		auto Ret = MakeStreamFromDelegate(OnArrayChanged);
+		Ret.GetReceiver().Pin()->ReceiveValue(Array);
+		return Ret;
 	}
 
 	TValueStream<ElementType> MakeAddStream()
 	{
-		return MakeStreamFromDelegate(OnElementAdded, Array).template Get<0>();
+		auto Ret = MakeStreamFromDelegate(OnElementAdded);
+		Ret.GetReceiver().Pin()->ReceiveValues(Array);
+		return Ret;
 	}
 
 	TValueStream<ElementType> MakeStrictAddStream()
 	{
-		auto [ValueStream, Handle] = MakeStreamFromDelegate(OnElementAdded, Array);
+		FDelegateHandle Handle;
+		auto Ret = MakeStreamFromDelegate(OnElementAdded, &Handle);
+		Ret.GetReceiver().Pin()->ReceiveValues(Array);
 		StrictAddStreamHandles.Add(Handle);
-		return MoveTemp(ValueStream);
+		return Ret;
 	}
 
 	TCancellableFuture<void> WaitForElementToBeRemoved(const ElementType& Element)

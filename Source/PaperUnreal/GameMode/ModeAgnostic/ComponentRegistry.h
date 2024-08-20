@@ -120,10 +120,11 @@ TValueStream<ComponentType*> MakeComponentStream(AActor* Owner)
 	Initial.RemoveAll([](ComponentType* Each) { return !Each->HasBegunPlay(); });
 
 	UComponentRegistry* Registry = Owner->GetWorld()->GetSubsystem<UComponentRegistry>();
-	return MakeStreamFromDelegate<ComponentType*>(
-			Registry->GetComponentMulticastDelegate(ComponentType::StaticClass(), Owner),
-			Initial,
-			[](auto) { return true; },
-			[](UActorComponent* BeforeCast) { return Cast<ComponentType>(BeforeCast); })
-		.template Get<0>();
+	
+	auto Ret = MakeStreamFromDelegate(
+		Registry->GetComponentMulticastDelegate(ComponentType::StaticClass(), Owner),
+		[](auto) { return true; },
+		[](UActorComponent* BeforeCast) { return Cast<ComponentType>(BeforeCast); });
+	Ret.GetReceiver().Pin()->ReceiveValues(Initial);
+	return Ret;
 }

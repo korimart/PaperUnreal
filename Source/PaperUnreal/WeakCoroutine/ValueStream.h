@@ -70,6 +70,15 @@ public:
 		PopFront(Promises).SetValue(Forward<U>(Value));
 	}
 
+	template <typename U>
+	void ReceiveValues(const TArray<U>& Values)
+	{
+		for (const U& Each : Values)
+		{
+			ReceiveValue(Each);
+		}
+	}
+
 	void Close()
 	{
 		bClosed = true;
@@ -141,48 +150,50 @@ private:
 };
 
 
-// TODO cancellablefuture.h에 있는 delegate 파라미터 가져오는 로직 분리해서 여기도 T 넘길 필요 없도록 사용법 개선
-template <typename T>
-TTuple<TValueStream<T>, FDelegateHandle> MakeStreamFromDelegate(
-	auto& MulticastDelegate, const TArray<T>& ReadyValues = {})
+auto MakeStreamFromDelegate(
+	auto& MulticastDelegate, FDelegateHandle* OutHandle = nullptr)
 {
-	return MakeStreamFromDelegate(MulticastDelegate, ReadyValues,
+	return MakeStreamFromDelegate(MulticastDelegate,
 		[](auto...) { return true; },
-		[]<typename ArgType>(ArgType&& Arg) -> decltype(auto) { return Forward<ArgType>(Arg); });
+		[]<typename ArgType>(ArgType&& Arg) -> std::decay_t<ArgType> { return Forward<ArgType>(Arg); },
+		OutHandle);
 }
 
 
 /**
  * 주의 : 델리게이트를 복사하는 경우 여러 델리게이트를 통해 Value Stream에 Value가 공급될 수 있음
  * 
- * @tparam T
  * @tparam DelegateType 
  * @tparam PredicateType 
  * @tparam TransformFuncType 
  * @param MulticastDelegate 
- * @param ReadyValues 
  * @param Predicate 
  * @param TransformFunc 
  * @return 
  */
-template <typename T, typename DelegateType, typename PredicateType, typename TransformFuncType>
-TTuple<TValueStream<T>, FDelegateHandle> MakeStreamFromDelegate(
+template <typename DelegateType, typename PredicateType, typename TransformFuncType>
+auto MakeStreamFromDelegate(
 	DelegateType& MulticastDelegate,
-	const TArray<T>& ReadyValues,
 	PredicateType&& Predicate,
-	TransformFuncType&& TransformFunc)
+	TransformFuncType&& TransformFunc,
+	FDelegateHandle* OutHandle = nullptr)
 {
-	TValueStream<T> Ret;
+	using RetType = decltype
+	(
+		std::declval<typename TDelegateTypeTraits<typename DelegateType::FDelegate>::ParamTypeTuple>()
+		.ApplyAfter([&TransformFunc]<typename... ArgTypes>(ArgTypes&&... Args)
+		{
+			return TransformFunc(Forward<ArgTypes>(Args)...);
+		})
+	);
+	
+	TValueStream<RetType> Ret;
 
 	auto Receiver = Ret.GetReceiver();
-	for (const T& Each : ReadyValues)
-	{
-		Receiver.Pin()->ReceiveValue(Each);
-	}
 
 	struct FStreamCloser
 	{
-		TWeakPtr<TValueStreamValueReceiver<T>> Receiver;
+		TWeakPtr<TValueStreamValueReceiver<RetType>> Receiver;
 
 		~FStreamCloser()
 		{
@@ -207,7 +218,12 @@ TTuple<TValueStream<T>, FDelegateHandle> MakeStreamFromDelegate(
 			}
 		}));
 
-	return MakeTuple(MoveTemp(Ret), Handle);
+	if (OutHandle)
+	{
+		*OutHandle = Handle;
+	}
+
+	return Ret;
 }
 
 

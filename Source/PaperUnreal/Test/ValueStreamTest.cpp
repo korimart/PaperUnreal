@@ -17,9 +17,9 @@ bool FValueStreamTest::RunTest(const FString& Parameters)
 		FWeakCoroutine Coroutine = RunWeakCoroutine([&]() -> FWeakCoroutine
 		{
 			auto Added = Stream::Combine(
-					MakeStreamFromDelegate<int32>(Delegate0).Get<0>(),
-					MakeStreamFromDelegate<int32>(Delegate1).Get<0>(),
-					MakeStreamFromDelegate<int32>(Delegate2).Get<0>())
+					MakeStreamFromDelegate(Delegate0),
+					MakeStreamFromDelegate(Delegate1),
+					MakeStreamFromDelegate(Delegate2))
 				| Awaitables::Transform([](int32 A, int32 B, int32 C) { return A + B + C; });
 
 			while (true)
