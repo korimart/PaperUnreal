@@ -92,6 +92,10 @@ protected:
 		PlayerStateLiveData.Notify();
 	}
 
+	virtual void PawnLeavingGame() override
+	{
+	}
+
 private:
 	TLiveData<APawn*> Pawn2;
 	TLiveData<APawn*> SpectatorPawn2;
