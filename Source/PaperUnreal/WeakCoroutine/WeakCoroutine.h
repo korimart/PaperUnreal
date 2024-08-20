@@ -23,7 +23,7 @@ class UWeakCoroutineError : public UFailableResultError
 public:
 	static UWeakCoroutineError* InvalidCoroutine()
 	{
-		return NewError<UWeakCoroutineError>(TEXT("AbortIfInvalid로 등록된 오브젝트가 Valid 하지 않음"));
+		return NewError<UWeakCoroutineError>(TEXT("WeakList에 등록된 오브젝트가 Valid 하지 않음"));
 	}
 
 	static UWeakCoroutineError* ExplicitAbort()
@@ -149,9 +149,9 @@ public:
 		using AllowedErrorTypeList = typename std::decay_t<WithErrorAwaitableType>::AllowedErrorTypeList;
 
 		return Forward<WithErrorAwaitableType>(Awaitable).Awaitable
-			| Awaitables::AbortIfRequested()
-			| Awaitables::AbortIfInvalidPromise()
-			| Awaitables::AbortIfErrorNotIn<AllowedErrorTypeList>()
+			| Awaitables::DestroyIfAbortRequested()
+			| Awaitables::DestroyIfInvalidPromise()
+			| Awaitables::DestroyIfErrorNotIn<AllowedErrorTypeList>()
 			| Awaitables::ReturnAsAbortPtr(*this)
 			| Awaitables::CaptureSourceLocation();
 	}
@@ -161,9 +161,9 @@ public:
 	auto await_transform(AwaitableType&& Awaitable)
 	{
 		return Forward<AwaitableType>(Awaitable)
-			| Awaitables::AbortIfRequested()
-			| Awaitables::AbortIfInvalidPromise()
-			| Awaitables::AbortIfError()
+			| Awaitables::DestroyIfAbortRequested()
+			| Awaitables::DestroyIfInvalidPromise()
+			| Awaitables::DestroyIfError()
 			| Awaitables::ReturnAsAbortPtr(*this)
 			| Awaitables::CaptureSourceLocation();
 	}

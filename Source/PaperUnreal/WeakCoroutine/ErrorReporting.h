@@ -264,18 +264,18 @@ struct TErrorReportResultType
 
 
 template <CErrorReportingAwaitable InnerAwaitableType>
-class TAbortIfErrorAwaitable
-	: public TConditionalResumeAwaitable<TAbortIfErrorAwaitable<InnerAwaitableType>, InnerAwaitableType>
+class TDestroyIfErrorAwaitable
+	: public TConditionalResumeAwaitable<TDestroyIfErrorAwaitable<InnerAwaitableType>, InnerAwaitableType>
 {
 public:
-	using Super = TConditionalResumeAwaitable<TAbortIfErrorAwaitable, InnerAwaitableType>;
+	using Super = TConditionalResumeAwaitable<TDestroyIfErrorAwaitable, InnerAwaitableType>;
 	using ResultType = typename TErrorReportResultType<InnerAwaitableType>::Type;
 
 	template <typename AwaitableType>
-	TAbortIfErrorAwaitable(AwaitableType&& Awaitable)
+	TDestroyIfErrorAwaitable(AwaitableType&& Awaitable)
 		: Super(Forward<AwaitableType>(Awaitable))
 	{
-		static_assert(CNonErrorReportingAwaitable<TAbortIfErrorAwaitable>);
+		static_assert(CNonErrorReportingAwaitable<TDestroyIfErrorAwaitable>);
 	}
 
 	bool ShouldResume(const auto& Handle, const TFailableResult<ResultType>& Result) const
@@ -296,13 +296,13 @@ public:
 };
 
 template <typename AwaitableType>
-TAbortIfErrorAwaitable(AwaitableType&&) -> TAbortIfErrorAwaitable<AwaitableType>;
+TDestroyIfErrorAwaitable(AwaitableType&&) -> TDestroyIfErrorAwaitable<AwaitableType>;
 
 
-struct FAbortIfErrorAdaptor : TAwaitableAdaptorBase<FAbortIfErrorAdaptor>
+struct FDestroyIfErrorAdaptor : TAwaitableAdaptorBase<FDestroyIfErrorAdaptor>
 {
 	template <CAwaitable AwaitableType>
-	friend decltype(auto) operator|(AwaitableType&& Awaitable, FAbortIfErrorAdaptor)
+	friend decltype(auto) operator|(AwaitableType&& Awaitable, FDestroyIfErrorAdaptor)
 	{
 		if constexpr (!CErrorReportingAwaitable<std::decay_t<AwaitableType>>)
 		{
@@ -310,27 +310,27 @@ struct FAbortIfErrorAdaptor : TAwaitableAdaptorBase<FAbortIfErrorAdaptor>
 		}
 		else
 		{
-			return TAbortIfErrorAwaitable{Forward<AwaitableType>(Awaitable)};
+			return TDestroyIfErrorAwaitable{Forward<AwaitableType>(Awaitable)};
 		}
 	}
 };
 
 
 template <CErrorReportingAwaitable InnerAwaitableType, typename AllowedErrorTypeList>
-class TAbortIfErrorNotInAwaitable
-	: public TConditionalResumeAwaitable<TAbortIfErrorNotInAwaitable<InnerAwaitableType, AllowedErrorTypeList>, InnerAwaitableType>
+class TDestroyIfErrorNotInAwaitable
+	: public TConditionalResumeAwaitable<TDestroyIfErrorNotInAwaitable<InnerAwaitableType, AllowedErrorTypeList>, InnerAwaitableType>
 {
 public:
-	using Super = TConditionalResumeAwaitable<TAbortIfErrorNotInAwaitable, InnerAwaitableType>;
+	using Super = TConditionalResumeAwaitable<TDestroyIfErrorNotInAwaitable, InnerAwaitableType>;
 	using ResultType = typename TErrorReportResultType<InnerAwaitableType>::Type;
 
 	static constexpr bool bAllowAll = std::is_same_v<void, AllowedErrorTypeList>;
 
 	template <typename AwaitableType>
-	TAbortIfErrorNotInAwaitable(AwaitableType&& Awaitable)
+	TDestroyIfErrorNotInAwaitable(AwaitableType&& Awaitable)
 		: Super(Forward<AwaitableType>(Awaitable))
 	{
-		static_assert(CErrorReportingAwaitable<TAbortIfErrorNotInAwaitable>);
+		static_assert(CErrorReportingAwaitable<TDestroyIfErrorNotInAwaitable>);
 	}
 
 	bool ShouldResume(const auto& Handle, const TFailableResult<ResultType>& Result) const
@@ -358,10 +358,10 @@ public:
 
 
 template <typename AllowedErrorTypeList>
-struct TAbortIfErrorNotInAdaptor : TAwaitableAdaptorBase<TAbortIfErrorNotInAdaptor<AllowedErrorTypeList>>
+struct TDestroyIfErrorNotInAdaptor : TAwaitableAdaptorBase<TDestroyIfErrorNotInAdaptor<AllowedErrorTypeList>>
 {
 	template <typename AwaitableType>
-	friend decltype(auto) operator|(AwaitableType&& Awaitable, TAbortIfErrorNotInAdaptor)
+	friend decltype(auto) operator|(AwaitableType&& Awaitable, TDestroyIfErrorNotInAdaptor)
 	{
 		if constexpr (!CErrorReportingAwaitable<std::decay_t<AwaitableType>>)
 		{
@@ -369,7 +369,7 @@ struct TAbortIfErrorNotInAdaptor : TAwaitableAdaptorBase<TAbortIfErrorNotInAdapt
 		}
 		else
 		{
-			return TAbortIfErrorNotInAwaitable<AwaitableType, AllowedErrorTypeList>{Forward<AwaitableType>(Awaitable)};
+			return TDestroyIfErrorNotInAwaitable<AwaitableType, AllowedErrorTypeList>{Forward<AwaitableType>(Awaitable)};
 		}
 	}
 };
@@ -377,13 +377,13 @@ struct TAbortIfErrorNotInAdaptor : TAwaitableAdaptorBase<TAbortIfErrorNotInAdapt
 
 namespace Awaitables
 {
-	inline FAbortIfErrorAdaptor AbortIfError()
+	inline FDestroyIfErrorAdaptor DestroyIfError()
 	{
 		return {};
 	}
 
 	template <typename AllowedErrorTypeList>
-	TAbortIfErrorNotInAdaptor<AllowedErrorTypeList> AbortIfErrorNotIn()
+	TDestroyIfErrorNotInAdaptor<AllowedErrorTypeList> DestroyIfErrorNotIn()
 	{
 		return {};
 	}

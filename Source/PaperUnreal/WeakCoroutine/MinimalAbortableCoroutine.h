@@ -39,7 +39,7 @@ struct TMinimalAbortableCoroutine
 		template <typename AwaitableType>
 		auto await_transform(AwaitableType&& Awaitable)
 		{
-			return Forward<AwaitableType>(Awaitable) | Awaitables::AbortIfRequested();
+			return Forward<AwaitableType>(Awaitable) | Awaitables::DestroyIfAbortRequested();
 		}
 
 		void OnAbortRequested()
@@ -49,7 +49,7 @@ struct TMinimalAbortableCoroutine
 		// TODO 여기다가 쓰는 게 아니라 awaitable 쪽에서 SetErrors가 있는지 검사
 		void SetErrors(const TArray<UFailableResultError*>&)
 		{
-			// 미니멀이기 때문에 AbortIfError 등의 Awaitable을 사용해도
+			// 미니멀이기 때문에 DestroyIfError 등의 Awaitable을 사용해도
 			// 어떤 에러가 발생했는지 기록하지 않음
 		}
 	};

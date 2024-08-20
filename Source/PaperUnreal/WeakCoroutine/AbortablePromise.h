@@ -31,7 +31,7 @@ struct TAbortablePromise
 			static_cast<Derived*>(this)->OnAbortRequested();
 		}
 
-		if (bSuspendedOnAbortIfRequestedAwaitable)
+		if (bSuspendedOnAbortAwaitable)
 		{
 			std::coroutine_handle<Derived>::from_promise(*static_cast<Derived*>(this)).destroy();
 		}
@@ -44,10 +44,10 @@ struct TAbortablePromise
 
 private:
 	template <typename>
-	friend class TAbortIfRequestedAwaitable;
+	friend class TDestroyIfAbortRequestedAwaitable;
 
 	bool bAbortRequested = false;
-	bool bSuspendedOnAbortIfRequestedAwaitable = false;
+	bool bSuspendedOnAbortAwaitable = false;
 
 	TWeakPtr<std::monostate> GetPromiseLifeFromDerived() const
 	{
@@ -209,22 +209,22 @@ private:
  * co_await 되고 있는 Awaitable이 resume 또는 destroy하지 않더라도 임의의 시점에 코루틴을 파괴할 수 있게 합니다.
  */
 template <typename InnerAwaitableType>
-class TAbortIfRequestedAwaitable
-	: public TConditionalResumeAwaitable<TAbortIfRequestedAwaitable<InnerAwaitableType>, InnerAwaitableType>
+class TDestroyIfAbortRequestedAwaitable
+	: public TConditionalResumeAwaitable<TDestroyIfAbortRequestedAwaitable<InnerAwaitableType>, InnerAwaitableType>
 {
 public:
-	using Super = TConditionalResumeAwaitable<TAbortIfRequestedAwaitable, InnerAwaitableType>;
+	using Super = TConditionalResumeAwaitable<TDestroyIfAbortRequestedAwaitable, InnerAwaitableType>;
 	using ReturnType = typename Super::ReturnType;
 
 	template <typename AwaitableType>
-	TAbortIfRequestedAwaitable(AwaitableType&& Awaitable)
+	TDestroyIfAbortRequestedAwaitable(AwaitableType&& Awaitable)
 		: Super(Forward<AwaitableType>(Awaitable))
 	{
 	}
 
-	TAbortIfRequestedAwaitable(TAbortIfRequestedAwaitable&&) = default;
+	TDestroyIfAbortRequestedAwaitable(TDestroyIfAbortRequestedAwaitable&&) = default;
 
-	~TAbortIfRequestedAwaitable()
+	~TDestroyIfAbortRequestedAwaitable()
 	{
 		if (bSuspended)
 		{
@@ -242,7 +242,7 @@ public:
 		}
 
 		bSuspended = true;
-		AbortablePromiseHandle.promise().bSuspendedOnAbortIfRequestedAwaitable = true;
+		AbortablePromiseHandle.promise().bSuspendedOnAbortAwaitable = true;
 
 		return Super::await_suspend(Forward<HandleType>(AbortablePromiseHandle));
 	}
@@ -250,7 +250,7 @@ public:
 	bool ShouldResume(const auto& AbortablePromiseHandle, const auto&)
 	{
 		bSuspended = false;
-		AbortablePromiseHandle.promise().bSuspendedOnAbortIfRequestedAwaitable = false;
+		AbortablePromiseHandle.promise().bSuspendedOnAbortAwaitable = false;
 
 		return !AbortablePromiseHandle.promise().bAbortRequested;
 	}
@@ -260,15 +260,15 @@ private:
 };
 
 template <typename AwaitableType>
-TAbortIfRequestedAwaitable(AwaitableType&&) -> TAbortIfRequestedAwaitable<AwaitableType>;
+TDestroyIfAbortRequestedAwaitable(AwaitableType&&) -> TDestroyIfAbortRequestedAwaitable<AwaitableType>;
 
 
-struct FAbortIfRequestedAdaptor : TAwaitableAdaptorBase<FAbortIfRequestedAdaptor>
+struct FDestroyIfAbortRequestedAdaptor : TAwaitableAdaptorBase<FDestroyIfAbortRequestedAdaptor>
 {
 	template <CAwaitable AwaitableType>
-	friend decltype(auto) operator|(AwaitableType&& Awaitable, FAbortIfRequestedAdaptor)
+	friend decltype(auto) operator|(AwaitableType&& Awaitable, FDestroyIfAbortRequestedAdaptor)
 	{
-		return TAbortIfRequestedAwaitable{Forward<AwaitableType>(Awaitable)};
+		return TDestroyIfAbortRequestedAwaitable{Forward<AwaitableType>(Awaitable)};
 	}
 };
 
@@ -278,7 +278,7 @@ namespace Awaitables
 	/**
 	 * TAbortablePromise를 상속하는 promise_type은 await_transform에서 Awaitable에 대해 이 함수를 호출해야 합니다.
 	 */
-	inline FAbortIfRequestedAdaptor AbortIfRequested()
+	inline FDestroyIfAbortRequestedAdaptor DestroyIfAbortRequested()
 	{
 		return {};
 	}

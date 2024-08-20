@@ -126,25 +126,25 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 			Received.Add(co_await Array[4].Get<1>());
 		});
 
-		TestEqual(TEXT("AbortIfNotValid가 잘 작동하는는지 테스트"), Received.Num(), 0);
-		TestFalse(TEXT("AbortIfNotValid가 잘 작동하는는지 테스트"), *bLifeDestroyed);
+		TestEqual(TEXT("AddToWeakList가 잘 작동하는는지 테스트"), Received.Num(), 0);
+		TestFalse(TEXT("AddToWeakList가 잘 작동하는는지 테스트"), *bLifeDestroyed);
 		Array[0].Get<0>().SetValue(0);
-		TestEqual(TEXT("AbortIfNotValid가 잘 작동하는는지 테스트"), Received[0], 0);
-		TestFalse(TEXT("AbortIfNotValid가 잘 작동하는는지 테스트"), *bLifeDestroyed);
+		TestEqual(TEXT("AddToWeakList가 잘 작동하는는지 테스트"), Received[0], 0);
+		TestFalse(TEXT("AddToWeakList가 잘 작동하는는지 테스트"), *bLifeDestroyed);
 		Array[1].Get<0>().SetValue(1);
-		TestEqual(TEXT("AbortIfNotValid가 잘 작동하는는지 테스트"), Received[1], 1);
-		TestFalse(TEXT("AbortIfNotValid가 잘 작동하는는지 테스트"), *bLifeDestroyed);
+		TestEqual(TEXT("AddToWeakList가 잘 작동하는는지 테스트"), Received[1], 1);
+		TestFalse(TEXT("AddToWeakList가 잘 작동하는는지 테스트"), *bLifeDestroyed);
 
 		AbortIfNotValid->MarkAsGarbage();
 		Array[2].Get<0>().SetValue(2);
-		TestEqual(TEXT("AbortIfNotValid가 잘 작동하는는지 테스트"), Received.Num(), 2);
-		TestTrue(TEXT("AbortIfNotValid가 잘 작동하는는지 테스트"), *bLifeDestroyed);
+		TestEqual(TEXT("AddToWeakList가 잘 작동하는는지 테스트"), Received.Num(), 2);
+		TestTrue(TEXT("AddToWeakList가 잘 작동하는는지 테스트"), *bLifeDestroyed);
 		Array[3].Get<0>().SetValue(3);
-		TestEqual(TEXT("AbortIfNotValid가 잘 작동하는는지 테스트"), Received.Num(), 2);
-		TestTrue(TEXT("AbortIfNotValid가 잘 작동하는는지 테스트"), *bLifeDestroyed);
+		TestEqual(TEXT("AddToWeakList가 잘 작동하는는지 테스트"), Received.Num(), 2);
+		TestTrue(TEXT("AddToWeakList가 잘 작동하는는지 테스트"), *bLifeDestroyed);
 		Array[4].Get<0>().SetValue(4);
-		TestEqual(TEXT("AbortIfNotValid가 잘 작동하는는지 테스트"), Received.Num(), 2);
-		TestTrue(TEXT("AbortIfNotValid가 잘 작동하는는지 테스트"), *bLifeDestroyed);
+		TestEqual(TEXT("AddToWeakList가 잘 작동하는는지 테스트"), Received.Num(), 2);
+		TestTrue(TEXT("AddToWeakList가 잘 작동하는는지 테스트"), *bLifeDestroyed);
 	}
 
 	{

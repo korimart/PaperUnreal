@@ -84,10 +84,10 @@ template <typename AwaitableType>
 TWeakAwaitable(AwaitableType&& Awaitable) -> TWeakAwaitable<AwaitableType>;
 
 
-struct FAbortIfInvalidPromiseAdaptor : TAwaitableAdaptorBase<FAbortIfInvalidPromiseAdaptor>
+struct FDestroyIfInvalidPromiseAdaptor : TAwaitableAdaptorBase<FDestroyIfInvalidPromiseAdaptor>
 {
 	template <typename AwaitableType>
-	friend auto operator|(AwaitableType&& Awaitable, FAbortIfInvalidPromiseAdaptor)
+	friend auto operator|(AwaitableType&& Awaitable, FDestroyIfInvalidPromiseAdaptor)
 	{
 		return TWeakAwaitable{Forward<AwaitableType>(Awaitable)};
 	}
@@ -276,7 +276,7 @@ struct TReturnAsAbortPtrAdaptor : TAwaitableAdaptorBase<TReturnAsAbortPtrAdaptor
 
 namespace Awaitables
 {
-	inline FAbortIfInvalidPromiseAdaptor AbortIfInvalidPromise()
+	inline FDestroyIfInvalidPromiseAdaptor DestroyIfInvalidPromise()
 	{
 		return {};
 	}
