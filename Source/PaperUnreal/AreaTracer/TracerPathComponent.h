@@ -4,27 +4,38 @@
 
 #include "CoreMinimal.h"
 #include "AreaBoundaryComponent.h"
-#include "TracerPathProvider.h"
 #include "TracerPathComponent.generated.h"
 
 
 UCLASS()
-class UTracerPathComponent : public UActorComponent2, public ITracerPathProvider
+class UTracerPathComponent : public UActorComponent2
 {
 	GENERATED_BODY()
 
 public:
-	virtual TLiveDataView<TOptional<FVector2D>> GetRunningPathHead() const override { return PathHead; }
-	virtual TLiveDataView<TArray<FVector2D>> GetRunningPathTail() const override { return PathTail; }
-	
+	TLiveDataView<TOptional<FVector2D>> GetRunningPathHead() const { return PathHead; }
+	TLiveDataView<TArray<FVector2D>> GetRunningPathTail() const { return PathTail; }
+
 	TLiveDataView<TOptional<FSegmentArray2D>> GetLastCompletePath() const { return LastCompletePath; }
-	
+
 	const FSegmentArray2D& GetRunningPath() const { return Path; }
 
 	// TODO remove dependency
 	void SetNoPathArea(UAreaBoundaryComponent* Area) { NoPathArea = Area; }
 
 	void ClearPath() { EmptyPoints(); }
+
+	void OverrideHeadAndTail(const TOptional<FVector2D>& Head, const TArray<FVector2D>& Tail)
+	{
+		ClearPath();
+
+		for (const FVector2D& Each : Tail)
+		{
+			AddPoint(Each);
+		}
+
+		PathHead = Head;
+	}
 
 private:
 	UPROPERTY()
@@ -34,7 +45,7 @@ private:
 	mutable TLiveData<TArray<FVector2D>> PathTail;
 	mutable TLiveData<TOptional<FSegmentArray2D>> LastCompletePath;
 	FSegmentArray2D Path;
-	
+
 	FTickingSwitch Switch;
 
 	UTracerPathComponent()
@@ -113,7 +124,8 @@ private:
 			return;
 		}
 
-		if (Path.GetPoint(-1).Equals(ActorLocation2D))
+		const float Dist = (Path.GetPoint(-1) - ActorLocation2D).Length();
+		if (Dist < 10.f)
 		{
 			return;
 		}

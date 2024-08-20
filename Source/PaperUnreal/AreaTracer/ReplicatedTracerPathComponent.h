@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "TracerPathComponent.h"
-#include "TracerPathProvider.h"
 #include "Net/UnrealNetwork.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 #include "ReplicatedTracerPathComponent.generated.h"
@@ -102,13 +101,13 @@ struct FNumberedVector2DArray
 
 
 UCLASS()
-class UReplicatedTracerPathComponent : public UActorComponent2, public ITracerPathProvider
+class UReplicatedTracerPathComponent : public UActorComponent2
 {
 	GENERATED_BODY()
 
 public:
-	virtual TLiveDataView<TOptional<FVector2D>> GetRunningPathHead() const override { return PathHead; }
-	virtual TLiveDataView<TArray<FVector2D>> GetRunningPathTail() const override { return PathTail; }
+	TLiveDataView<TOptional<FVector2D>> GetRunningPathHead() const { return PathHead; }
+	TLiveDataView<TArray<FVector2D>> GetRunningPathTail() const { return PathTail; }
 
 	void SetTracerPathSource(UTracerPathComponent* Source)
 	{

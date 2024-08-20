@@ -8,6 +8,7 @@
 #include "TracerPointEventComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "PaperUnreal/GameFramework2/ComponentGroupComponent.h"
+#include "PaperUnreal/GameFramework2/Character2.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/AssetPaths.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/ComponentRegistry.h"
 #include "PaperUnreal/GameMode/ModeAgnostic/LineMeshComponent.h"
@@ -25,6 +26,9 @@ public:
 	UPROPERTY()
 	UTracerPathComponent* ServerTracerPath;
 
+	UPROPERTY()
+	UTracerPathComponent* ClientPredictedTracerPath;
+
 	void SetTracerColorStream(TValueStream<FLinearColor>&& Stream)
 	{
 		check(GetNetMode() != NM_DedicatedServer);
@@ -33,16 +37,16 @@ public:
 
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_TracerPathProvider)
-	TScriptInterface<ITracerPathProvider> RepTracerPathProvider;
-	TLiveData<TScriptInterface<ITracerPathProvider>&> TracerPathProvider{RepTracerPathProvider};
+	UReplicatedTracerPathComponent* RepTracerPath;
+	TLiveData<UReplicatedTracerPathComponent*&> ReplicatedTracerPath{RepTracerPath};
 
 	UFUNCTION()
-	void OnRep_TracerPathProvider() { TracerPathProvider.Notify(); }
+	void OnRep_TracerPathProvider() { ReplicatedTracerPath.Notify(); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-		DOREPLIFETIME_CONDITION(ThisClass, RepTracerPathProvider, COND_InitialOnly);
+		DOREPLIFETIME_CONDITION(ThisClass, RepTracerPath, COND_InitialOnly);
 	}
 
 	UPROPERTY()
@@ -57,14 +61,12 @@ private:
 	{
 		ServerTracerPath = NewChildComponent<UTracerPathComponent>(GetOwner());
 		ServerTracerPath->RegisterComponent();
-		TracerPathProvider = TScriptInterface<ITracerPathProvider>{ServerTracerPath};
 
 		if (GetNetMode() != NM_Standalone)
 		{
-			auto TracerPathReplicator = NewChildComponent<UReplicatedTracerPathComponent>(GetOwner());
-			TracerPathReplicator->SetTracerPathSource(ServerTracerPath);
-			TracerPathReplicator->RegisterComponent();
-			TracerPathProvider = TracerPathReplicator;
+			ReplicatedTracerPath = NewChildComponent<UReplicatedTracerPathComponent>(GetOwner());
+			ReplicatedTracerPath->SetTracerPathSource(ServerTracerPath);
+			ReplicatedTracerPath->RegisterComponent();
 		}
 	}
 
@@ -72,15 +74,28 @@ private:
 	{
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
-			co_await TracerPathProvider;
+			// Standalone 또는 Listen Server에서는 PlayerMachine에서도 ServerTracerPath가 있을 수가 있음
+			if (!IsValid(ServerTracerPath))
+			{
+				co_await ReplicatedTracerPath;
+
+				ClientPredictedTracerPath = NewChildComponent<UTracerPathComponent>(GetOwner());
+				ClientPredictedTracerPath->RegisterComponent();
+
+				Cast<UCharacterMovementComponent2>(GetOuterACharacter2()->GetMovementComponent())
+					->OnCorrected.AddWeakLambda(this, [this]()
+					{
+						ClientPredictedTracerPath->OverrideHeadAndTail(
+							ReplicatedTracerPath.Get()->GetRunningPathHead().Get(),
+							ReplicatedTracerPath.Get()->GetRunningPathTail().Get());
+					});
+			}
 
 			ClientTracerMesh = NewChildComponent<ULineMeshComponent>(GetOwner());
 			ClientTracerMesh->RegisterComponent();
 
 			auto TracerPointEvent = NewChildComponent<UTracerPointEventComponent>(GetOwner());
-			TracerPointEvent->SetEventSource(
-				// Standalone 또는 Listen Server에서는 PlayerMachine에서도 ServerTracerPath가 있을 수가 있음
-				IsValid(ServerTracerPath) ? ServerTracerPath : TracerPathProvider.Get().GetInterface());
+			TracerPointEvent->SetEventSource(IsValid(ServerTracerPath) ? ServerTracerPath : ClientPredictedTracerPath);
 			TracerPointEvent->RegisterComponent();
 			TracerPointEvent->AddEventListener(ClientTracerMesh);
 

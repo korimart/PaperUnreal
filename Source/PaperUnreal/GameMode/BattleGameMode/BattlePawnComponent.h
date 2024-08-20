@@ -49,13 +49,6 @@ private:
 	UFUNCTION()
 	void OnRep_Tracer() { Tracer.Notify(); }
 
-	UPROPERTY(ReplicatedUsing=OnRep_TracerPathProvider)
-	TScriptInterface<ITracerPathProvider> RepTracerPathProvider;
-	TLiveData<TScriptInterface<ITracerPathProvider>&> TracerPathProvider{RepTracerPathProvider};
-
-	UFUNCTION()
-	void OnRep_TracerPathProvider() { TracerPathProvider.Notify(); }
-
 	UPROPERTY(ReplicatedUsing=OnRep_Life)
 	ULifeComponent* RepLife;
 	mutable TLiveData<ULifeComponent*&> Life{RepLife};
@@ -67,7 +60,6 @@ private:
 	{
 		Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 		DOREPLIFETIME_CONDITION(ThisClass, RepTracer, COND_InitialOnly);
-		DOREPLIFETIME_CONDITION(ThisClass, RepTracerPathProvider, COND_InitialOnly);
 		DOREPLIFETIME_CONDITION(ThisClass, RepLife, COND_InitialOnly);
 	}
 

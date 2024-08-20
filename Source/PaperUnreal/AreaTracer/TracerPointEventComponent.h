@@ -3,8 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "TracerPathComponent.h"
 #include "TracerPointEventListener.h"
-#include "TracerPathProvider.h"
 #include "PaperUnreal/GameFramework2/ActorComponent2.h"
 #include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 #include "TracerPointEventComponent.generated.h"
@@ -16,10 +16,10 @@ class UTracerPointEventComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	void SetEventSource(ITracerPathProvider* Source)
+	void SetEventSource(UTracerPathComponent* Source)
 	{
 		check(!HasBeenInitialized());
-		EventSource = Cast<UObject>(Source);
+		EventSource = Source;
 	}
 
 	void AddEventListener(ITracerPointEventListener* Listener)
@@ -30,7 +30,7 @@ public:
 
 private:
 	UPROPERTY()
-	TScriptInterface<ITracerPathProvider> EventSource;
+	UTracerPathComponent* EventSource;
 
 	UTracerPointEventComponent()
 	{
@@ -41,7 +41,7 @@ private:
 	{
 		Super::InitializeComponent();
 
-		AddLifeDependency(CastChecked<UActorComponent2>(EventSource.GetObject()));
+		AddLifeDependency(EventSource);
 	}
 
 	void InitiateEventListeningSequence(ITracerPointEventListener* Listener)
