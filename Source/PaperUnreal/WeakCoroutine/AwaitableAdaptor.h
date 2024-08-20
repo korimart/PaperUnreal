@@ -57,6 +57,7 @@ public:
 		if (Awaitable)
 		{
 			Awaitable->await_abort();
+			Awaitable.Reset();
 		}
 	}
 
@@ -81,6 +82,19 @@ namespace Awaitables
 	inline FAwaitableGetterAdaptor TakeAwaitable()
 	{
 		return {};
+	}
+
+	template <typename MaybeAwaitableType>
+	decltype(auto) TakeAwaitableOrForward(MaybeAwaitableType&& MaybeAwaitable)
+	{
+		if constexpr (CAwaitable<MaybeAwaitableType>)
+		{
+			return Forward<MaybeAwaitableType>(MaybeAwaitable);
+		}
+		else
+		{
+			return Forward<MaybeAwaitableType>(MaybeAwaitable) | TakeAwaitable();
+		}
 	}
 }
 

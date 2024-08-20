@@ -119,6 +119,6 @@ namespace Awaitables
 	template <typename... AwaitableTypes>
 	auto AnyOf(AwaitableTypes&&... Awaitables)
 	{
-		return TAnyOfAwaitable{AwaitableOrIdentity(Forward<AwaitableTypes>(Awaitables))...};
+		return TAnyOfAwaitable{TakeAwaitableOrForward(Forward<AwaitableTypes>(Awaitables))...};
 	}
 }
