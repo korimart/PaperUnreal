@@ -21,6 +21,7 @@ public:
 	FOnJoinPressed OnJoinPressed;
 
 	FSimpleMulticastDelegate OnCancelJoinPressed;
+	FSimpleMulticastDelegate OnQuitPressed;
 
 	UFUNCTION(BlueprintImplementableEvent)
 	void OnJoinFailed();
@@ -45,5 +46,11 @@ private:
 	void CancelJoin()
 	{
 		OnCancelJoinPressed.Broadcast();
+	}
+	
+	UFUNCTION(BlueprintCallable)
+	void Quit()
+	{
+		OnQuitPressed.Broadcast();
 	}
 };

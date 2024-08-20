@@ -28,7 +28,7 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<UMenuWidget> MenuWidgetClass;
-	
+
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<UToastWidget> ToastWidgetClass;
 
@@ -51,6 +51,7 @@ private:
 
 		ListenToHostRequest();
 		ListenToJoinRequest();
+		ListenToQuitRequest();
 	}
 
 	void SetupLevelBackground()
@@ -76,7 +77,7 @@ private:
 	FWeakCoroutine DisplayNetworkErrorIfError()
 	{
 		UPaperUnrealGameInstance* GameInstance = GetWorld()->GetGameInstance<UPaperUnrealGameInstance>();
-		
+
 		const bool bReturnedToMenuByError = UGameplayStatics::HasOption(GetWorld()->GetAuthGameMode()->OptionsString, TEXT("closed"));
 		const TOptional<ENetworkFailure::Type> Error = GameInstance->GetLastNetworkFailure();
 		GameInstance->ClearErrors();
@@ -86,7 +87,7 @@ private:
 			// TODO 엔진을 다 안 읽어봐서 어떤 경우에 이게 발생할 수 있는지 모름 그러므로 로그를 남긴다 log error
 			co_return;
 		}
-		
+
 		if (bReturnedToMenuByError && Error)
 		{
 			UToastWidget* Toast = CreateWidget<UToastWidget>(GetOwningPlayerController(), ToastWidgetClass);
@@ -101,7 +102,7 @@ private:
 			{
 				ErrorMessage = FText::FromString(TEXT("알 수 없는 네트워크 에러가 발생했습니다."));
 			}
-			
+
 			auto H = Toast->Toast(ErrorMessage);
 			co_await WaitForSeconds(GetWorld(), 5.f);
 		}
@@ -142,5 +143,11 @@ private:
 				MenuWidget->OnJoinCancelled();
 			}
 		}
+	}
+
+	FWeakCoroutine ListenToQuitRequest()
+	{
+		co_await MenuWidget->OnQuitPressed;
+		UKismetSystemLibrary::QuitGame(GetWorld(), GetOwningPlayerController(), EQuitPreference::Quit, false);
 	}
 };
