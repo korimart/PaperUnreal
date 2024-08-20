@@ -6,6 +6,16 @@
 #include "TypeTraits.h"
 
 
+/**
+ * Inner Awaitable의 await_resume 반환을 미리 보고 resume / destroy 여부를 결정하기 위한 클래스
+ * CRTP을 사용하여 Derived Class에 기능을 제공합니다.
+ * 
+ * Derived Class는 이 클래스를 상속하고 
+ * bool ShouldResume(const auto& CoroutineHandle, const TFailableResult<ResultType>& Result) const
+ * 를 구현하여 자신의 resume / destroy 여부를 결정합니다.
+ *
+ * (가장 간단한 예시는 TWeakAwaitable로, TWeakAwaitable은 Inner의 결과에 상관 없이 resume / destroy 기능만 사용합니다)
+ */
 template <typename Derived, CAwaitable InnerAwaitableType>
 class TConditionalResumeAwaitable
 {

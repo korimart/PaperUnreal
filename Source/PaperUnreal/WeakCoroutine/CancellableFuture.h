@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "ErrorReporting.h"
-#include "TransformAwaitable.h"
 #include "TypeTraits.h"
 #include "GameFramework/GameStateBase.h"
 #include "Engine/AssetManager.h"
@@ -44,11 +43,17 @@ class UCancellableFutureError : public UFailableResultError
 	GENERATED_BODY()
 
 public:
+	/**
+	 * SetValue가 호출 전에 Promise가 파괴된 경우
+	 */
 	static UCancellableFutureError* PromiseNotFulfilled()
 	{
 		return NewError<UCancellableFutureError>(TEXT("PromiseNotFulfilled"));
 	}
 
+	/**
+	 * Promise가 SetValue를 포기한 경우 (Cancel을 호출한 경우)
+	 */
 	static UCancellableFutureError* Cancelled()
 	{
 		return NewError<UCancellableFutureError>(TEXT("Cancelled"));
@@ -116,6 +121,14 @@ private:
 };
 
 
+/**
+ * std::future와 비슷하지만 TFailableResult를 통한 에러 핸들링 기능을 추가한 클래스
+ * 코루틴과의 접목을 염두에 두고 작성되었으므로 Then Chain을 구성하는 것이 불가능합니다(이 경우 코루틴을 사용해야 합니다)
+ * 
+ * 에러 핸들링 기능에 대한 설명은 TFailableResult를 참고해주세요
+ *
+ * 한 번 소모되면 다시 값을 가져올 수 없습니다. (Then 또는 ConsumeValue 중 하나를 한 번만 호출할 수 있음)
+ */
 template <typename T>
 class TCancellableFuture
 {
@@ -193,6 +206,11 @@ private:
 };
 
 
+/**
+ * std::promise와 비슷하지만 TFailableResult를 통한 에러 핸들링 기능을 구현한 클래스
+ * 
+ * @see TCancellableFuture
+ */
 template <typename T>
 class TCancellablePromise
 {
@@ -258,7 +276,10 @@ private:
 	TSharedPtr<StateType> State = MakeShared<StateType>();
 };
 
-
+/**
+ * TCancellablePromise와 달리 이 클래스는 복사가 가능하며 여러 장소에서 SetValue를 호출하는 것이 가능합니다.
+ * 첫 SetValue로 설정된 값이 Future로 전달되며 그 이후의 SetValue는 모두 무시됩니다.
+ */
 template <typename T>
 class TShareableCancellablePromise
 {
@@ -382,13 +403,22 @@ private:
 template <typename T>
 TCancellableFutureAwaitable(T&&) -> TCancellableFutureAwaitable<T>;
 
+/**
+ * co_await Future; 지원용
+ */
 template <typename T>
 auto operator co_await(TCancellableFuture<T>& Future) { return TCancellableFutureAwaitable{Future}; }
 
+/**
+ * co_await MoveTemp(Future); 지원용
+ */
 template <typename T>
 auto operator co_await(TCancellableFuture<T>&& Future) { return TCancellableFutureAwaitable{MoveTemp(Future)}; }
 
 
+/**
+ * Promise에서 Future를 쉽게 꺼내기 위한 편의 함수
+ */
 template <typename T>
 TTuple<TCancellablePromise<T>, TCancellableFuture<T>> MakePromise()
 {
@@ -398,6 +428,9 @@ TTuple<TCancellablePromise<T>, TCancellableFuture<T>> MakePromise()
 }
 
 
+/**
+ * Promise에서 Future를 쉽게 꺼내기 위한 편의 함수
+ */
 template <typename T>
 TTuple<TShareableCancellablePromise<T>, TCancellableFuture<T>> MakeShareablePromise()
 {
@@ -406,6 +439,23 @@ TTuple<TShareableCancellablePromise<T>, TCancellableFuture<T>> MakeShareableProm
 }
 
 
+/**
+ * TDelegate가 Execute될 때 Execute에 대한 인자를 반환으로 하는 TCancellableFuture를 반환합니다.
+ *
+ * 예시)
+ * DECLARE_DELEGATE_OneParam(FSomeDelegate, int32);
+ * FSomeDelegate Delegate;
+ * 
+ * TCancellableFuture<int32> Future = MakeFutureFromDelegate(Delegate);
+ * Delegate.Execute(42);
+ * check(Future.ConsumeValue().GetResult() == 42);
+ *
+ * Simple Delegate에 대해서는 TCancellableFuture<void>를 반환합니다.
+ * 파라미터가 2개 이상인 Delegate에 대해서는 TTuple로 묶어서 반환합니다.
+ *
+ * 주의 : 모든 타입은 Decay된 이후 TCancellableFuture로 만들어집니다.
+ * (즉 Delegate 파라미터 타입의 const, reference 등은 없어짐)
+ */
 template <CDelegate DelegateType>
 auto MakeFutureFromDelegate(DelegateType& Delegate)
 {
@@ -432,6 +482,23 @@ auto MakeFutureFromDelegate(DelegateType& Delegate)
 	}
 }
 
+/**
+ * 
+ * TDelegate가 Execute될 때 Execute에 대한 인자를 Transform한 것을 반환으로 하는 TCancellableFuture를 반환합니다.
+ *
+ * 예시)
+ * DECLARE_DELEGATE_OneParam(FSomeDelegate, int32);
+ * FSomeDelegate Delegate;
+ *
+ * const auto FilterGreaterThan10 = [](int32 Value) { return Value > 10; }; // 10이하는 걸러짐 (false 반환이 걸러지는 쪽)
+ * const auto TransformToString = [](int32 Value) { return FString::FromInt(Value); };
+ * 
+ * TCancellableFuture<FString> Future = MakeFutureFromDelegate(Delegate, FilterGreaterThan10, TransformToString);
+ * Delegate.Execute(1);
+ * Delegate.Execute(5);
+ * Delegate.Execute(15);
+ * check(Future.ConsumeValue().GetResult() == TEXT("15"));
+ */
 template <CDelegate DelegateType, typename PredicateType, typename TransformFuncType>
 auto MakeFutureFromDelegate(DelegateType& Delegate, PredicateType&& Predicate, TransformFuncType&& TransformFunc)
 {
@@ -471,6 +538,9 @@ auto MakeFutureFromDelegate(DelegateType& Delegate, PredicateType&& Predicate, T
 	return MoveTemp(Future);
 }
 
+/**
+ * MakeFutureFromDelegate의 멀티캐스트 델리게이트 버전 (위 함수 주석 참고 부탁드립니다)
+ */
 template <typename MulticastDelegateType>
 auto MakeFutureFromDelegate(MulticastDelegateType& MulticastDelegate)
 {
@@ -480,6 +550,9 @@ auto MakeFutureFromDelegate(MulticastDelegateType& MulticastDelegate)
 	return Ret;
 }
 
+/**
+ * MakeFutureFromDelegate의 멀티캐스트 델리게이트 버전 (위 함수 주석 참고 부탁드립니다)
+ */
 template <CMulticastDelegate MulticastDelegateType, typename PredicateType, typename TransformFuncType>
 auto MakeFutureFromDelegate(MulticastDelegateType& MulticastDelegate, PredicateType&& Predicate, TransformFuncType&& TransformFunc)
 {
@@ -489,12 +562,18 @@ auto MakeFutureFromDelegate(MulticastDelegateType& MulticastDelegate, PredicateT
 	return Ret;
 }
 
+/**
+ * co_await Delegate; 지원용
+ */
 template <CDelegate DelegateType>
 auto operator co_await(DelegateType& Delegate)
 {
 	return TCancellableFutureAwaitable{MakeFutureFromDelegate(Delegate)};
 }
 
+/**
+ * co_await MulticastDelegate; 지원용
+ */
 template <CMulticastDelegate MulticastDelegateType>
 auto operator co_await(MulticastDelegateType& MulticastDelegate)
 {
@@ -502,6 +581,9 @@ auto operator co_await(MulticastDelegateType& MulticastDelegate)
 }
 
 
+/**
+ * 월드에 GameState가 존재하는 시점에 완료되는 TCancellableFuture를 반환합니다.
+ */
 inline TCancellableFuture<AGameStateBase*> WaitForGameState(UWorld* World)
 {
 	check(IsValid(World));
@@ -515,6 +597,9 @@ inline TCancellableFuture<AGameStateBase*> WaitForGameState(UWorld* World)
 }
 
 
+/**
+ * FTimerManager를 사용해 Seconds 후에 완료되는 TCancellableFuture를 반환합니다.
+ */
 inline TCancellableFuture<void> WaitForSeconds(UWorld* World, float Seconds)
 {
 	check(IsValid(World));
@@ -553,12 +638,18 @@ auto RequestAsyncLoadImpl(const auto& SoftPointer)
 	return Ret;
 }
 
+/**
+ * FStreamableManager를 사용해 애셋 로드 이후 완료되는 TCancellableFuture를 반환합니다.
+ */
 template <typename SoftType>
 TCancellableFuture<UClass*> RequestAsyncLoad(const TSoftClassPtr<SoftType>& SoftPointer)
 {
 	return RequestAsyncLoadImpl(SoftPointer);
 }
 
+/**
+ * FStreamableManager를 사용해 애셋 로드 이후 완료되는 TCancellableFuture를 반환합니다.
+ */
 template <typename SoftType>
 TCancellableFuture<SoftType*> RequestAsyncLoad(const TSoftObjectPtr<SoftType>& SoftPointer)
 {

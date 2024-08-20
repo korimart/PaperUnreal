@@ -6,6 +6,12 @@
 #include "CancellableFuture.h"
 
 
+/**
+ * 코루틴에 co_await 기능을 제공하는 promise_type.
+ * 코루틴 정의 시 promise_type에 이 클래스를 상속시켜 기능을 얻을 수 있습니다.
+ *
+ * @tparam Derived 이 클래스를 상속하는 promise_type (CRTP)
+ */
 template <typename ReturnType>
 class TAwaitablePromise
 {
@@ -45,6 +51,13 @@ private:
 };
 
 
+/**
+ * TAwaitablePromise를 상속하는 promise_type에 대한 코루틴이 상속하는 클래스
+ *
+ * @see TAwaitablePromise
+ * @tparam Derived 이 클래스를 상속하는 return_object 클래스 (CRTP)
+ * @tparam T co_await의 반환형
+ */
 template <typename Derived, typename T>
 class TAwaitableCoroutine : public TCancellableFutureAwaitable<TCancellableFuture<T>>
 {

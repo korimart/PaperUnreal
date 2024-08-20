@@ -3,7 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "TypeTraits.h"
 #include "ErrorReporting.h"
 #include "MinimalAbortableCoroutine.h"
 #include "NoDestroyAwaitable.h"
@@ -116,9 +115,18 @@ TAnyOfAwaitable(AwaitableTypes&&...) -> TAnyOfAwaitable<AwaitableTypes...>;
 
 namespace Awaitables
 {
-	template <typename... AwaitableTypes>
-	auto AnyOf(AwaitableTypes&&... Awaitables)
+	/**
+	 * Awaitable 또는 Awaitable Producer를 파라미터로 받아 각각에 대해 co_await을 호출하고
+	 * 그 중 하나라도 완료되는 타이밍에 resume하는 Awaitable을 반환합니다.
+	 *
+	 * Awaitable은 await_ 함수들을 구현한 클래스이며
+	 * Awaitable Producer는 operator co_await을 구현해 Awaitable을 반환할 수 있는 클래스를 말합니다.
+	 *
+	 * 이 함수에 대한 예시는 AnyOfAwaitableTest.cpp를 참고해주세요
+	 */
+	template <typename... MaybeAwaitableTypes>
+	auto AnyOf(MaybeAwaitableTypes&&... MaybeAwaitables)
 	{
-		return TAnyOfAwaitable{TakeAwaitableOrForward(Forward<AwaitableTypes>(Awaitables))...};
+		return TAnyOfAwaitable{TakeAwaitableOrForward(Forward<MaybeAwaitableTypes>(MaybeAwaitables))...};
 	}
 }

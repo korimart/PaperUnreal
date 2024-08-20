@@ -7,6 +7,19 @@
 #include "ConditionalResumeAwaitable.h"
 
 
+/**
+ * 코루틴에 Abort 기능을 제공하는 promise_type.
+ * 코루틴 정의 시 promise_type에 이 클래스를 상속시켜 기능을 얻을 수 있습니다.
+ *
+ * 코루틴에 Abort를 호출하면 코루틴은 이미 co_await 중인 경우에는 즉시, 아닌 경우에는 다음 co_await 진입 시 즉시 종료됩니다.
+ * 이 코루틴 내에서 co_await 되는 Awaitable들은 모두 await_abort 함수를 추가적으로 구현해야 합니다.
+ * Awaitable이 co_await 되고 있는 동안 코루틴에 Abort가 호출되면 Awaitable::await_abort가 호출됩니다.
+ * 이 함수의 호출 이후 Awaitable은 더 이상 coroutine_handle에 접근해서는 안 됩니다. (resume, destroy를 호출하는 등)
+ *
+ * 중요 : TAbortablePromise를 상속하는 promise_type은 await_transform에서 Awaitable에 대해 Awaitables::AbortIfRequested()를 호출해야합니다.
+ * 
+ * @tparam Derived 이 클래스를 상속하는 promise_type (CRTP)
+ */
 template <typename Derived>
 struct TAbortablePromise
 {
@@ -43,18 +56,20 @@ private:
 };
 
 
+/**
+ * TAbortablePromise를 상속하는 promise_type에 대한 코루틴이 상속하는 클래스
+ *
+ * @see TAbortablePromise
+ * @tparam Derived 이 클래스를 상속하는 return_object 클래스 (CRTP)
+ */
 template <typename Derived>
 class TAbortableCoroutine
 {
 public:
-	~TAbortableCoroutine()
-	{
-		if (bAbortOnDestruction)
-		{
-			Abort();
-		}
-	}
-
+	/**
+	 * 가장 빠른 기회에 코루틴을 중지하고 파괴합니다.
+	 * 현재 co_await 중인 경우에는 즉시, 그 외에는 다음 co_await에서 Abort합니다.
+	 */
 	void Abort()
 	{
 		if (GetPromiseLife().IsValid())
@@ -63,11 +78,9 @@ public:
 		}
 	}
 
-	void AbortOnDestruction()
-	{
-		bAbortOnDestruction = true;
-	}
-
+	/**
+	 * 코루틴이 이미 파괴되었는지 또는 파괴 예정인지 여부를 반환합니다.
+	 */
 	bool IsDeadMan() const
 	{
 		if (!GetPromiseLife().IsValid())
@@ -84,8 +97,6 @@ public:
 	}
 
 private:
-	bool bAbortOnDestruction = false;
-
 	TWeakPtr<std::monostate> GetPromiseLife() const
 	{
 		return static_cast<const Derived*>(this)->PromiseLife;
@@ -98,6 +109,12 @@ private:
 };
 
 
+/**
+ * TAbortableCoroutine에 대한 Scoped Handle
+ * 이 객체의 생명주기가 끝날 때 TAbortableCoroutine도 Abort합니다.
+ * 
+ * @tparam AbortableCoroutineType TAbortableCoroutine을 상속하는 코루틴 return_object 타입
+ */
 template <typename AbortableCoroutineType>
 class TAbortableCoroutineHandle
 {
@@ -139,12 +156,25 @@ public:
 	{
 		return &*Coroutine;
 	}
-	
+
+	/**
+	 * TArray<TAbortableCoroutineHandle<T>>에 TAbortableCoroutineHandle<T>를 추가하기 위한 편의 함수
+	 * 배열에 핸들을 모아두고 나중에 일괄적으로 파괴하고 싶은 경우에 유용합니다.
+	 *
+	 * Array << DoSomething();
+	 * Array << DoSomething();
+	 * Array << DoSomething();
+	 * 
+	 * Array.Empty() // 세 코루틴을 일괄적으로 Abort
+	 */
 	friend void operator<<(TArray<TAbortableCoroutineHandle>& Array, TAbortableCoroutineHandle&& Right)
 	{
 		Array.Add(MoveTemp(Right));
 	}
 
+	/**
+	 * 현재 가지고 있는 코루틴을 파괴합니다.
+	 */
 	void Reset()
 	{
 		if (Coroutine)
@@ -173,6 +203,11 @@ private:
 };
 
 
+/**
+ * TAbortablePromise에서 기능의 구현을 위해 내부적으로 사용하는 Awaitable
+ * TAbortablePromise인 코루틴에서 co_await를 호출하면 이 Awaitable로 Wrapping해
+ * co_await 되고 있는 Awaitable이 resume 또는 destroy하지 않더라도 임의의 시점에 코루틴을 파괴할 수 있게 합니다.
+ */
 template <typename InnerAwaitableType>
 class TAbortIfRequestedAwaitable
 	: public TConditionalResumeAwaitable<TAbortIfRequestedAwaitable<InnerAwaitableType>, InnerAwaitableType>
@@ -240,6 +275,9 @@ struct FAbortIfRequestedAdaptor : TAwaitableAdaptorBase<FAbortIfRequestedAdaptor
 
 namespace Awaitables
 {
+	/**
+	 * TAbortablePromise를 상속하는 promise_type은 await_transform에서 Awaitable에 대해 이 함수를 호출해야 합니다.
+	 */
 	inline FAbortIfRequestedAdaptor AbortIfRequested()
 	{
 		return {};
