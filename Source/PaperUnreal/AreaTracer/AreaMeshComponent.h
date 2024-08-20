@@ -77,6 +77,8 @@ public:
 	}
 
 private:
+	static constexpr float MeshHeight = 0.1f;
+	
 	UPROPERTY()
 	UDynamicMeshComponent* DynamicMeshComponent;
 
@@ -98,6 +100,7 @@ private:
 
 		DynamicMeshComponent = NewObject<UDynamicMeshComponent>(GetOwner(), TEXT("DynamicMeshComponent"));
 		DynamicMeshComponent->AttachToComponent(GetOwner()->GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);
+		DynamicMeshComponent->SetRelativeLocation({0.f, 0.f, MeshHeight});
 		DynamicMeshComponent->RegisterComponent();
 	}
 
