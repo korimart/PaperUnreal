@@ -58,6 +58,13 @@ public:
 		Mesh->Attributes()->PrimaryUV()->SetTriangle(Tri0, {0, 1, 2});
 		Mesh->Attributes()->PrimaryUV()->SetTriangle(Tri1, {1, 3, 2});
 
+		const float CurrentTime = GetWorld()->GetRealTimeSeconds();
+		const int TimeUVIndex0 = Mesh->Attributes()->GetUVLayer(1)->AppendElement({CurrentTime, CurrentTime});
+		const int TimeUVIndex1 = Mesh->Attributes()->GetUVLayer(1)->AppendElement({CurrentTime, CurrentTime});
+		const int TimeUVIndex2 = Mesh->Attributes()->GetUVLayer(1)->AppendElement({CurrentTime, CurrentTime});
+		Mesh->Attributes()->GetUVLayer(1)->SetTriangle(Tri0, {TimeUVIndex0, TimeUVIndex1, TimeUVIndex2});
+		Mesh->Attributes()->GetUVLayer(1)->SetTriangle(Tri1, {TimeUVIndex0, TimeUVIndex1, TimeUVIndex2});
+
 		DynamicMeshComponent->NotifyMeshModified();
 	}
 
@@ -114,6 +121,8 @@ public:
 		NormalOverlay->AppendElement(FVector3f::UnitZ());
 		NormalOverlay->AppendElement(FVector3f::UnitZ());
 
+		DynamicMeshComponent->GetMesh()->Attributes()->SetNumUVLayers(2);
+		
 		UE::Geometry::FDynamicMeshUVOverlay* UVOverlay = DynamicMeshComponent->GetMesh()->Attributes()->PrimaryUV();
 		UVOverlay->AppendElement({0.f, 0.f});
 		UVOverlay->AppendElement({1.f, 0.f});
