@@ -337,7 +337,7 @@ public:
 					return LiveData.GetValid();
 				}
 
-				return MakeFutureFromDelegate<typename Validator::ValidType>(LiveData.OnChanged,
+				return MakeFutureFromDelegate(LiveData.OnChanged,
 					[](ConstRefValueType NewValue) { return Validator::IsValid(NewValue); },
 					[](ConstRefValueType NewValue) { return Validator::ToValidConstruct(NewValue); });
 			}()
@@ -564,7 +564,7 @@ public:
 
 	TCancellableFuture<void> WaitForElementToBeRemoved(const ElementType& Element)
 	{
-		return MakeFutureFromDelegate<void>(
+		return MakeFutureFromDelegate(
 			OnElementRemoved,
 			[Element](const ElementType& Removed) { return Removed == Element; },
 			[](const ElementType& Removed) { return; });

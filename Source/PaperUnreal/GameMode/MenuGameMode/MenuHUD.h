@@ -114,22 +114,14 @@ private:
 		UGameplayStatics::OpenLevel(GetWorld(), TEXT("TopDownMap"), true, TEXT("Game=PVPBattle?listen"));
 	}
 
-	DECLARE_MULTICAST_DELEGATE_OneParam(FOnTravelFailture, ETravelFailure::Type);
-	FOnTravelFailture OnTravelFailure;
-
 	FWeakCoroutine ListenToJoinRequest()
 	{
-		GEngine->OnTravelFailure().AddWeakLambda(this, [this](const auto&, ETravelFailure::Type Type, const auto&)
-		{
-			OnTravelFailure.Broadcast(Type);
-		});
-
 		while (true)
 		{
 			const FString HostAddress = co_await MenuWidget->OnJoinPressed;
 
 			// OpenLevel을 호출하는 즉시 Delegate가 호출될 수 있으므로 미리 awaitable을 만들어 둠
-			auto Failure = MakeFutureFromDelegate(OnTravelFailure);
+			auto Failure = MakeFutureFromDelegate(GEngine->OnTravelFailure());
 			UGameplayStatics::OpenLevel(GetWorld(), *HostAddress);
 
 			const int32 Reason = co_await Awaitables::AnyOf(Failure, MenuWidget->OnCancelJoinPressed);

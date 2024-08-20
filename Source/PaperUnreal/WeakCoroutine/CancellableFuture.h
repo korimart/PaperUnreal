@@ -136,7 +136,7 @@ public:
 
 	template <typename U>
 	TCancellableFuture(U&& ReadyValue)
-		requires requires (StateType State) { State.SetValue(Forward<U>(ReadyValue)); }
+		requires requires(StateType State) { State.SetValue(Forward<U>(ReadyValue)); }
 		: State(MakeShared<StateType>())
 	{
 		State->SetValue(Forward<U>(ReadyValue));
@@ -333,7 +333,7 @@ public:
 	{
 		static_assert(CErrorReportingAwaitable<TCancellableFutureAwaitable>);
 	}
-	
+
 	TCancellableFutureAwaitable(FutureType&& InFuture)
 		requires !std::is_reference_v<FutureType>
 		: Future(MoveTemp(InFuture))
@@ -374,7 +374,7 @@ public:
 
 protected:
 	FutureType Future;
-	
+
 private:
 	TSharedRef<bool> bAborted = MakeShared<bool>(false);
 };
@@ -409,33 +409,42 @@ TTuple<TShareableCancellablePromise<T>, TCancellableFuture<T>> MakeShareableProm
 template <CDelegate DelegateType>
 auto MakeFutureFromDelegate(DelegateType& Delegate)
 {
-	using ParamTypeTuple = typename TFuncParamTypesToTypeList<TTuple, typename DelegateType::TFuncType>::Type;
-	constexpr int32 ParamCount = TTypeListCount_V<ParamTypeTuple>;
+	constexpr int32 ParamCount = TDelegateTypeTraits<DelegateType>::ParamCount;
+	using RetType = typename TDelegateTypeTraits<DelegateType>::DecayedParamTypeOrTuple;
 
 	if constexpr (ParamCount == 0)
 	{
-		return MakeFutureFromDelegate<void>(Delegate,
+		return MakeFutureFromDelegate(Delegate,
 			[]() { return true; },
 			[]() { return; });
 	}
 	else if constexpr (ParamCount == 1)
 	{
-		using ResultType = std::decay_t<typename TFirstInTypeList<ParamTypeTuple>::Type>;
-		return MakeFutureFromDelegate<ResultType>(Delegate,
+		return MakeFutureFromDelegate(Delegate,
 			[](auto) { return true; },
 			[]<typename T>(T&& V) -> decltype(auto) { return Forward<T>(V); });
 	}
 	else
 	{
-		// 파라미터가 여러 개인 델리게이트는 지원하지 않음
-		static_assert(TFalse<DelegateType>::Value);
+		return MakeFutureFromDelegate(Delegate,
+			[](const auto&...) { return true; },
+			[]<typename... ArgTypes>(ArgTypes&&... Args) -> decltype(auto) { return RetType{Forward<ArgTypes>(Args)...}; });
 	}
 }
 
-template <typename T, CDelegate DelegateType, typename PredicateType, typename TransformFuncType>
+template <CDelegate DelegateType, typename PredicateType, typename TransformFuncType>
 auto MakeFutureFromDelegate(DelegateType& Delegate, PredicateType&& Predicate, TransformFuncType&& TransformFunc)
 {
-	auto [Promise, Future] = MakeShareablePromise<T>();
+	using RetType = decltype
+	(
+		std::declval<typename TDelegateTypeTraits<DelegateType>::ParamTypeTuple>()
+		.ApplyAfter([&TransformFunc]<typename... ArgTypes>(ArgTypes&&... Args)
+		{
+			return TransformFunc(Forward<ArgTypes>(Args)...);
+		})
+	);
+	
+	auto [Promise, Future] = MakeShareablePromise<RetType>();
 
 	FutureDetails::BindOneOff(Delegate, [
 			Promise,
@@ -448,7 +457,7 @@ auto MakeFutureFromDelegate(DelegateType& Delegate, PredicateType&& Predicate, T
 				return;
 			}
 
-			if constexpr (std::is_same_v<T, void>)
+			if constexpr (std::is_same_v<RetType, void>)
 			{
 				TransformFunc(Forward<ArgTypes>(Args)...);
 				Promise.SetValue();
@@ -471,11 +480,11 @@ auto MakeFutureFromDelegate(MulticastDelegateType& MulticastDelegate)
 	return Ret;
 }
 
-template <typename T, CMulticastDelegate MulticastDelegateType, typename PredicateType, typename TransformFuncType>
+template <CMulticastDelegate MulticastDelegateType, typename PredicateType, typename TransformFuncType>
 auto MakeFutureFromDelegate(MulticastDelegateType& MulticastDelegate, PredicateType&& Predicate, TransformFuncType&& TransformFunc)
 {
 	typename MulticastDelegateType::FDelegate Delegate;
-	auto Ret = MakeFutureFromDelegate<T>(Delegate, Forward<PredicateType>(Predicate), Forward<TransformFuncType>(TransformFunc));
+	auto Ret = MakeFutureFromDelegate(Delegate, Forward<PredicateType>(Predicate), Forward<TransformFuncType>(TransformFunc));
 	MulticastDelegate.Add(Delegate);
 	return Ret;
 }
@@ -536,7 +545,7 @@ auto RequestAsyncLoadImpl(const auto& SoftPointer)
 	}
 
 	FStreamableDelegate Delegate;
-	auto Ret = MakeFutureFromDelegate<OutputType>(
+	auto Ret = MakeFutureFromDelegate(
 		Delegate,
 		[]() { return true; },
 		[SoftPointer]() { return SoftPointer.Get(); });

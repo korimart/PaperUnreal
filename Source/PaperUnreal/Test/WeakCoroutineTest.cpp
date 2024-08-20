@@ -284,7 +284,7 @@ bool FWeakCoroutineTest::RunTest(const FString& Parameters)
 		UDummy* Dummy = NewObject<UDummy>();
 
 		FStreamableDelegate Delegate;
-		auto Ret = MakeFutureFromDelegate<UObject*>(
+		auto Ret = MakeFutureFromDelegate(
 			Delegate,
 			[]() { return true; },
 			[Dummy]() { return Dummy; });

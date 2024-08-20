@@ -155,6 +155,31 @@ struct TUObjectUnsafeWrapperTypeTraits : TUObjectUnsafeWrapperTypeTraitsImpl<std
 };
 
 
+template <typename TypeList, template <typename> typename TransformTypeFunc>
+struct TTransformTypeList;
+
+template <template <typename...> typename TypeList, typename... ElementTypes, template <typename> typename TransformTypeFunc>
+struct TTransformTypeList<TypeList<ElementTypes...>, TransformTypeFunc>
+{
+	using Type = TypeList<typename TransformTypeFunc<ElementTypes>::Type...>;
+};
+
+
+template <typename DelegateType>
+struct TDelegateTypeTraits
+{
+	using ParamTypeTuple = typename TFuncParamTypesToTypeList<TTuple, typename DelegateType::TFuncType>::Type;
+	using DecayedParamTypeTuple = typename TTransformTypeList<ParamTypeTuple, TDecay>::Type;
+	
+	static constexpr int32 ParamCount = TTypeListCount_V<ParamTypeTuple>;
+	
+	using DecayedParamTypeOrTuple = std::conditional_t<
+		ParamCount == 0,
+		void,
+		typename std::conditional_t<ParamCount == 1, TFirstInTypeList<DecayedParamTypeTuple>, TIdentity<DecayedParamTypeTuple>>::Type>;
+};
+
+
 template <typename T>
 concept CUObjectUnsafeWrapper = requires(T Arg) { { TUObjectUnsafeWrapperTypeTraits<T>::GetUObject(Arg) }; };
 
