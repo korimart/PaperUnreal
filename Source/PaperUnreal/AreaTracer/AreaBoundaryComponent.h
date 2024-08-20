@@ -5,6 +5,8 @@
 #include "CoreMinimal.h"
 #include "AreaBoundaryProvider.h"
 #include "PaperUnreal/GameFramework2/ActorComponent2.h"
+#include "PaperUnreal/WeakCoroutine/CoroutineMutex.h"
+#include "PaperUnreal/WeakCoroutine/WeakCoroutine.h"
 #include "AreaBoundaryComponent.generated.h"
 
 
@@ -45,28 +47,9 @@ public:
 	using FExpansionResult = FUnionResult;
 
 	template <CSegmentArray2D SegmentArrayType>
-	TCancellableFuture<TArray<FExpansionResult>> ExpandByPath(SegmentArrayType&& Path)
+	CAwaitable auto ExpandByPath(SegmentArrayType&& Path)
 	{
-		if (!Path.IsValid())
-		{
-			return TArray<FExpansionResult>{};
-		}
-
-		TCancellablePromise<TArray<FExpansionResult>> Promise;
-		TCancellableFuture<TArray<FExpansionResult>> Future = Promise.GetFuture();
-
-		AreaBoundary.AwaitAndModify([
-				Path = Forward<SegmentArrayType>(Path),
-				Promise = MoveTemp(Promise)
-			](FLoopedSegmentArray2D& Boundary) mutable
-			{
-				TArray<FExpansionResult> Results = Boundary.Union(MoveTemp(Path));
-				const bool bNotify = Results.Num() > 0;
-				Promise.SetValue(MoveTemp(Results));
-				return bNotify;
-			});
-
-		return Future;
+		return ExpandByPathLocked(Forward<SegmentArrayType>(Path));
 	}
 
 	template <CSegmentArray2D SegmentArrayType>
@@ -163,4 +146,24 @@ public:
 
 private:
 	mutable TLiveData<FLoopedSegmentArray2D> AreaBoundary;
+
+	TWeakCoroutine<TArray<FExpansionResult>> ExpandByPathLocked(FSegmentArray2D Path)
+	{
+		if (!Path.IsValid())
+		{
+			co_return TArray<FExpansionResult>{};
+		}
+
+		FCoroutineScopedLock ScopedLock;
+		co_await ScopedLock.Lock(AreaBoundary.Mutex);
+
+		TArray<FExpansionResult> Ret;
+		AreaBoundary.ModifyAssumeLocked([&](FLoopedSegmentArray2D& Boundary)
+		{
+			Ret = Boundary.Union(MoveTemp(Path));
+			const bool bNotify = Ret.Num() > 0;
+			return bNotify;
+		});
+		co_return Ret;
+	}
 };

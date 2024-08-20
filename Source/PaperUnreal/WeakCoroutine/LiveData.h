@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "CoroutineMutex.h"
 #include "TypeTraits.h"
 #include "FilterAwaitable.h"
 #include "ValueStream.h"
@@ -93,6 +94,8 @@ struct TLiveDataValidator<TSoftObjectPtr<ObjectType>>
 class FLiveDataBase
 {
 public:
+	FCoroutineMutex Mutex;
+	
 	FLiveDataBase() = default;
 
 	// Value Stream을 Multicast Delegate을 통해서 만들기 때문에 허용하면 여러 곳에서
@@ -103,61 +106,6 @@ public:
 	FLiveDataBase(FLiveDataBase&&) = default;
 
 protected:
-	bool bExecutingCallbacks = false;
-	TArray<TCancellablePromise<void>> CallbackGuardAwaiters;
-
-	struct FScopedCallbackGuard
-	{
-		FScopedCallbackGuard(FLiveDataBase* InThis)
-			: This(InThis)
-		{
-			// 여기 걸리면 콜백 호출 도중에 LiveData를 수정하려고 한 것임
-			// Array 순회 도중에 Array를 수정하려고 한 것과 비슷함
-			check(!This->bExecutingCallbacks);
-			This->bExecutingCallbacks = true;
-		}
-
-		~FScopedCallbackGuard()
-		{
-			LetAwaitersIn();
-			This->bExecutingCallbacks = false;
-		}
-
-	private:
-		FLiveDataBase* This;
-
-		void LetAwaitersIn()
-		{
-			while (This->CallbackGuardAwaiters.Num() > 0)
-			{
-				PopFront(This->CallbackGuardAwaiters).SetValue();
-			}
-		}
-	};
-
-	template <typename FuncType>
-	void AwaitCallbackGuard(FuncType&& Func)
-	{
-		if (!bExecutingCallbacks)
-		{
-			FScopedCallbackGuard S{this};
-			Func();
-			return;
-		}
-
-		auto [Promise, Future] = MakePromise<void>();
-
-		Future.Then([Func = Forward<FuncType>(Func)](const auto& Result) mutable
-		{
-			if (Result.Succeeded())
-			{
-				Func();
-			}
-		});
-
-		CallbackGuardAwaiters.Add(MoveTemp(Promise));
-	}
-
 	template <typename Validator, typename FuncType>
 	static auto RelayValidRefTo(FuncType Func)
 	{
@@ -213,7 +161,9 @@ public:
 	{
 		if (Value != Right)
 		{
-			check(!bExecutingCallbacks);
+			FCoroutineScopedLock Lock;
+			Lock.LockChecked(Mutex);
+		
 			Value = Forward<T>(Right);
 			return true;
 		}
@@ -229,7 +179,8 @@ public:
 
 	void Modify(const auto& Func)
 	{
-		FScopedCallbackGuard S{this};
+		FCoroutineScopedLock Lock;
+		Lock.LockChecked(Mutex);
 
 		// TODO static assert Func takes a non-const lvalue reference
 		if (Func(Value))
@@ -237,29 +188,30 @@ public:
 			OnChanged.Broadcast(Get());
 		}
 	}
-
-	template <typename FuncType>
-	void AwaitAndModify(FuncType&& Func)
+	
+	void ModifyAssumeLocked(const auto& Func)
 	{
-		AwaitCallbackGuard([this, Func = Forward<FuncType>(Func)]() mutable
+		// TODO static assert Func takes a non-const lvalue reference
+		if (Func(Value))
 		{
-			if (Func(Value))
-			{
-				OnChanged.Broadcast(Get());
-			}
-		});
+			OnChanged.Broadcast(Get());
+		}
 	}
 
 	void Notify()
 	{
-		FScopedCallbackGuard S{this};
+		FCoroutineScopedLock Lock;
+		Lock.LockChecked(Mutex);
+		
 		OnChanged.Broadcast(Get());
 	}
 
 	template <typename FuncType>
 	void Observe(UObject* Lifetime, FuncType&& Func)
 	{
-		FScopedCallbackGuard S{this};
+		FCoroutineScopedLock Lock;
+		Lock.LockChecked(Mutex);
+		
 		Func(Get());
 		OnChanged.AddWeakLambda(Lifetime, Forward<FuncType>(Func));
 	}
@@ -267,7 +219,9 @@ public:
 	template <typename T, typename FuncType>
 	void Observe(const TSharedRef<T>& Lifetime, FuncType&& Func)
 	{
-		FScopedCallbackGuard S{this};
+		FCoroutineScopedLock Lock;
+		Lock.LockChecked(Mutex);
+		
 		Func(Get());
 		OnChanged.Add(FOnChanged::FDelegate::CreateSPLambda(Lifetime, Forward<FuncType>(Func)));
 	}
@@ -283,7 +237,9 @@ public:
 	template <typename FuncType>
 	void ObserveIfValid(UObject* Lifetime, FuncType&& Func)
 	{
-		FScopedCallbackGuard S{this};
+		FCoroutineScopedLock Lock;
+		Lock.LockChecked(Mutex);
+		
 		auto ValidCheckingFunc = RelayValidRefTo<Validator>(Forward<FuncType>(Func));
 		ValidCheckingFunc(Get());
 		OnChanged.AddWeakLambda(Lifetime, MoveTemp(ValidCheckingFunc));
@@ -292,7 +248,9 @@ public:
 	template <typename T, typename FuncType>
 	void ObserveIfValid(const TSharedRef<T>& Lifetime, FuncType&& Func)
 	{
-		FScopedCallbackGuard S{this};
+		FCoroutineScopedLock Lock;
+		Lock.LockChecked(Mutex);
+		
 		auto ValidCheckingFunc = RelayValidRefTo<Validator>(Forward<FuncType>(Func));
 		ValidCheckingFunc(Get());
 		OnChanged.Add(FOnChanged::FDelegate::CreateSPLambda(Lifetime, MoveTemp(ValidCheckingFunc)));
@@ -386,7 +344,9 @@ public:
 	template <typename T>
 	void SetValueSilent(T&& NewArray)
 	{
-		check(!bExecutingCallbacks);
+		FCoroutineScopedLock Lock;
+		Lock.LockChecked(Mutex);
+		
 		Array = Forward<T>(NewArray);
 	}
 
@@ -422,7 +382,8 @@ public:
 
 	void Empty()
 	{
-		FScopedCallbackGuard S{this};
+		FCoroutineScopedLock Lock;
+		Lock.LockChecked(Mutex);
 
 		// OnElementRemoved의 콜백에서 Array가 비었음을 즉시 볼 수 있도록 미리 비움
 		auto Removed = MoveTemp(Array);
@@ -440,7 +401,8 @@ public:
 
 	void NotifyDiff(const TArray<ElementType>& OldArray)
 	{
-		FScopedCallbackGuard S{this};
+		FCoroutineScopedLock Lock;
+		Lock.LockChecked(Mutex);
 
 		bool bAnyRemoved = false;
 		for (const ElementType& Each : OldArray)
@@ -471,7 +433,8 @@ public:
 	template <typename FuncType>
 	void ObserveAdd(UObject* Lifetime, FuncType&& Func)
 	{
-		FScopedCallbackGuard S{this};
+		FCoroutineScopedLock Lock;
+		Lock.LockChecked(Mutex);
 
 		for (const ElementType& Each : Array)
 		{
@@ -484,7 +447,8 @@ public:
 	template <typename T, typename FuncType>
 	void ObserveAdd(const TSharedRef<T>& Lifetime, FuncType&& Func)
 	{
-		FScopedCallbackGuard S{this};
+		FCoroutineScopedLock Lock;
+		Lock.LockChecked(Mutex);
 
 		for (const ElementType& Each : Array)
 		{
@@ -605,14 +569,18 @@ private:
 
 	void NotifyAdd(const ElementType& Element)
 	{
-		FScopedCallbackGuard S{this};
+		FCoroutineScopedLock Lock;
+		Lock.LockChecked(Mutex);
+		
 		OnElementAdded.Broadcast(Element);
 		OnArrayChanged.Broadcast(Get());
 	}
 
 	void NotifyRemove(const ElementType& Element)
 	{
-		FScopedCallbackGuard S{this};
+		FCoroutineScopedLock Lock;
+		Lock.LockChecked(Mutex);
+		
 		OnElementRemoved.Broadcast(Element);
 		OnArrayChanged.Broadcast(Get());
 		CloseStrictAddStreams();

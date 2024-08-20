@@ -259,7 +259,7 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 	{
 		TLiveData<int32> LiveData;
 
-		TestEqual(TEXT("AwaitAndModify가 Guard를 기다렸다가 잘 실행되는지 테스트"), LiveData.Get(), 0);
+		TestEqual(TEXT("직접 lock + ModifyAssumeLocked로 잘 실행되는지 테스트"), LiveData.Get(), 0);
 
 		auto Handle = LiveData.Observe([&](int32 Value)
 		{
@@ -268,62 +268,98 @@ bool FLiveDataTest::RunTest(const FString& Parameters)
 				return;
 			}
 
-			LiveData.AwaitAndModify([](int32& Value)
+			RunWeakCoroutine([&]() -> FWeakCoroutine
 			{
-				Value++;
-				return true;
+				FCoroutineScopedLock Lock;
+				co_await Lock.Lock(LiveData.Mutex);
+
+				LiveData.ModifyAssumeLocked([](int32& Value)
+				{
+					Value++;
+					return true;
+				});
 			});
 
-			LiveData.AwaitAndModify([](int32& Value)
+			RunWeakCoroutine([&]() -> FWeakCoroutine
 			{
-				Value++;
-				return true;
+				FCoroutineScopedLock Lock;
+				co_await Lock.Lock(LiveData.Mutex);
+
+				LiveData.ModifyAssumeLocked([](int32& Value)
+				{
+					Value++;
+					return true;
+				});
 			});
 
-			LiveData.AwaitAndModify([](int32& Value)
+			RunWeakCoroutine([&]() -> FWeakCoroutine
 			{
-				Value++;
-				return true;
+				FCoroutineScopedLock Lock;
+				co_await Lock.Lock(LiveData.Mutex);
+
+				LiveData.ModifyAssumeLocked([](int32& Value)
+				{
+					Value++;
+					return true;
+				});
 			});
 		});
 
-		// 한 번 Observe가 실행될 때마다 AwaitAndModify가 3개 예약됨
+		// 한 번 Observe가 실행될 때마다 ModifyAssumeLocked가 3개 예약됨
 		// 이걸 100번 예약하고 예약된 걸 전부다 flush하면 값이 300이 되어야 함
 		// 공식 = 3n (n은 observe를 호출한 횟수)
-		TestEqual(TEXT("AwaitAndModify가 Guard를 기다렸다가 잘 실행되는지 테스트"), LiveData.Get(), 300);
+		TestEqual(TEXT("직접 lock + ModifyAssumeLocked로 잘 실행되는지 테스트"), LiveData.Get(), 300);
 	}
 
 	{
 		TLiveData<int32> LiveData;
 		LiveData.Modify([&](int32& Value)
 		{
-			TestEqual(TEXT("AwaitAndModify가 Guard를 기다렸다가 잘 실행되는지 테스트"), Value, 0);
+			TestEqual(TEXT("직접 lock + ModifyAssumeLocked로 잘 실행되는지 테스트"), Value, 0);
 
-			LiveData.AwaitAndModify([](int32& Value)
+			RunWeakCoroutine([&]() -> FWeakCoroutine
 			{
-				Value++;
-				return true;
-			});
-			TestEqual(TEXT("AwaitAndModify가 Guard를 기다렸다가 잘 실행되는지 테스트"), Value, 0);
+				FCoroutineScopedLock Lock;
+				co_await Lock.Lock(LiveData.Mutex);
 
-			LiveData.AwaitAndModify([](int32& Value)
-			{
-				Value++;
-				return true;
+				LiveData.ModifyAssumeLocked([](int32& Value)
+				{
+					Value++;
+					return true;
+				});
 			});
-			TestEqual(TEXT("AwaitAndModify가 Guard를 기다렸다가 잘 실행되는지 테스트"), Value, 0);
+			TestEqual(TEXT("직접 lock + ModifyAssumeLocked로 잘 실행되는지 테스트"), Value, 0);
 
-			LiveData.AwaitAndModify([](int32& Value)
+			RunWeakCoroutine([&]() -> FWeakCoroutine
 			{
-				Value++;
-				return true;
+				FCoroutineScopedLock Lock;
+				co_await Lock.Lock(LiveData.Mutex);
+
+				LiveData.ModifyAssumeLocked([](int32& Value)
+				{
+					Value++;
+					return true;
+				});
 			});
-			TestEqual(TEXT("AwaitAndModify가 Guard를 기다렸다가 잘 실행되는지 테스트"), Value, 0);
+			TestEqual(TEXT("직접 lock + ModifyAssumeLocked로 잘 실행되는지 테스트"), Value, 0);
+
+			RunWeakCoroutine([&]() -> FWeakCoroutine
+			{
+				FCoroutineScopedLock Lock;
+				co_await Lock.Lock(LiveData.Mutex);
+
+				LiveData.ModifyAssumeLocked([](int32& Value)
+				{
+					Value++;
+					return true;
+				});
+			});
+			TestEqual(TEXT("직접 lock + ModifyAssumeLocked로 잘 실행되는지 테스트"), Value, 0);
 
 			return true;
 		});
 
-		TestEqual(TEXT(""), LiveData.Get(), 3);
+		TestEqual(TEXT("직접 lock + ModifyAssumeLocked로 잘 실행되는지 테스트"), LiveData.Get(), 3);
 	}
 
 	{
