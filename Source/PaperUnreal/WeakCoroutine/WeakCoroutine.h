@@ -184,7 +184,14 @@ private:
 
 	void OnAbortByInvalidity()
 	{
-		AddError(UWeakCoroutineError::InvalidCoroutine());
+		// TODO 만약에 프로그램이 종료 중인 경우
+		// 엔진이 종료되면서 이 destructor가 호출되는데 이 때 엔진 종료 중이기 때문에 NewObject가 실패함
+		// 그래서 일단 이 경우에는 에러를 주지 않도록 막음 근데 문제는 이러면 이 에러에 의존하는
+		// 특정 리소스의 clean up이 제대로 이루어지지 않을 수 있음 현재는 그런 경우는 없지만 추후 수정 필요
+		if (!IsEngineExitRequested())
+		{
+			AddError(UWeakCoroutineError::InvalidCoroutine());
+		}
 	}
 };
 

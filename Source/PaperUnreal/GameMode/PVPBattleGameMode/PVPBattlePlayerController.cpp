@@ -18,7 +18,7 @@ void APVPBattlePlayerController::BeginPlay()
 		RunWeakCoroutine(this, [this, Subsystem]() -> FWeakCoroutine
 		{
 			co_await AddToWeakList(Subsystem);
-			
+
 			for (auto PawnStream = GetPawn2().MakeStream();;)
 			{
 				auto PossessedPawn = co_await PawnStream;
@@ -36,5 +36,9 @@ void APVPBattlePlayerController::BeginPlay()
 	}
 
 	EnableCheats();
-	CheatManager->AddCheatManagerExtension(NewObject<UInGameCheats>(CheatManager));
+
+	if (CheatManager)
+	{
+		CheatManager->AddCheatManagerExtension(NewObject<UInGameCheats>(CheatManager));
+	}
 }
