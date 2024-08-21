@@ -41,9 +41,9 @@ private:
 	UPROPERTY()
 	UAreaBoundaryComponent* NoPathArea;
 
-	mutable TLiveData<TOptional<FVector2D>> PathHead;
-	mutable TLiveData<TArray<FVector2D>> PathTail;
-	mutable TLiveData<TOptional<FSegmentArray2D>> LastCompletePath;
+	TLiveData<TOptional<FVector2D>> PathHead;
+	TLiveData<TArray<FVector2D>> PathTail;
+	TLiveData<TOptional<FSegmentArray2D>> LastCompletePath;
 	FSegmentArray2D Path;
 
 	FTickingSwitch Switch;

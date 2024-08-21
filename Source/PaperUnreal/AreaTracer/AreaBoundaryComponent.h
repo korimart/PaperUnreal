@@ -145,7 +145,7 @@ public:
 	}
 
 private:
-	mutable TLiveData<FLoopedSegmentArray2D> AreaBoundary;
+	TLiveData<FLoopedSegmentArray2D> AreaBoundary;
 
 	TWeakCoroutine<TArray<FExpansionResult>> ExpandByPathLocked(FSegmentArray2D Path)
 	{

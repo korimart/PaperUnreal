@@ -21,11 +21,11 @@ public:
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_CharacterMesh)
 	TSoftObjectPtr<USkeletalMesh> RepCharacterMesh;
-	mutable TLiveData<TSoftObjectPtr<USkeletalMesh>&> CharacterMesh{RepCharacterMesh};
+	TLiveData<TSoftObjectPtr<USkeletalMesh>&> CharacterMesh{RepCharacterMesh};
 	
 	UPROPERTY(ReplicatedUsing=OnRep_TracerBaseColor)
 	FLinearColor RepTracerBaseColor;
-	mutable TLiveData<FLinearColor&> TracerBaseColor{RepTracerBaseColor};
+	TLiveData<FLinearColor&> TracerBaseColor{RepTracerBaseColor};
 
 	UFUNCTION()
 	void OnRep_CharacterMesh() { CharacterMesh.Notify(); }

@@ -51,7 +51,7 @@ private:
 
 	UPROPERTY(ReplicatedUsing=OnRep_Life)
 	ULifeComponent* RepLife;
-	mutable TLiveData<ULifeComponent*&> Life{RepLife};
+	TLiveData<ULifeComponent*&> Life{RepLife};
 
 	UFUNCTION()
 	void OnRep_Life() { Life.Notify(); }

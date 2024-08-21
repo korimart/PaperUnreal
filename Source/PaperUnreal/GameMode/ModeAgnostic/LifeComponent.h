@@ -20,7 +20,7 @@ public:
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_bAlive)
 	bool RepbAlive = true;
-	mutable TLiveData<bool&> bAlive{RepbAlive};
+	TLiveData<bool&> bAlive{RepbAlive};
 
 	UFUNCTION()
 	void OnRep_bAlive() { bAlive.Notify(); }

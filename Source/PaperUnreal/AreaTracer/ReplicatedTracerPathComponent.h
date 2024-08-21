@@ -119,11 +119,11 @@ public:
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_PathHead)
 	FOptionalVector2D RepPathHead;
-	mutable TLiveData<TOptional<FVector2D>> PathHead;
+	TLiveData<TOptional<FVector2D>> PathHead;
 
 	UPROPERTY(ReplicatedUsing=OnRep_PathTail)
 	FNumberedVector2DArray RepPathTail;
-	mutable TLiveData<TArray<FVector2D>> PathTail;
+	TLiveData<TArray<FVector2D>> PathTail;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override
 	{

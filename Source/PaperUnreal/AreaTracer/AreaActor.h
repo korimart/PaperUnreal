@@ -38,11 +38,11 @@ public:
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_AreaBaseColor)
 	FLinearColor RepAreaBaseColor;
-	mutable TLiveData<FLinearColor&> AreaBaseColor{RepAreaBaseColor};
+	TLiveData<FLinearColor&> AreaBaseColor{RepAreaBaseColor};
 
 	UPROPERTY(ReplicatedUsing=OnRep_ServerCalculatedArea)
 	float RepServerCalculatedArea;
-	mutable TLiveData<float&> ServerCalculatedArea{RepServerCalculatedArea};
+	TLiveData<float&> ServerCalculatedArea{RepServerCalculatedArea};
 
 	UFUNCTION()
 	void OnRep_AreaBaseColor() { AreaBaseColor.Notify(); }

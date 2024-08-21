@@ -27,14 +27,14 @@ public:
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_StageComponent)
 	UStageComponent* RepStageComponent;
-	mutable TLiveData<UStageComponent*&> StageComponent{RepStageComponent};
+	TLiveData<UStageComponent*&> StageComponent{RepStageComponent};
 
 	UFUNCTION()
 	void OnRep_StageComponent() { StageComponent.Notify(); }
 	
 	UPROPERTY(ReplicatedUsing=OnRep_BattleGameStateComponent)
 	UBattleGameStateComponent* RepBattleGameStateComponent;
-	mutable TLiveData<UBattleGameStateComponent*&> BattleGameStateComponent{RepBattleGameStateComponent};
+	TLiveData<UBattleGameStateComponent*&> BattleGameStateComponent{RepBattleGameStateComponent};
 	
 	UFUNCTION()
 	void OnRep_BattleGameStateComponent() { BattleGameStateComponent.Notify(); }

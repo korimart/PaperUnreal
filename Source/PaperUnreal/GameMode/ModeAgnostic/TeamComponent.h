@@ -20,7 +20,7 @@ public:
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_TeamIndex)
 	int32 RepTeamIndex = -1;
-	mutable TLiveData<int32&> TeamIndex{RepTeamIndex};
+	TLiveData<int32&> TeamIndex{RepTeamIndex};
 
 	UFUNCTION()
 	void OnRep_TeamIndex() { TeamIndex.Notify(); }

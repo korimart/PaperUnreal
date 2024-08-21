@@ -25,7 +25,7 @@ public:
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_Points)
 	TArray<FVector2D> RepPoints;
-	mutable TLiveData<FLoopedSegmentArray2D> AreaBoundary;
+	TLiveData<FLoopedSegmentArray2D> AreaBoundary;
 
 	UFUNCTION()
 	void OnRep_Points() { AreaBoundary.SetValueNoComparison(RepPoints); }

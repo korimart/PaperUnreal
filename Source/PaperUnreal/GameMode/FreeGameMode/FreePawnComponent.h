@@ -26,7 +26,7 @@ public:
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_Tracer)
 	UTracerComponent* RepTracer;
-	mutable TLiveData<UTracerComponent*&> Tracer{RepTracer};
+	TLiveData<UTracerComponent*&> Tracer{RepTracer};
 
 	UFUNCTION()
 	void OnRep_Tracer() { Tracer.Notify(); }

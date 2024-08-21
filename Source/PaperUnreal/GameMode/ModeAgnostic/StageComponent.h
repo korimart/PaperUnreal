@@ -57,7 +57,7 @@ public:
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_CurrentStage)
 	FName RepCurrentStage;
-	mutable TLiveData<FName&> CurrentStage{RepCurrentStage};
+	TLiveData<FName&> CurrentStage{RepCurrentStage};
 
 	UPROPERTY(ReplicatedUsing=OnRep_StageInfos)
 	TArray<FReplicatedStageInfo> RepStageInfos;

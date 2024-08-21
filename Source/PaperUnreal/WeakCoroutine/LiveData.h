@@ -629,8 +629,8 @@ template <typename ValueType>
 class TLiveDataView
 {
 public:
-	TLiveDataView(TLiveData<ValueType>& InLiveData)
-		: LiveData(InLiveData)
+	TLiveDataView(const TLiveData<ValueType>& InLiveData)
+		: LiveData(const_cast<TLiveData<ValueType>&>(InLiveData))
 	{
 	}
 

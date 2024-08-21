@@ -28,7 +28,7 @@ public:
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_InventoryComponent)
 	UInventoryComponent* RepInventoryComponent;
-	mutable TLiveData<UInventoryComponent*&> InventoryComponent{RepInventoryComponent};
+	TLiveData<UInventoryComponent*&> InventoryComponent{RepInventoryComponent};
 
 	UFUNCTION()
 	void OnRep_InventoryComponent() { InventoryComponent.Notify(); }

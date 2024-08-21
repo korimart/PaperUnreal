@@ -144,7 +144,7 @@ public:
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_AreaSpawner)
 	UAreaSpawnerComponent* RepAreaSpawner;
-	mutable TLiveData<UAreaSpawnerComponent*&> AreaSpawner{RepAreaSpawner};
+	TLiveData<UAreaSpawnerComponent*&> AreaSpawner{RepAreaSpawner};
 
 	UFUNCTION()
 	void OnRep_AreaSpawner() { AreaSpawner.Notify(); }
@@ -153,7 +153,7 @@ private:
 	// FOptionalBattleResult는 TOptionalFromThis<FBattleResult> 상속
 	UPROPERTY(ReplicatedUsing=OnRep_BattleResult)
 	FBattleResult RepBattleResult;
-	mutable TLiveData<TOptional<FBattleResult>> BattleResult;
+	TLiveData<TOptional<FBattleResult>> BattleResult;
 
 	UFUNCTION()
 	void OnRep_BattleResult()
@@ -176,7 +176,7 @@ private:
 		DOREPLIFETIME(ThisClass, RepBattleResult);
 	}
 
-	mutable TLiveData<TArray<AAreaActor*>> LiveAreas;
+	TLiveData<TArray<AAreaActor*>> LiveAreas;
 
 	virtual void AttachServerMachineComponents() override
 	{
