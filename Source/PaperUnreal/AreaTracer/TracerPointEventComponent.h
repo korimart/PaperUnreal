@@ -44,42 +44,39 @@ private:
 		AddLifeDependency(EventSource);
 	}
 
-	void InitiateEventListeningSequence(ITracerPointEventListener* Listener)
+	FWeakCoroutine InitiateEventListeningSequence(ITracerPointEventListener* Listener)
 	{
-		RunWeakCoroutine(this, [this, Listener]() -> FWeakCoroutine
+		co_await AddToWeakList(Listener);
+
+		while (true)
 		{
-			co_await AddToWeakList(Listener);
+			auto Stream = EventSource->GetRunningPathTail().MakeStrictAddStream() | Awaitables::Catch<UEndOfStreamError>();
 
-			while (true)
+			const TFailableResult<FVector2D> FirstPoint = co_await Stream;
+			if (!FirstPoint)
 			{
-				auto Stream = EventSource->GetRunningPathTail().MakeStrictAddStream() | Awaitables::Catch<UEndOfStreamError>();
-
-				const TFailableResult<FVector2D> FirstPoint = co_await Stream;
-				if (!FirstPoint)
-				{
-					continue;
-				}
-
-				Listener->OnTracerBegin();
-				Listener->AddPoint(FirstPoint.GetResult());
-
-				bool bLastPointIsHead = false;
-
-				// 여기의 &캡쳐는 Handle이 코루틴 프레임과 수명을 같이하고 &가 코루틴 프레임에 대한 캡쳐기 때문에 안전함
-				FDelegateSPHandle Handle = EventSource->GetRunningPathHead().ObserveIfValid([&](const FVector2D& Head)
-				{
-					bLastPointIsHead ? Listener->SetPoint(-1, Head) : Listener->AddPoint(Head);
-					bLastPointIsHead = true;
-				});
-
-				while (TFailableResult<FVector2D> Point = co_await Stream)
-				{
-					bLastPointIsHead ? Listener->SetPoint(-1, Point.GetResult()) : Listener->AddPoint(Point.GetResult());
-					bLastPointIsHead = false;
-				}
-
-				Listener->OnTracerEnd();
+				continue;
 			}
-		});
+
+			Listener->OnTracerBegin();
+			Listener->AddPoint(FirstPoint.GetResult());
+
+			bool bLastPointIsHead = false;
+
+			// 여기의 &캡쳐는 Handle이 코루틴 프레임과 수명을 같이하고 &가 코루틴 프레임에 대한 캡쳐기 때문에 안전함
+			FDelegateSPHandle Handle = EventSource->GetRunningPathHead().ObserveIfValid([&](const FVector2D& Head)
+			{
+				bLastPointIsHead ? Listener->SetPoint(-1, Head) : Listener->AddPoint(Head);
+				bLastPointIsHead = true;
+			});
+
+			while (TFailableResult<FVector2D> Point = co_await Stream)
+			{
+				bLastPointIsHead ? Listener->SetPoint(-1, Point.GetResult()) : Listener->AddPoint(Point.GetResult());
+				bLastPointIsHead = false;
+			}
+
+			Listener->OnTracerEnd();
+		}
 	}
 };

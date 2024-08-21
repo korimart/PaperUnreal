@@ -56,7 +56,7 @@ public:
 	{
 		return LiveAreas;
 	}
-	
+
 	AAreaActor* FindLiveAreaByTeam(int32 TeamIndex) const
 	{
 		AAreaActor* const* Found = GetLiveAreas().Get().FindByPredicate([&](AAreaActor* Each)
@@ -193,27 +193,28 @@ private:
 	virtual void InitializeComponent() override
 	{
 		Super::InitializeComponent();
+		InitiateLiveAreasFeeder();
+	}
 
-		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
+	FWeakCoroutine InitiateLiveAreasFeeder()
+	{
+		co_await AreaSpawner;
+
+		// TODO Awaitables::WhieTrue처럼 편의함수 제공 가능
+		AreaSpawner->GetSpawnedAreas().ObserveAddIfValid(this, [this](AAreaActor* Area)
 		{
-			co_await AreaSpawner;
-
-			// TODO Awaitables::WhieTrue처럼 편의함수 제공 가능
-			AreaSpawner->GetSpawnedAreas().ObserveAddIfValid(this, [this](AAreaActor* Area)
+			RunWeakCoroutine(this, [this, Area]() -> FWeakCoroutine
 			{
-				RunWeakCoroutine(this, [this, Area]() -> FWeakCoroutine
+				co_await AddToWeakList(Area);
+
+				FDelegateSPHandle Handle = Area->LifeComponent->GetbAlive().Observe([this, Area](bool bAlive)
 				{
-					co_await AddToWeakList(Area);
-
-					FDelegateSPHandle Handle = Area->LifeComponent->GetbAlive().Observe([this, Area](bool bAlive)
-					{
-						bAlive ? LiveAreas.Add(Area) : LiveAreas.Remove(Area);
-					});
-
-					co_await AreaSpawner->GetSpawnedAreas().WaitForElementToBeRemoved(Area);
-
-					LiveAreas.Remove(Area);
+					bAlive ? LiveAreas.Add(Area) : LiveAreas.Remove(Area);
 				});
+
+				co_await AreaSpawner->GetSpawnedAreas().WaitForElementToBeRemoved(Area);
+
+				LiveAreas.Remove(Area);
 			});
 		});
 	}

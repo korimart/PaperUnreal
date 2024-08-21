@@ -38,7 +38,7 @@ private:
 
 	virtual void AttachServerMachineComponents() override
 	{
-		RepInventoryComponent = NewChildComponent<UInventoryComponent>();
-		RepInventoryComponent->RegisterComponent();
+		InventoryComponent = NewChildComponent<UInventoryComponent>();
+		InventoryComponent->RegisterComponent();
 	}
 };

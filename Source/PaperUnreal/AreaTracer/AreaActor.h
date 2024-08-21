@@ -84,8 +84,9 @@ private:
 
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
-			auto AreaStream = ServerAreaBoundary->GetBoundary().MakeStream() | Awaitables::Transform(&FLoopedSegmentArray2D::CalculateArea);
-			auto LifeAndArea = Stream::Combine(LifeComponent->GetbAlive().MakeStream(), MoveTemp(AreaStream));
+			auto LifeAndArea = Stream::Combine(
+				LifeComponent->GetbAlive().MakeStream(),
+				ServerAreaBoundary->GetBoundary().MakeStream() | Awaitables::Transform(&FLoopedSegmentArray2D::CalculateArea));
 
 			while (true)
 			{
