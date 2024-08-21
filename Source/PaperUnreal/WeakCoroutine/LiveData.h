@@ -120,6 +120,22 @@ protected:
 };
 
 
+/**
+ * 안드로이드의 LiveData를 흉내낸 것
+ *
+ * LiveData는 Value와 Delegate를 결합한 것입니다.
+ * Delegate는 호출 시에만 인자를 통해 값이 전달하고 호출이 종료되면 전달한 값에 대해서는 잊어버립니다.
+ * 그러므로 가장 마지막으로 Delegate를 통해 전달된 인자를 얻기 위해서 Delegate와 함께 해당 타입의 변수를 선언하는 것이 일반적입니다.
+ *
+ * DECLARE_MULTICAST_DELEGATE_OneParam(FOnDamageReceived, int32);
+ * FOnDamageReceived OnDamageReceived;
+ * int32 LastReceivedDamage;
+ *
+ * TLiveData는 이러한 코드블럭을 캡슐화하고 여러가지 편의 기능을 제공합니다.
+ * TLiveData<int32> ReceivedDamage;
+ *
+ * 자세한 사용법에 대해서는 Documentation 참고 부탁드립니다.
+ */
 template <typename InValueType, typename = void>
 class TLiveData : public FLiveDataBase
 {
@@ -284,6 +300,20 @@ public:
 		return Validator::ToValidRef(Get());
 	}
 
+	/**
+	 * co_await LiveData;를 지원합니다.
+	 * 
+	 * 기본적으로 LiveData는 항상 어떠한 데이터를 들고 있기 때문에 값을 기다릴 필요 없이
+	 * LiveData.Get()을 호출해 값을 즉각적으로 얻을 수 있습니다. 그리고 이러한 경우
+	 * requires constraint에 의해 co_await LiveData;를 호출하는 것이 불가능합니다.
+	 * 
+	 * 하지만 LiveData가 표현하는 데이터 중 일부 타입은 Invalid 상태를 가질 수 있습니다.
+	 * 예를 들어 TLiveData<UObject*>는 UObject*를 데이터로 가지므로 Invalid 상태가 될 수 있습니다.
+	 * 이러한 TLiveData들에 한정하여 co_await을 호출하면 내부 데이터가 Valid 상태가 될 때 완료되는
+	 * Awaitable을 얻을 수 있습니다. 이 Awaitable은 한 번만 co_await 할 수 있습니다.
+	 *
+	 * Invalid 상태를 가질 수 있는 타입들에 대해서는 파일 상단의 TLiveDataValidator의 Specialization들 참고
+	 */
 	friend auto operator co_await(TLiveData& LiveData) requires Validator::bSupported
 	{
 		return TCancellableFutureAwaitable<TCancellableFuture<typename Validator::ValidType>>
@@ -302,6 +332,9 @@ public:
 		};
 	}
 
+	/**
+	 * Observe 함수로 등록한 콜백이 받는 값들과 동일한 값들에 대한 Stream을 반환합니다.
+	 */
 	TValueStream<DecayedValueType> MakeStream()
 	{
 		auto Ret = MakeStreamFromDelegate(OnChanged);
@@ -399,6 +432,10 @@ public:
 		}
 	}
 
+	/**
+	 * 현재 Array와 OldArray를 비교하여 없어진 Element들과 추가된 Element에 대해 콜백을 호출합니다.
+	 * (즉 ObserveAdd, AddStream 등에 값이 제공됩니다)
+	 */
 	void NotifyDiff(const TArray<ElementType>& OldArray)
 	{
 		FCoroutineScopedLock Lock;

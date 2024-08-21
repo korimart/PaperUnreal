@@ -7,6 +7,9 @@
 #include "MinimalAbortableCoroutine.h"
 
 
+/**
+ * @see Awaitables::FilterWithError
+ */
 template <typename InnerAwaitableType, typename PredicateType>
 class TFilterAwaitable
 {
@@ -95,16 +98,11 @@ struct TFilterAdaptor : TAwaitableAdaptorBase<TFilterAdaptor<PredicateType>>
 	}
 };
 
-namespace Awaitables
+
+namespace FilterDetails
 {
 	template <typename PredicateType>
-	auto FilterWithError(PredicateType&& Predicate)
-	{
-		return TFilterAdaptor<PredicateType>{Forward<PredicateType>(Predicate)};
-	}
-
-	template <typename PredicateType>
-	auto Filter(PredicateType&& Predicate)
+	auto FilterImpl(PredicateType&& Predicate)
 	{
 		auto Relay = [Predicate = Forward<PredicateType>(Predicate)]
 			<typename FailableResultType>(const FailableResultType& FailableResult) mutable
@@ -124,7 +122,56 @@ namespace Awaitables
 
 		return TFilterAdaptor<decltype(Relay)>{MoveTemp(Relay)};
 	}
+}
 
+
+namespace Awaitables
+{
+	/**
+	 * Awaitable을 받아서 co_await를 호출한 결과에 대해
+	 * Predicate가 true를 반환한 것을 반환하는 Awaitable을 반환합니다.
+	 * false를 반환하면 true를 반환할 때까지 Awaitable에 co_await를 다시 호출합니다.
+	 *
+	 * 왜 WithError가 붙어있는지는 Filter 함수 참고
+	 */
+	template <typename PredicateType>
+	auto FilterWithError(PredicateType&& Predicate)
+	{
+		return TFilterAdaptor<PredicateType>{Forward<PredicateType>(Predicate)};
+	}
+
+	/**
+	 * Awaitable을 받아서 co_await를 호출한 결과에 대해
+	 * Predicate가 true를 반환한 것을 반환하는 Awaitable을 반환합니다.
+	 * false를 반환하면 true를 반환할 때까지 Awaitable에 co_await를 다시 호출합니다.
+	 *
+	 * 만약 Awaitable에 co_await을 호출한 결과가 TFailableResult이면
+	 * Succeeded 상태인 경우에만 Predicate를 GetResult로 호출합니다.
+	 * Failed 상태이면 Filter하지 않고 그대로 반환합니다. (즉 에러가 Propagate 됨)
+	 */
+	template <typename PredicateType>
+	auto Filter(PredicateType&& Predicate)
+	{
+		return FilterDetails::FilterImpl(Forward<PredicateType>(Predicate));
+	}
+
+	/**
+	 * ValueType의 변수를 선언해 가장 최근의 결과를 저장하고 중복된 결과를 걸러내 값이 달라질 경우에만
+	 * 코루틴을 resume하는 Awaitable을 반환합니다.
+	 *
+	 * IntAwaitable이 int32를 반환하는 Awaitable이면,
+	 * 
+	 * const int32 Value0 = co_await IntAwaitable;
+	 * const int32 Value1 = co_await IntAwaitable;
+	 * const int32 Value2 = co_await IntAwaitable;
+	 * 의 값이 모두 동일할 수 있습니다. (IntAwaitable이 같은 값을 세 번 반환한 경우)
+	 *
+	 * auto NoDuplicate = IntAwaitable | Awaitables::FilterDuplicate<int32>();
+	 * const int32 Value0 = co_await NoDuplicate;
+	 * const int32 Value1 = co_await NoDuplicate;
+	 * const int32 Value2 = co_await NoDuplicate;
+	 * 이 경우 값의 변화 없이는 NoDuplicate이 co_await을 완료하지 않습니다.
+	 */
 	template <typename ValueType>
 	auto FilterDuplicate()
 	{
@@ -147,7 +194,7 @@ namespace Awaitables
 	{
 		return Filter([Value = Forward<ValueType>(Value)](const auto& Result) { return Result != Value; });
 	}
-	
+
 	template <typename ValueType>
 	auto IfLessThan(ValueType&& Value)
 	{
@@ -164,6 +211,10 @@ namespace Awaitables
 		return Filter([](const auto& Result) { return !Result.IsNull(); });
 	}
 
+	/**
+	 * Awaitable을 받아서 co_await를 호출한 결과가 TFailableResult라고 가정하고
+	 * 발생한 에러가 ErrorTypes의 부분집합이면 이 결과를 버리는 Awaitable을 반환합니다.
+	 */
 	template <typename... ErrorTypes>
 	auto IgnoreError()
 	{
@@ -173,7 +224,7 @@ namespace Awaitables
 			{
 				return true;
 			}
-			
+
 			return !Result.template OnlyContains<ErrorTypes...>();
 		});
 	}

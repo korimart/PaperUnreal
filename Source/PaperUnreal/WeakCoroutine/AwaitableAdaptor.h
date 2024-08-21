@@ -6,6 +6,10 @@
 #include "TypeTraits.h"
 
 
+/**
+ * @see Awaitables::TakeAwaitable
+ * @see TAwaitableAdaptorBase
+ */
 template <typename AwaitableProducerType>
 class TAwaitableGetterAwaitable
 {

@@ -107,6 +107,15 @@ private:
 };
 
 
+/**
+ * TOptional과 비슷하지만 값의 유무와 더불어 왜 값을 설정할 수 없었는지를 설명하는 에러를 세팅할 수 있는 클래스
+ * 
+ * 두 가지 상태를 가질 수 있습니다. 1) 값을 가짐 2) 에러가 발생하여 값을 가지지 않고 에러를 조회할 수 있음
+ *
+ * UObject*, TScriptInterface, 언리얼 인터페이스 클래스와 같이 UPROPERTY의 도움 없이는 dangling pointer가
+ * 될 수 있는 객체들에 대해서는 TStrongObjectPtr로 감싸 값을 조회할 때까지 생명주기를 연장합니다.
+ * @see UInvalidObjectError
+ */
 template <typename InResultType>
 class TFailableResult
 {
@@ -163,32 +172,55 @@ public:
 	TFailableResult(TFailableResult&&) = default;
 	TFailableResult& operator=(TFailableResult&&) = default;
 
+	/**
+	 * if (FailableResult) {} 신택스 지원용
+	 */
 	explicit operator bool() const
 	{
 		return Succeeded();
 	}
 
+	/**
+	 * 필요한 경우 에러가 발생한 TFailableResult를 다른 곳에 넘기기 전에
+	 * 내 에러를 추가하여 에러 발생 원인에 대해 좀 더 자세한 설명을 제공할 수 있습니다.
+	 *
+	 * 예시) 정수 나누기 함수가 TFailableResult<int32>에 UDivideByZeroError를 실어서 반환한 경우
+	 * 정수 나누기 함수를 호출한 함수가 대미지 계산 함수이면 여기에 추가적으로 UInvalidDamageError를 더해서
+	 * 자신의 호출자에게 넘길 수 있습니다.
+	 */
 	void AddError(UFailableResultError* Error)
 	{
 		Errors.Emplace(Error);
 	}
 
+	/**
+	 * 에러가 발생해 GetResult를 호출할 수 없음을 의미합니다.
+	 */
 	bool Failed() const
 	{
 		return (Result.IsSet() && Result->Expired()) || Errors.Num() > 0;
 	}
 
+	/**
+	 * 값이 성공적으로 설정돼 GetResult를 호출할 수 있음을 의미합니다.
+	 */
 	bool Succeeded() const
 	{
 		return !Failed();
 	}
 
+	/**
+	 * 값을 레퍼런스로 반환합니다. Succeeded()가 참일 때만 호출 가능
+	 */
 	decltype(auto) GetResult()
 	{
 		check(Succeeded());
 		return Result->Get();
 	}
 
+	/**
+	 * 값을 const 레퍼런스로 반환합니다. Succeeded()가 참일 때만 호출 가능
+	 */
 	decltype(auto) GetResult() const
 	{
 		check(Succeeded());
@@ -206,6 +238,9 @@ public:
 		return Ret;
 	}
 
+	/**
+	 * 발생한 에러들이 ErrorTypes의 부분집합이면 true를 반환합니다.
+	 */
 	template <typename... ErrorTypes>
 	bool OnlyContains() const
 	{
@@ -219,7 +254,10 @@ public:
 		}
 		return true;
 	}
-	
+
+	/**
+	 * 발생한 에러 중에서 하나라도 ErrorTypes에 속하는 것이 있으면 true를 반환합니다.
+	 */
 	template <typename... ErrorTypes>
 	bool ContainsAnyOf() const
 	{
@@ -240,6 +278,9 @@ private:
 };
 
 
+/**
+ * Awaitable에 co_await을 한 결과가 TFailableResult이면 CErrorReportingAwaitable
+ */
 template <typename AwaitableType>
 concept CErrorReportingAwaitable = requires(AwaitableType Awaitable)
 {
@@ -248,6 +289,9 @@ concept CErrorReportingAwaitable = requires(AwaitableType Awaitable)
 };
 
 
+/**
+ * Awaitable에 co_await을 한 결과가 TFailableResult가 아니면 CNonErrorReportingAwaitable
+ */
 template <typename AwaitableType>
 concept CNonErrorReportingAwaitable = requires(AwaitableType Awaitable)
 {
@@ -256,6 +300,9 @@ concept CNonErrorReportingAwaitable = requires(AwaitableType Awaitable)
 };
 
 
+/**
+ * Error Reporting Awaitable이 co_await으로 반환하는 TFailableResult<T>의 T를 반환하는 Type Function
+ */
 template <typename AwaitableType>
 struct TErrorReportResultType
 {
@@ -263,6 +310,9 @@ struct TErrorReportResultType
 };
 
 
+/**
+ * @see Awaitables::DestroyIfError
+ */
 template <CErrorReportingAwaitable InnerAwaitableType>
 class TDestroyIfErrorAwaitable
 	: public TConditionalResumeAwaitable<TDestroyIfErrorAwaitable<InnerAwaitableType>, InnerAwaitableType>
@@ -316,6 +366,9 @@ struct FDestroyIfErrorAdaptor : TAwaitableAdaptorBase<FDestroyIfErrorAdaptor>
 };
 
 
+/**
+ * @see Awaitables::DestroyIfErrorNotIn
+ */
 template <CErrorReportingAwaitable InnerAwaitableType, typename AllowedErrorTypeList>
 class TDestroyIfErrorNotInAwaitable
 	: public TConditionalResumeAwaitable<TDestroyIfErrorNotInAwaitable<InnerAwaitableType, AllowedErrorTypeList>, InnerAwaitableType>
@@ -377,11 +430,30 @@ struct TDestroyIfErrorNotInAdaptor : TAwaitableAdaptorBase<TDestroyIfErrorNotInA
 
 namespace Awaitables
 {
+	/**
+	 * Awaitable을 받아서 Awaitable에 co_await을 호출한 결과가 에러 상태인 TFailableResult이면
+	 * 코루틴 핸들에 destroy를 호출하는 Awaitable을 반환합니다.
+	 *
+	 * co_await를 호출한 결과가 Succeeded 상태인 TFailableResult<T>이면 T를 반환합니다.
+	 * (즉 TFailableResult를 제거해서 반환)
+	 * 
+	 * Awaitable이 Error Reporting Awaitable이 아니면 no-op입니다.
+	 * @see CErrorReportingAwaitable
+	 */
 	inline FDestroyIfErrorAdaptor DestroyIfError()
 	{
 		return {};
 	}
 
+	/**
+	 * Awaitable을 받아서 Awaitable에 co_await을 호출한 결과가 에러 상태인 TFailableResult이고
+	 * 발생한 에러가 AllowedErrorTypeList 중의 하나가 아니면 코루틴 핸들에 destroy를 호출하는 Awaitable을 반환합니다.
+	 *
+	 * DestroyIfError와 달리 항상 TFailableResult를 반환합니다.
+	 * 
+	 * Awaitable이 Error Reporting Awaitable이 아니면 no-op입니다.
+	 * @see CErrorReportingAwaitable
+	 */
 	template <typename AllowedErrorTypeList>
 	TDestroyIfErrorNotInAdaptor<AllowedErrorTypeList> DestroyIfErrorNotIn()
 	{
