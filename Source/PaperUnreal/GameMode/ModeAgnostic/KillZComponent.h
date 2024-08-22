@@ -28,7 +28,6 @@ private:
 		if (GetOwner()->GetActorLocation().Z < -300.f)
 		{
 			OnKillZ.Broadcast();
-			DestroyComponent();
 		}
 	}
 };

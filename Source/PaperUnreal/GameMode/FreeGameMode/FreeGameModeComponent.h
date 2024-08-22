@@ -55,7 +55,6 @@ private:
 	FWeakCoroutine InitiatePawnSpawnSequence(APlayerController* Player)
 	{
 		co_await AddToWeakList(Player);
-		co_await (bStarted.MakeStream() | Awaitables::If(true));
 
 		Player
 			->PlayerState
@@ -63,19 +62,20 @@ private:
 			->GetInventoryComponent().Get()
 			->SetTracerBaseColor(NonEyeSoaringRandomColor());
 
+		co_await (bStarted.MakeStream() | Awaitables::If(true));
 		co_await Player->PlayerState->FindComponentByClass<UReadyStateComponent>()->GetbReady().If(true);
 
-		APawn* Pawn = PawnSpawner->SpawnAtLocation(
+		TAbortPtr<APawn> Pawn = co_await PawnSpawner->SpawnAtLocation(
 			GetDefaultPawnClass(),
 			{1500.f, 1500.f, 100.f},
 			[&](APawn* Spawned) { NewChildComponent<UFreePawnComponent>(Spawned)->RegisterComponent(); });
-
 		Player->Possess(Pawn);
 
+		auto KillZComponent = NewChildComponent<UKillZComponent>(Pawn);
+		KillZComponent->RegisterComponent();
+		
 		while (true)
 		{
-			auto KillZComponent = NewChildComponent<UKillZComponent>(Pawn);
-			KillZComponent->RegisterComponent();
 			co_await KillZComponent->OnKillZ;
 			Pawn->FindComponentByClass<UFreePawnComponent>()->GetTracer()->ServerTracerPath->ClearPath();
 			Pawn->SetActorLocation({1500.f, 1500.f, 100.f});

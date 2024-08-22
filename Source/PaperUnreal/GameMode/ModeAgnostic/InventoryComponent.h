@@ -15,7 +15,14 @@ class UInventoryComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
+	/**
+	 * 현재 플레이어가 착용하고 있는 캐릭터 메시 TSoftObjectPtr<USkeletalMesh>
+	 */
 	DECLARE_LIVE_DATA_GETTER_SETTER(CharacterMesh);
+	
+	/**
+	 * 현재 플레이어가 착용하고 있는 트레이서의 컬러 FLinearColor
+	 */
 	DECLARE_LIVE_DATA_GETTER_SETTER(TracerBaseColor);
 
 private:
