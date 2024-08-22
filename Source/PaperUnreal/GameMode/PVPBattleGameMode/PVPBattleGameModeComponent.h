@@ -88,7 +88,8 @@ private:
 	{
 		Super::BeginPlay();
 
-		InitiatePrivilegeGranter();
+		InitiateNormiePrivilegeGranter();
+		InitiateHostPrivilegeGranter();
 		InitiateGameFlow();
 	}
 
@@ -108,20 +109,21 @@ private:
 		return false;
 	}
 
-	FWeakCoroutine InitiatePrivilegeGranter()
+	FWeakCoroutine InitiateNormiePrivilegeGranter()
 	{
-		auto PrivilegeStream = Privileges.MakeAddStream();
-
+		for (auto PrivilegeStream = Privileges.MakeAddStream();;)
 		{
-			auto FirstPlayerPrivilege = co_await PrivilegeStream;
-			FirstPlayerPrivilege->GivePrivilege(PVPBattlePrivilege::Host);
-			FirstPlayerPrivilege->GivePrivilege(PVPBattlePrivilege::Normie);
+			(co_await PrivilegeStream)->GivePrivilege(PVPBattlePrivilege::Normie);
 		}
+	}
 
-		while (true)
+	FWeakCoroutine InitiateHostPrivilegeGranter()
+	{
+		for (auto PrivilegeStream = Privileges.MakeAddStream() | Awaitables::IfValid();;)
 		{
-			auto PlayerPrivilege = co_await PrivilegeStream;
-			PlayerPrivilege->GivePrivilege(PVPBattlePrivilege::Normie);
+			UPrivilegeComponent* PrivilegeComponent = (co_await PrivilegeStream).Unsafe();
+			PrivilegeComponent->GivePrivilege(PVPBattlePrivilege::Host);
+			co_await PrivilegeComponent->OnEndPlay;
 		}
 	}
 
