@@ -243,7 +243,7 @@ public:
 	}
 
 	template <typename FuncType>
-	UE_NODISCARD FDelegateSPHandle Observe(FuncType&& Func)
+	[[nodiscard]] FDelegateSPHandle Observe(FuncType&& Func)
 	{
 		FDelegateSPHandle Ret;
 		Observe(Ret.ToShared(), Forward<FuncType>(Func));
@@ -273,7 +273,7 @@ public:
 	}
 
 	template <typename FuncType>
-	UE_NODISCARD FDelegateSPHandle ObserveIfValid(FuncType&& Func) requires Validator::bSupported
+	[[nodiscard]] FDelegateSPHandle ObserveIfValid(FuncType&& Func) requires Validator::bSupported
 	{
 		FDelegateSPHandle Ret;
 		ObserveIfValid(Ret.ToShared(), Forward<FuncType>(Func));
@@ -496,7 +496,7 @@ public:
 	}
 
 	template <typename FuncType>
-	UE_NODISCARD FDelegateSPHandle ObserveAdd(FuncType&& Func)
+	[[nodiscard]] FDelegateSPHandle ObserveAdd(FuncType&& Func)
 	{
 		FDelegateSPHandle Ret;
 		ObserveAdd(Ret.ToShared(), Forward<FuncType>(Func));
@@ -510,7 +510,7 @@ public:
 	}
 
 	template <typename FuncType>
-	UE_NODISCARD FDelegateSPHandle ObserveAddIfValid(FuncType&& Func) requires Validator::bSupported
+	[[nodiscard]] FDelegateSPHandle ObserveAddIfValid(FuncType&& Func) requires Validator::bSupported
 	{
 		return ObserveAdd(RelayValidRefTo<Validator>(Forward<FuncType>(Func)));
 	}
@@ -528,7 +528,7 @@ public:
 	}
 
 	template <typename FuncType>
-	UE_NODISCARD FDelegateSPHandle ObserveRemove(FuncType&& Func)
+	[[nodiscard]] FDelegateSPHandle ObserveRemove(FuncType&& Func)
 	{
 		FDelegateSPHandle Ret;
 		ObserveRemove(Ret.ToShared(), Forward<FuncType>(Func));
@@ -542,7 +542,7 @@ public:
 	}
 
 	template <typename FuncType>
-	UE_NODISCARD FDelegateSPHandle ObserveRemoveIfValid(FuncType&& Func) requires Validator::bSupported
+	[[nodiscard]] FDelegateSPHandle ObserveRemoveIfValid(FuncType&& Func) requires Validator::bSupported
 	{
 		return ObserveRemove(RelayValidRefTo<Validator>(Forward<FuncType>(Func)));
 	}

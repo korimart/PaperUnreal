@@ -11,7 +11,7 @@
 namespace Utils_Private
 {
 	template <typename FuncType>
-	class UE_NODISCARD TFinally
+	class [[nodiscard]] TFinally
 	{
 	public:
 		TFinally(FuncType InFunc) : Func(InFunc)
@@ -164,14 +164,14 @@ bool IsNearlyLE(T Left, T Right)
 
 
 template <typename FuncType>
-UE_NODISCARD auto Finally(FuncType&& Func)
+[[nodiscard]] auto Finally(FuncType&& Func)
 {
 	return Utils_Private::TFinally<FuncType>{Forward<FuncType>(Func)};
 }
 
 
 template <typename FuncType>
-UE_NODISCARD auto FinallyIfValid(UObject* Object, FuncType&& Func)
+[[nodiscard]] auto FinallyIfValid(UObject* Object, FuncType&& Func)
 {
 	return Finally([Object = TWeakObjectPtr{Object}, Func = Forward<FuncType>(Func)]()
 	{
@@ -183,7 +183,7 @@ UE_NODISCARD auto FinallyIfValid(UObject* Object, FuncType&& Func)
 }
 
 
-struct UE_NODISCARD FScopedAddToViewport
+struct [[nodiscard]] FScopedAddToViewport
 {
 	TWeakObjectPtr<UUserWidget> Widget;
 

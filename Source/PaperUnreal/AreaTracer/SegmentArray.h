@@ -282,8 +282,10 @@ public:
 		{
 			return Points.Num() >= 3;
 		}
-
-		return Points.Num() >= 2;
+		else
+		{
+			return Points.Num() >= 2;
+		}
 	}
 
 	/**
@@ -582,7 +584,7 @@ private:
 	 * 예를 들어 영역에서 나갔다 들어왔다 나간 경우 (나감-들어옴), (들어옴-나감)의 두 부분으로 쪼개서 반환
 	 */
 	TArray<FSegmentArray2D> SplitIntoCleanPaths(FSegmentArray2D Path);
-	
+
 	auto UnionAssumeTwoIntersections(FSegmentArray2D Path) requires bLoop;
 	void DifferenceAssumeTwoIntersections(FSegmentArray2D Path) requires bLoop;
 };

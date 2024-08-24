@@ -8,7 +8,7 @@
 #include "ToastWidget.generated.h"
 
 
-class UE_NODISCARD FToastHandle
+class FToastHandle
 {
 public:
 	FToastHandle(class UToastWidget* Widget, uint32 InId)
