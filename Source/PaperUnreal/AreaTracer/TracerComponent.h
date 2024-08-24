@@ -82,6 +82,11 @@ private:
 				ClientPredictedTracerPath = NewChildComponent<UTracerPathComponent>(GetOwner());
 				ClientPredictedTracerPath->RegisterComponent();
 
+				// 내가 게임에 입장하기 전에 이미 바닥에 그려져 있던 것들로 먼저 초기화한다
+				ClientPredictedTracerPath->OverrideHeadAndTail(
+					ReplicatedTracerPath.Get()->GetRunningPathHead().Get(),
+					ReplicatedTracerPath.Get()->GetRunningPathTail().Get());
+				
 				Cast<UCharacterMovementComponent2>(GetOuterACharacter2()->GetMovementComponent())
 					->OnCorrected.AddWeakLambda(this, [this]()
 					{
