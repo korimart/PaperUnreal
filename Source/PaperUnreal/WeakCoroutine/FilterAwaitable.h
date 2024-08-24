@@ -203,7 +203,15 @@ namespace Awaitables
 
 	inline auto IfValid()
 	{
-		return Filter([](auto* Result) { return ::IsValid(Result); });
+		return FilterWithError([](const auto& Result)
+		{
+			if (Result)
+			{
+				return ::IsValid(Result.GetResult());
+			}
+
+			return !Result.template OnlyContains<UInvalidObjectError>();
+		});
 	}
 
 	inline auto IfNotNull()

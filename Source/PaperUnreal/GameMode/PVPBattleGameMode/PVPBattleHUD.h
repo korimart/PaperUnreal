@@ -139,18 +139,21 @@ private:
 		RunWeakCoroutine(this, [this]() -> FWeakCoroutine
 		{
 			auto GameState = co_await WaitForGameState(GetWorld());
-
-			auto GameStateComponentStream
-				= MakeComponentStream<UPVPBattleGameStateComponent>(GameState)
-				// 결과창을 오래 동안 보고 있으면 여러 매치가 끝나면서
-				// 스트림 안에는 이전 매치의 쓰레기가 된 Component들이 들어있음
-				// 그것들은 무시하고 항상 가장 최신의 Component를 받는다
-				| Awaitables::IgnoreError<UInvalidObjectError>();
+			auto GameStateComponentStream = MakeComponentStream<UPVPBattleGameStateComponent>(GameState) | Awaitables::IfValid();
 
 			while (true)
 			{
 				GameStateComponent = (co_await GameStateComponentStream).Unsafe();
 				StageComponent = (co_await GameStateComponent->GetStageComponent()).Unsafe();
+
+				// 한 번에 여러 개의 GameStateComponent가 공존할 수 있음
+				// PVPBattleGameModeComponent를 읽어보면 다음 게임을 시작할 때까지 지난 번 게임 스테이트를 파괴하지 않음
+				// 그 이유는 지난 게임에서 맵을 어질러 놓은 것을 연출로 일단 냅두고 나중에 파괴하기 때문임
+				// 그런 경우이면 새 GameStateComponent가 존재할 것이기 때문에 다시 가져온다
+				if (StageComponent->GetCurrentStage().Get() == PVPBattleStage::Finished)
+				{
+					continue;
+				}
 
 				GetWorld()->GetSubsystem<ULoadingWidgetSubsystem>()->Remove();
 

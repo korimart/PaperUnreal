@@ -33,6 +33,7 @@ namespace PVPBattleStage
 	inline FName WillPlay{TEXT("PVPBattleStage_WillPlay")};
 	inline FName Playing{TEXT("PVPBattleStage_Playing")};
 	inline FName Result{TEXT("PVPBattleStage_Result")};
+	inline FName Finished{TEXT("PVPBattleStage_Finished")};
 }
 
 
@@ -178,6 +179,9 @@ private:
 
 			StageComponent->SetCurrentStage(PVPBattleStage::Result);
 			StageComponent->SetStageWorldStartTime(PVPBattleStage::Result, GetWorld()->GetTimeSeconds());
+			
+			co_await WaitForSeconds(GetWorld(), 3.f);
+			StageComponent->SetCurrentStage(PVPBattleStage::Finished);
 
 			for (APlayerState* Each : GetWorld()->GetGameState()->PlayerArray)
 			{
