@@ -4,17 +4,18 @@
 
 #include "CoreMinimal.h"
 #include "AreaBoundaryComponent.h"
+#include "TracerPathProvider.h"
 #include "TracerPathComponent.generated.h"
 
 
 UCLASS()
-class UTracerPathComponent : public UActorComponent2
+class UTracerPathComponent : public UActorComponent2, public ITracerPathProvider
 {
 	GENERATED_BODY()
 
 public:
-	TLiveDataView<TOptional<FVector2D>> GetRunningPathHead() const { return PathHead; }
-	TLiveDataView<TArray<FVector2D>> GetRunningPathTail() const { return PathTail; }
+	virtual TLiveDataView<TOptional<FVector2D>> GetRunningPathHead() const override { return PathHead; }
+	virtual TLiveDataView<TArray<FVector2D>> GetRunningPathTail() const override { return PathTail; }
 
 	TLiveDataView<TOptional<FSegmentArray2D>> GetLastCompletePath() const { return LastCompletePath; }
 

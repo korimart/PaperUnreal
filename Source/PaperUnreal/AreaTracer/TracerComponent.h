@@ -79,28 +79,48 @@ private:
 			{
 				co_await ReplicatedTracerPath;
 
-				ClientPredictedTracerPath = NewChildComponent<UTracerPathComponent>(GetOwner());
-				ClientPredictedTracerPath->RegisterComponent();
+				// Role 확인을 위해 기다림
+				co_await GetOuterACharacter2()->WaitForController();
 
-				// 내가 게임에 입장하기 전에 이미 바닥에 그려져 있던 것들로 먼저 초기화한다
-				ClientPredictedTracerPath->OverrideHeadAndTail(
-					ReplicatedTracerPath.Get()->GetRunningPathHead().Get(),
-					ReplicatedTracerPath.Get()->GetRunningPathTail().Get());
-				
-				Cast<UCharacterMovementComponent2>(GetOuterACharacter2()->GetMovementComponent())
-					->OnCorrected.AddWeakLambda(this, [this]()
-					{
-						ClientPredictedTracerPath->OverrideHeadAndTail(
-							ReplicatedTracerPath.Get()->GetRunningPathHead().Get(),
-							ReplicatedTracerPath.Get()->GetRunningPathTail().Get());
-					});
+				// 해보니까 내가 컨트롤 하는 캐릭터 무브먼트 컴포넌트일 때만 prediction이 좀 자연스러움
+				if (GetOwner()->GetLocalRole() == ROLE_AutonomousProxy)
+				{
+					ClientPredictedTracerPath = NewChildComponent<UTracerPathComponent>(GetOwner());
+					ClientPredictedTracerPath->RegisterComponent();
+
+					// 내가 게임에 입장하기 전에 이미 바닥에 그려져 있던 것들로 먼저 초기화한다
+					ClientPredictedTracerPath->OverrideHeadAndTail(
+						ReplicatedTracerPath.Get()->GetRunningPathHead().Get(),
+						ReplicatedTracerPath.Get()->GetRunningPathTail().Get());
+
+					Cast<UCharacterMovementComponent2>(GetOuterACharacter2()->GetMovementComponent())
+						->OnCorrected.AddWeakLambda(this, [this]()
+						{
+							ClientPredictedTracerPath->OverrideHeadAndTail(
+								ReplicatedTracerPath.Get()->GetRunningPathHead().Get(),
+								ReplicatedTracerPath.Get()->GetRunningPathTail().Get());
+						});
+				}
 			}
 
 			ClientTracerMesh = NewChildComponent<ULineMeshComponent>(GetOwner());
 			ClientTracerMesh->RegisterComponent();
 
 			auto TracerPointEvent = NewChildComponent<UTracerPointEventComponent>(GetOwner());
-			TracerPointEvent->SetEventSource(IsValid(ServerTracerPath) ? ServerTracerPath : ClientPredictedTracerPath);
+			
+			if (IsValid(ClientPredictedTracerPath))
+			{
+				TracerPointEvent->SetEventSource(ClientPredictedTracerPath);
+			}
+			else if (IsValid(ServerTracerPath))
+			{
+				TracerPointEvent->SetEventSource(ServerTracerPath);
+			}
+			else
+			{
+				TracerPointEvent->SetEventSource(ReplicatedTracerPath.Get());
+			}
+			
 			TracerPointEvent->RegisterComponent();
 			TracerPointEvent->AddEventListener(ClientTracerMesh);
 

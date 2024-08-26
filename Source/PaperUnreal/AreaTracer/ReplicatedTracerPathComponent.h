@@ -101,13 +101,13 @@ struct FNumberedVector2DArray
 
 
 UCLASS()
-class UReplicatedTracerPathComponent : public UActorComponent2
+class UReplicatedTracerPathComponent : public UActorComponent2, public ITracerPathProvider
 {
 	GENERATED_BODY()
 
 public:
-	TLiveDataView<TOptional<FVector2D>> GetRunningPathHead() const { return PathHead; }
-	TLiveDataView<TArray<FVector2D>> GetRunningPathTail() const { return PathTail; }
+	virtual TLiveDataView<TOptional<FVector2D>> GetRunningPathHead() const override { return PathHead; }
+	virtual TLiveDataView<TArray<FVector2D>> GetRunningPathTail() const override { return PathTail; }
 
 	void SetTracerPathSource(UTracerPathComponent* Source)
 	{
