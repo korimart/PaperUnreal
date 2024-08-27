@@ -79,9 +79,6 @@ private:
 			{
 				co_await ReplicatedTracerPath;
 
-				// Role 확인을 위해 기다림
-				co_await GetOuterACharacter2()->WaitForController();
-
 				// 해보니까 내가 컨트롤 하는 캐릭터 무브먼트 컴포넌트일 때만 prediction이 좀 자연스러움
 				if (GetOwner()->GetLocalRole() == ROLE_AutonomousProxy)
 				{

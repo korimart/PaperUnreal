@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PlayerState.h"
 #include "PaperUnreal/WeakCoroutine/CancellableFuture.h"
 #include "Character2.generated.h"
 
