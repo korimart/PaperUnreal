@@ -26,9 +26,6 @@ public:
 	UPROPERTY()
 	UTracerPathComponent* ServerTracerPath;
 
-	UPROPERTY()
-	UTracerPathComponent* ClientPredictedTracerPath;
-
 	void SetTracerColorStream(TValueStream<FLinearColor>&& Stream)
 	{
 		check(GetNetMode() != NM_DedicatedServer);
@@ -78,46 +75,17 @@ private:
 			if (!IsValid(ServerTracerPath))
 			{
 				co_await ReplicatedTracerPath;
-
-				// 해보니까 내가 컨트롤 하는 캐릭터 무브먼트 컴포넌트일 때만 prediction이 좀 자연스러움
-				if (GetOwner()->GetLocalRole() == ROLE_AutonomousProxy)
-				{
-					ClientPredictedTracerPath = NewChildComponent<UTracerPathComponent>(GetOwner());
-					ClientPredictedTracerPath->RegisterComponent();
-
-					// 내가 게임에 입장하기 전에 이미 바닥에 그려져 있던 것들로 먼저 초기화한다
-					ClientPredictedTracerPath->OverrideHeadAndTail(
-						ReplicatedTracerPath.Get()->GetRunningPathHead().Get(),
-						ReplicatedTracerPath.Get()->GetRunningPathTail().Get());
-
-					Cast<UCharacterMovementComponent2>(GetOuterACharacter2()->GetMovementComponent())
-						->OnCorrected.AddWeakLambda(this, [this]()
-						{
-							ClientPredictedTracerPath->OverrideHeadAndTail(
-								ReplicatedTracerPath.Get()->GetRunningPathHead().Get(),
-								ReplicatedTracerPath.Get()->GetRunningPathTail().Get());
-						});
-				}
 			}
+
+			ITracerPathProvider* PathProvider = IsValid(ServerTracerPath)
+				? static_cast<ITracerPathProvider*>(ServerTracerPath)
+				: static_cast<ITracerPathProvider*>(ReplicatedTracerPath.Get());
 
 			ClientTracerMesh = NewChildComponent<ULineMeshComponent>(GetOwner());
 			ClientTracerMesh->RegisterComponent();
 
 			auto TracerPointEvent = NewChildComponent<UTracerPointEventComponent>(GetOwner());
-			
-			if (IsValid(ClientPredictedTracerPath))
-			{
-				TracerPointEvent->SetEventSource(ClientPredictedTracerPath);
-			}
-			else if (IsValid(ServerTracerPath))
-			{
-				TracerPointEvent->SetEventSource(ServerTracerPath);
-			}
-			else
-			{
-				TracerPointEvent->SetEventSource(ReplicatedTracerPath.Get());
-			}
-			
+			TracerPointEvent->SetPathProvider(PathProvider);
 			TracerPointEvent->RegisterComponent();
 			TracerPointEvent->AddEventListener(ClientTracerMesh);
 

@@ -16,10 +16,10 @@ class UTracerPointEventComponent : public UActorComponent2
 	GENERATED_BODY()
 
 public:
-	void SetEventSource(ITracerPathProvider* Source)
+	void SetPathProvider(ITracerPathProvider* Provider)
 	{
 		check(!HasBeenInitialized());
-		PathProvider = Cast<UObject>(Source);
+		PathProvider = Cast<UObject>(Provider);
 	}
 
 	void AddEventListener(ITracerPointEventListener* Listener)
