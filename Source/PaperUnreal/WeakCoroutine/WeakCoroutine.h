@@ -15,6 +15,11 @@
 #include "WeakCoroutine.generated.h"
 
 
+#if _MSC_VER 
+	static_assert(_MSC_VER >= 1780, "Weak Coroutine이 작성된 MSVC 버전이 아닙니다. 그래도 진행하려면 이 라인을 지우고 컴파일 하세요.");
+#endif
+
+
 UCLASS()
 class UWeakCoroutineError : public UFailableResultError
 {
